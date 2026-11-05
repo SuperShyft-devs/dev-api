@@ -1,0 +1,397 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "allergy_kb_schema.json",
+  "title": "SuperShyft Allergy KB schema",
+  "description": "JSON Schema for allergen records, recommendations and category records. Word ranges (x-wordRange) cannot be expressed in JSON Schema and are enforced by validation_report checks and tests.",
+  "$defs": {
+    "allergen_record": {
+      "type": "object",
+      "required": [
+        "allergen_id",
+        "lab_test_name",
+        "source_group",
+        "canonical_category",
+        "allergen_type",
+        "definition",
+        "exposure_sources",
+        "typical_symptoms",
+        "interpretation_insight",
+        "card_summary",
+        "recommendation_ids",
+        "caution",
+        "clinical_review_status"
+      ],
+      "properties": {
+        "allergen_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$"
+        },
+        "lab_test_name": {
+          "type": "string",
+          "description": "Exact laboratory name. Never edited."
+        },
+        "source_group": {
+          "type": "string"
+        },
+        "source_group_display_order": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 15
+        },
+        "position_in_source_group": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "common_name": {
+          "type": "string"
+        },
+        "scientific_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "canonical_category": {
+          "type": "string"
+        },
+        "allergen_type": {
+          "type": "string",
+          "enum": [
+            "food",
+            "environmental",
+            "drug",
+            "occupational",
+            "insect",
+            "animal",
+            "parasite",
+            "total_ige"
+          ]
+        },
+        "definition": {
+          "type": "string",
+          "x-wordRange": [
+            25,
+            40
+          ]
+        },
+        "exposure_sources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 3,
+          "maxItems": 5
+        },
+        "typical_symptoms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 5
+        },
+        "interpretation_insight": {
+          "type": "string",
+          "x-wordRange": [
+            35,
+            55
+          ]
+        },
+        "card_summary": {
+          "type": "string",
+          "x-wordRange": [
+            12,
+            20
+          ]
+        },
+        "recommendation_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "caution": {
+          "type": "string",
+          "x-wordRange": [
+            15,
+            35
+          ]
+        },
+        "category_caution_rule_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cross_reactivity": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "related_allergen_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "patient_note": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "held_note_for_review": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "evidence_status": {
+              "type": "string"
+            },
+            "shown_to_patient": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "related_allergen_ids",
+            "patient_note",
+            "evidence_status",
+            "shown_to_patient"
+          ]
+        },
+        "review_flags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^E\\d{2}$"
+          }
+        },
+        "evidence_status": {
+          "type": "string"
+        },
+        "clinical_review_status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "in_review",
+            "approved",
+            "rejected"
+          ]
+        },
+        "content_version": {
+          "type": "string"
+        }
+      }
+    },
+    "recommendation": {
+      "type": "object",
+      "required": [
+        "recommendation_id",
+        "title",
+        "description",
+        "applicable_categories",
+        "clinical_priority",
+        "display_priority",
+        "theme",
+        "evidence_refs",
+        "clinical_review_status"
+      ],
+      "properties": {
+        "recommendation_id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string",
+          "x-wordRange": [
+            12,
+            25
+          ]
+        },
+        "applicable_categories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "applicable_allergen_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "required_context": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exclusions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "clinical_priority": {
+          "type": "string",
+          "enum": [
+            "safety_critical",
+            "important",
+            "routine"
+          ]
+        },
+        "display_priority": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "theme": {
+          "type": "string"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "clinical_review_status": {
+          "type": "string"
+        },
+        "review_note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "category": {
+      "type": "object",
+      "required": [
+        "category_id",
+        "patient_name",
+        "explanation",
+        "allergen_type",
+        "caution_rule_ids",
+        "member_allergen_ids"
+      ],
+      "properties": {
+        "category_id": {
+          "type": "string"
+        },
+        "patient_name": {
+          "type": "string"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "allergen_type": {
+          "type": "string"
+        },
+        "caution_rule_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "member_allergen_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": [
+        "evidence_id",
+        "pmid",
+        "title",
+        "journal",
+        "year",
+        "verification_level",
+        "claims_supported",
+        "limitations"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "pattern": "^E\\d{2}$"
+        },
+        "pmid": {
+          "type": "string"
+        },
+        "doi": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "verification_level": {
+          "type": "string",
+          "enum": [
+            "abstract_reviewed",
+            "title_metadata_only"
+          ]
+        }
+      }
+    },
+    "review_item": {
+      "type": "object",
+      "required": [
+        "queue_id",
+        "type",
+        "target",
+        "issue",
+        "severity",
+        "status"
+      ],
+      "properties": {
+        "severity": {
+          "type": "string",
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "open",
+            "resolved",
+            "wont_fix"
+          ]
+        }
+      }
+    }
+  },
+  "type": "object",
+  "properties": {
+    "allergen_record": {
+      "$ref": "#/$defs/allergen_record"
+    }
+  },
+  "x-notes": {
+    "language_rules": "Patient text is plain Indian English, no dashes, no diagnosis, no severity words applied to a class.",
+    "ids": "allergen_id = slug of lab_test_name"
+  }
+}

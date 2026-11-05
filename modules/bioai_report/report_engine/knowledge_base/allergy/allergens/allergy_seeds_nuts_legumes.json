@@ -1,0 +1,1177 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "source_group": "allergy_seeds_nuts_legumes",
+  "source_group_display_order": 11,
+  "patient_group_name": "Nuts, Seeds, Grains and Legumes",
+  "patient_group_explanation": "Nuts, seeds, grains, pulses and dried fruit.",
+  "group_caution_rule_ids": [
+    "C_SENS",
+    "C_CLASS",
+    "C_FOOD"
+  ],
+  "test_count": 21,
+  "clinical_review_status": "pending",
+  "allergens": [
+    {
+      "allergen_id": "raisin",
+      "lab_test_name": "Raisin",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 1,
+      "aliases": [
+        "Raisin (Dried Grape)"
+      ],
+      "common_name": "Raisin (Dried Grape)",
+      "scientific_name": "Vitis vinifera",
+      "canonical_category": "fruits_other",
+      "allergen_type": "food",
+      "definition": "Raisins are dried grapes. They are eaten as a snack and used in sweets, kheer, pulao, cakes and breakfast mixes across many Indian homes and festivals.",
+      "exposure_sources": [
+        "Sweets such as kheer and halwa",
+        "Pulao and biryani",
+        "Cakes and breakfast cereals",
+        "Dry fruit mixes"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to raisin. Raisins are dried and may carry sulphite preservatives, which can cause symptoms that are not allergic. A positive result alone does not prove allergy. If raisins cause symptoms, tell your doctor which product was eaten.",
+      "card_summary": "Dried grapes eaten as a snack and added to sweets and rice dishes.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs"
+      ],
+      "caution": "Reactions to dried fruit can come from preservatives and not from the fruit itself. A blood test cannot separate the two.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence",
+        "source_group_mismatch"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "wheat_flour",
+      "lab_test_name": "Wheat Flour",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 2,
+      "aliases": [
+        "Wheat Flour (Atta)"
+      ],
+      "common_name": "Wheat Flour (Atta)",
+      "scientific_name": "Triticum aestivum",
+      "canonical_category": "cereals_grains",
+      "allergen_type": "food",
+      "definition": "Wheat flour is made by grinding wheat grains. It is used for rotis, parathas, bread, biscuits, noodles and many packaged foods eaten every day at home.",
+      "exposure_sources": [
+        "Roti, paratha and puri",
+        "Bread and biscuits",
+        "Noodles and pasta",
+        "Many packaged foods"
+      ],
+      "typical_symptoms": [
+        "Hives",
+        "Itchy mouth",
+        "Stomach pain",
+        "Diarrhoea",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to wheat. Blood tests for wheat often turn positive in people who eat wheat without any problem. It does not diagnose wheat allergy, coeliac disease or gluten sensitivity. Do not stop wheat without medical advice.",
+      "card_summary": "Ground wheat used daily for rotis, bread, biscuits and many packaged foods.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs"
+      ],
+      "caution": "Wheat blood tests are often positive in people who tolerate wheat. Coeliac disease is a different condition and is not found by this test.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "food_lower_performance"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "pea",
+      "lab_test_name": "Pea",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 3,
+      "aliases": [
+        "Green Pea (Matar)"
+      ],
+      "common_name": "Green Pea (Matar)",
+      "scientific_name": "Pisum sativum",
+      "canonical_category": "legumes_pulses",
+      "allergen_type": "food",
+      "definition": "Peas are small green seeds that grow in pods. They are eaten fresh, frozen or dried, and are common in curries, pulao, samosas and soups.",
+      "exposure_sources": [
+        "Matar paneer and pulao",
+        "Samosas and stuffed snacks",
+        "Soups and stews",
+        "Frozen vegetable mixes"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to pea. Pea belongs to the legume family, so results for peanut, lentil or soya may also be positive. A positive result alone does not prove pea allergy. Discuss any past reactions with your doctor.",
+      "card_summary": "Small green seeds from pods, eaten fresh, frozen or dried in many dishes.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "Legume tests can be positive together, and many of these people eat the foods without problems. Do not stop legumes based on this result.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "cross_reactivity_pending"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "pumpkin_seed",
+      "lab_test_name": "Pumpkin Seed",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 4,
+      "aliases": [],
+      "common_name": "Pumpkin Seed",
+      "scientific_name": null,
+      "canonical_category": "edible_seeds",
+      "allergen_type": "food",
+      "definition": "Pumpkin seeds are flat green seeds taken from pumpkins. They are eaten roasted as a snack and added to cereals, breads, salads and seed mixes.",
+      "exposure_sources": [
+        "Roasted snack seeds",
+        "Seed mixes and trail mixes",
+        "Breakfast cereals and breads",
+        "Salads and garnishes"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to pumpkin seed. It does not prove allergy to the seed or to pumpkin vegetable. Seed allergy information is limited, so your doctor will look at your history before any advice about avoiding it.",
+      "card_summary": "Flat green seeds from pumpkins, eaten as a snack or in seed mixes.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs"
+      ],
+      "caution": "Published information on pumpkin seed allergy is limited. A positive result needs a doctor's review along with your symptoms.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence",
+        "species_unspecified"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "barley",
+      "lab_test_name": "Barley",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 5,
+      "aliases": [
+        "Barley (Jau)"
+      ],
+      "common_name": "Barley (Jau)",
+      "scientific_name": "Hordeum vulgare",
+      "canonical_category": "cereals_grains",
+      "allergen_type": "food",
+      "definition": "Barley is a cereal grain used in soups, porridge, flour blends, malt drinks and beer. Barley water is also a common home drink in summer.",
+      "exposure_sources": [
+        "Barley water and porridge",
+        "Malt drinks and malted foods",
+        "Soups and stews",
+        "Beer"
+      ],
+      "typical_symptoms": [
+        "Hives",
+        "Itchy mouth",
+        "Stomach pain",
+        "Diarrhoea",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to barley. Grain tests often turn positive in people who eat grains without any problem. It does not diagnose grain allergy or coeliac disease. Do not stop barley without medical advice.",
+      "card_summary": "A cereal grain used in soups, malt drinks, porridge and barley water.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs"
+      ],
+      "caution": "Grain blood tests are often positive in people who tolerate the grain. Coeliac disease is a different condition and is not found by this test.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "food_lower_performance"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "peanut",
+      "lab_test_name": "Peanut",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 6,
+      "aliases": [
+        "Peanut (Groundnut, Moongfali)"
+      ],
+      "common_name": "Peanut (Groundnut, Moongfali)",
+      "scientific_name": "Arachis hypogaea",
+      "canonical_category": "peanut",
+      "allergen_type": "food",
+      "definition": "Peanut is a legume that grows underground. It is eaten roasted, as peanut butter, in chutneys, chikki and snacks, and is pressed for groundnut oil.",
+      "exposure_sources": [
+        "Roasted peanuts and chikki",
+        "Chutneys and gravies",
+        "Namkeen and snack mixes",
+        "Peanut butter and sweets"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Vomiting",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "This result shows IgE to peanut. Peanut is one of the foods where blood tests are better supported, but a positive result still does not prove allergy or show how strong a reaction could be. Your doctor will review your history.",
+      "card_summary": "A groundnut legume eaten roasted and used in chutneys, sweets and snacks.",
+      "recommendation_ids": [
+        "food_review_past_reactions",
+        "food_label_reading",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_keep_eating_tolerated"
+      ],
+      "caution": "Do not test peanut at home if it has caused breathing trouble, swelling or collapse. Any food challenge must be done only under medical supervision.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "serious_reaction_possible"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "oats",
+      "lab_test_name": "Oats",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 7,
+      "aliases": [
+        "Oats (Jai)"
+      ],
+      "common_name": "Oats (Jai)",
+      "scientific_name": "Avena sativa",
+      "canonical_category": "cereals_grains",
+      "allergen_type": "food",
+      "definition": "Oats are a cereal grain eaten as porridge, in muesli and granola, and in biscuits and baby cereals. Rolled oats are common in Indian breakfasts.",
+      "exposure_sources": [
+        "Oats porridge and upma",
+        "Muesli and granola",
+        "Biscuits and bars",
+        "Baby cereals"
+      ],
+      "typical_symptoms": [
+        "Hives",
+        "Itchy mouth",
+        "Stomach pain",
+        "Diarrhoea",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to oats. Grain tests often turn positive in people who eat grains without any problem. It does not diagnose oat allergy or coeliac disease. Do not stop oats without medical advice.",
+      "card_summary": "A cereal grain eaten as porridge, in muesli and in many biscuits.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs"
+      ],
+      "caution": "Grain blood tests are often positive in people who tolerate the grain. Coeliac disease is a different condition and is not found by this test.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "food_lower_performance"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "maize",
+      "lab_test_name": "Maize",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 8,
+      "aliases": [
+        "Maize (Corn, Makka)"
+      ],
+      "common_name": "Maize (Corn, Makka)",
+      "scientific_name": "Zea mays",
+      "canonical_category": "cereals_grains",
+      "allergen_type": "food",
+      "definition": "Maize is a cereal grain eaten as corn on the cob, makki roti, popcorn and cornflour. It is also used in many packaged foods and snacks.",
+      "exposure_sources": [
+        "Makki ki roti and corn on the cob",
+        "Popcorn and cornflakes",
+        "Cornflour in sauces and gravies",
+        "Packaged foods"
+      ],
+      "typical_symptoms": [
+        "Hives",
+        "Itchy mouth",
+        "Stomach pain",
+        "Diarrhoea",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to maize. Grain tests often turn positive in people who eat grains without any problem. It does not prove maize allergy. Do not stop maize or corn foods without a doctor's advice.",
+      "card_summary": "A cereal grain eaten as corn, popcorn, makki roti and cornflour in many foods.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs"
+      ],
+      "caution": "Grain blood tests are often positive in people who tolerate the grain. Maize and corn are the same food for this test.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "food_lower_performance"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "soya_bean",
+      "lab_test_name": "Soya Bean",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 9,
+      "aliases": [
+        "Soya Bean (Soy)"
+      ],
+      "common_name": "Soya Bean (Soy)",
+      "scientific_name": "Glycine max",
+      "canonical_category": "legumes_pulses",
+      "allergen_type": "food",
+      "definition": "Soya bean is a legume used to make soya chunks, tofu, soya milk, soya flour and oil. It is also added to many packaged foods.",
+      "exposure_sources": [
+        "Soya chunks and tofu",
+        "Soya milk and soya flour",
+        "Protein bars and powders",
+        "Packaged foods and sauces"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to soya. Blood tests for soya often turn positive in people who eat it without any problem. It does not prove soya allergy. Do not stop soya foods without medical advice.",
+      "card_summary": "A legume used for soya chunks, tofu, soya milk and soya flour.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "Soya blood tests are often positive in people who tolerate soya. Peanut or other legume results may also be positive without real allergy.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "food_lower_performance"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "sunflower_seed",
+      "lab_test_name": "Sunflower Seed",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 10,
+      "aliases": [
+        "Sunflower Seed (Surajmukhi)"
+      ],
+      "common_name": "Sunflower Seed (Surajmukhi)",
+      "scientific_name": "Helianthus annuus",
+      "canonical_category": "edible_seeds",
+      "allergen_type": "food",
+      "definition": "Sunflower seeds are the seeds of the sunflower plant. They are eaten as snacks, added to breads and salads, and pressed to make sunflower oil.",
+      "exposure_sources": [
+        "Roasted snack seeds",
+        "Seed breads and bars",
+        "Salads and mixes",
+        "Sunflower oil in cooking"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to sunflower seed. It does not prove seed allergy. Cooking oil is a separate question, so ask your doctor before stopping it. Tell your doctor if the seeds have caused hives, swelling or breathing trouble.",
+      "card_summary": "Seeds of the sunflower plant, eaten as snacks and pressed for oil.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs"
+      ],
+      "caution": "Seed allergy information is limited. Do not stop sunflower oil or seeds because of this result alone.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "hazelnut",
+      "lab_test_name": "Hazelnut",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 11,
+      "aliases": [],
+      "common_name": "Hazelnut",
+      "scientific_name": "Corylus avellana",
+      "canonical_category": "tree_nuts",
+      "allergen_type": "food",
+      "definition": "Hazelnut is a tree nut with a sweet taste. It is found in chocolate spreads, sweets, chocolates, biscuits, ice creams, cakes and many other baked goods.",
+      "exposure_sources": [
+        "Chocolate spreads and sweets",
+        "Biscuits and cakes",
+        "Muesli and nut mixes",
+        "Ice creams"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Vomiting",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "This result shows IgE to hazelnut. In people with birch pollen allergy, hazelnut may cause only mouth itching. A positive result alone does not show whether a serious reaction could happen. Your doctor will review your history.",
+      "card_summary": "A sweet tree nut used in chocolate spreads, sweets and baked goods.",
+      "recommendation_ids": [
+        "food_review_past_reactions",
+        "food_label_reading",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_keep_eating_tolerated",
+        "pollen_food_link_note"
+      ],
+      "caution": "Nut tests can be positive for several nuts at once. A positive result alone does not show which nuts are a real problem, so your doctor may need to look at your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "serious_reaction_possible"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "semolina",
+      "lab_test_name": "Semolina",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 12,
+      "aliases": [
+        "Semolina (Suji, Rava)"
+      ],
+      "common_name": "Semolina (Suji, Rava)",
+      "scientific_name": "Triticum durum",
+      "canonical_category": "cereals_grains",
+      "allergen_type": "food",
+      "definition": "Semolina is a coarse flour made from wheat. It is used for upma, halwa, idli, rava dosa, pasta and many everyday South Indian breakfast dishes.",
+      "exposure_sources": [
+        "Upma and rava idli",
+        "Suji halwa",
+        "Rava dosa",
+        "Pasta"
+      ],
+      "typical_symptoms": [
+        "Hives",
+        "Itchy mouth",
+        "Stomach pain",
+        "Diarrhoea",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to semolina, which is made from wheat. Blood tests for grains often turn positive in people who eat them without any problem. It does not diagnose wheat allergy or coeliac disease.",
+      "card_summary": "Coarse wheat flour used for upma, halwa, rava idli and rava dosa.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs"
+      ],
+      "caution": "Semolina is wheat. This result may overlap with the wheat flour test, and neither proves allergy on its own.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "food_lower_performance",
+        "overlaps_wheat"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "walnut",
+      "lab_test_name": "Walnut",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 13,
+      "aliases": [
+        "Walnut (Akhrot)"
+      ],
+      "common_name": "Walnut (Akhrot)",
+      "scientific_name": "Juglans regia",
+      "canonical_category": "tree_nuts",
+      "allergen_type": "food",
+      "definition": "Walnut is a tree nut with a wrinkled shell. It is eaten as a dry fruit and used in sweets, cakes, salads, chutneys and Kashmiri dishes.",
+      "exposure_sources": [
+        "Dry fruit and nut mixes",
+        "Cakes, brownies and sweets",
+        "Salads and chutneys",
+        "Kashmiri dishes"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Vomiting",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "This result shows IgE to walnut. Walnut is a commonly reported nut trigger, but a positive result alone does not prove allergy or show how strong a reaction could be. Your doctor will review your history.",
+      "card_summary": "A wrinkled tree nut eaten as dry fruit and in cakes and sweets.",
+      "recommendation_ids": [
+        "food_review_past_reactions",
+        "food_label_reading",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_keep_eating_tolerated"
+      ],
+      "caution": "Nut tests can be positive for several nuts at once. A positive result alone does not show which nuts are a real problem, so your doctor may need to look at your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "serious_reaction_possible"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E18"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "almond",
+      "lab_test_name": "Almond",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 14,
+      "aliases": [
+        "Almond (Badam)"
+      ],
+      "common_name": "Almond (Badam)",
+      "scientific_name": "Prunus dulcis",
+      "canonical_category": "tree_nuts",
+      "allergen_type": "food",
+      "definition": "Almond is a tree nut eaten raw, soaked or roasted. It is used in sweets, thandai, milk, marzipan, cakes and many festive dishes across India.",
+      "exposure_sources": [
+        "Soaked almonds and dry fruit",
+        "Sweets, halwa and thandai",
+        "Almond milk and cakes",
+        "Marzipan and chocolates"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Vomiting",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "This result shows IgE to almond. A positive result alone does not prove allergy, and almond is related to fruits such as peach. Your doctor will review your history before any advice on avoiding it.",
+      "card_summary": "A tree nut eaten raw or soaked and used in sweets and drinks.",
+      "recommendation_ids": [
+        "food_review_past_reactions",
+        "food_label_reading",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_keep_eating_tolerated",
+        "pollen_food_link_note"
+      ],
+      "caution": "Nut tests can be positive for several nuts at once. A positive result alone does not show which nuts are a real problem, so your doctor may need to look at your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "serious_reaction_possible"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "cashew_nut",
+      "lab_test_name": "Cashew Nut",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 15,
+      "aliases": [
+        "Cashew Nut (Kaju)"
+      ],
+      "common_name": "Cashew Nut (Kaju)",
+      "scientific_name": "Anacardium occidentale",
+      "canonical_category": "tree_nuts",
+      "allergen_type": "food",
+      "definition": "Cashew is a tree nut with a mild, creamy taste. It is used in kaju katli, curries, rich gravies, pulao and as a roasted snack.",
+      "exposure_sources": [
+        "Kaju katli and sweets",
+        "Rich gravies and curries",
+        "Pulao and biryani",
+        "Roasted snack nuts"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Vomiting",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "This result shows IgE to cashew. Blood tests are better supported for cashew than for many foods, but a positive result still does not prove allergy or show how strong a reaction could be. Your doctor will review your history.",
+      "card_summary": "A creamy tree nut used in kaju sweets, rich gravies and snacks.",
+      "recommendation_ids": [
+        "food_review_past_reactions",
+        "food_label_reading",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_keep_eating_tolerated"
+      ],
+      "caution": "Nut tests can be positive for several nuts at once. A positive result alone does not show which nuts are a real problem, so your doctor may need to look at your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "pistachio_nut"
+        ],
+        "patient_note": null,
+        "held_note_for_review": "Cashew and pistachio are close relatives, and people can react to both. Ask your doctor whether pistachio matters for you.",
+        "evidence_status": "cashew_pistachio_pending_review",
+        "shown_to_patient": false
+      },
+      "review_flags": [
+        "serious_reaction_possible"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "sesame_seed",
+      "lab_test_name": "Sesame Seed",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 16,
+      "aliases": [
+        "Sesame Seed (Til)"
+      ],
+      "common_name": "Sesame Seed (Til)",
+      "scientific_name": "Sesamum indicum",
+      "canonical_category": "edible_seeds",
+      "allergen_type": "food",
+      "definition": "Sesame seeds are tiny seeds used whole, ground into paste, or pressed into oil. They are common in til laddoo, gajak, chutneys, breads and tahini.",
+      "exposure_sources": [
+        "Til laddoo, gajak and chikki",
+        "Chutneys and spice mixes",
+        "Bread, buns and burgers",
+        "Tahini, hummus and sesame oil"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Vomiting",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "This result shows IgE to sesame. Sesame is a recognised cause of food allergy, but a positive result alone does not prove it or show how strong a reaction could be. Your doctor will review your history.",
+      "card_summary": "Tiny seeds used whole, as paste or oil in sweets, breads and chutneys.",
+      "recommendation_ids": [
+        "food_review_past_reactions",
+        "food_label_reading",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_keep_eating_tolerated"
+      ],
+      "caution": "Sesame is often hidden in breads, spice mixes and oils. A positive result needs a doctor's review, especially if you have had a serious reaction.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "serious_reaction_possible"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "poppy_seed",
+      "lab_test_name": "Poppy (Seed)",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 17,
+      "aliases": [
+        "Poppy Seed (Khus Khus)"
+      ],
+      "common_name": "Poppy Seed (Khus Khus)",
+      "scientific_name": "Papaver somniferum",
+      "canonical_category": "edible_seeds",
+      "allergen_type": "food",
+      "definition": "Poppy seeds are tiny seeds from the poppy plant. They are used in kormas, gravies, halwa, breads and sweets, especially in North Indian and Bengali cooking.",
+      "exposure_sources": [
+        "Rich gravies and kormas",
+        "Halwa and sweets",
+        "Breads and rolls",
+        "Bengali dishes with posto"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to poppy seed. Published information on poppy seed allergy is limited, and a positive result alone does not prove it. Tell your doctor if these seeds have ever caused swelling, hives or breathing trouble.",
+      "card_summary": "Tiny seeds used in kormas, gravies, halwa, breads and many festive sweets.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs"
+      ],
+      "caution": "Published information on poppy seed allergy is limited. A positive result needs a doctor's review along with your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "pistachio_nut",
+      "lab_test_name": "Pistachio Nut",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 18,
+      "aliases": [
+        "Pistachio (Pista)"
+      ],
+      "common_name": "Pistachio (Pista)",
+      "scientific_name": "Pistacia vera",
+      "canonical_category": "tree_nuts",
+      "allergen_type": "food",
+      "definition": "Pistachio is a green tree nut eaten roasted and salted, or used in sweets, kulfi, ice cream, baklava, cakes, festive desserts and as a garnish.",
+      "exposure_sources": [
+        "Roasted snack nuts",
+        "Kulfi and ice cream",
+        "Sweets and baklava",
+        "Cakes and dessert toppings"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Vomiting",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "This result shows IgE to pistachio. A positive result alone does not prove allergy or show how strong a reaction could be. Pistachio is closely related to cashew, so results for both may be positive. Your doctor will review your history.",
+      "card_summary": "A green tree nut used in snacks, kulfi, ice cream and sweets.",
+      "recommendation_ids": [
+        "food_review_past_reactions",
+        "food_label_reading",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_keep_eating_tolerated"
+      ],
+      "caution": "Nut tests can be positive for several nuts at once. A positive result alone does not show which nuts are a real problem, so your doctor may need to look at your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "cashew_nut"
+        ],
+        "patient_note": null,
+        "held_note_for_review": "Cashew and pistachio are close relatives, and people can react to both. Ask your doctor whether cashew matters for you.",
+        "evidence_status": "cashew_pistachio_pending_review",
+        "shown_to_patient": false
+      },
+      "review_flags": [
+        "serious_reaction_possible"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "flaxseed",
+      "lab_test_name": "Flaxseed",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 19,
+      "aliases": [
+        "Flaxseed (Alsi)"
+      ],
+      "common_name": "Flaxseed (Alsi)",
+      "scientific_name": "Linum usitatissimum",
+      "canonical_category": "edible_seeds",
+      "allergen_type": "food",
+      "definition": "Flaxseed is a small brown or golden seed, also called linseed. It is eaten roasted, ground in chutneys and laddoos, or added to breads and cereals.",
+      "exposure_sources": [
+        "Alsi chutney and laddoo",
+        "Seed mixes and cereals",
+        "Breads and bars",
+        "Smoothies and health foods"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to flaxseed. Published information on flaxseed allergy is limited, and a positive result alone does not prove it. Tell your doctor if flaxseed or linseed products have ever caused hives, swelling or stomach upset.",
+      "card_summary": "Small seeds also called linseed, eaten roasted, ground or in cereals and breads.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs"
+      ],
+      "caution": "Published information on flaxseed allergy is limited. Do not stop flaxseed based on this result alone.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "lentil",
+      "lab_test_name": "Lentil",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 20,
+      "aliases": [
+        "Lentil (Masoor Dal)"
+      ],
+      "common_name": "Lentil (Masoor Dal)",
+      "scientific_name": "Lens culinaris",
+      "canonical_category": "legumes_pulses",
+      "allergen_type": "food",
+      "definition": "Lentils are small dried legume seeds. They are cooked as dal, soups and khichdi, and ground into flour for snacks, pancakes and dosa batters at home.",
+      "exposure_sources": [
+        "Masoor dal and khichdi",
+        "Soups and stews",
+        "Dosa and snack batters",
+        "Lentil flour"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to lentil. Lentil belongs to the legume family, so results for pea, peanut or soya may also be positive. A positive result alone does not prove lentil allergy. Discuss past reactions with your doctor.",
+      "card_summary": "Small dried legume seeds cooked as masoor dal, soups and khichdi at home.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "Legume tests can be positive together, and many of these people eat the foods without problems. Do not stop dal based on this result.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "cross_reactivity_pending"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "coconut",
+      "lab_test_name": "Coconut",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 21,
+      "aliases": [
+        "Coconut (Nariyal)"
+      ],
+      "common_name": "Coconut (Nariyal)",
+      "scientific_name": "Cocos nucifera",
+      "canonical_category": "coconut_products",
+      "allergen_type": "food",
+      "definition": "Coconut is the fruit of the coconut palm. Its flesh, water, milk and oil are widely used in curries, chutneys, sweets, drinks and temple offerings.",
+      "exposure_sources": [
+        "Chutneys and curries",
+        "Sweets and laddoos",
+        "Coconut water",
+        "Coconut oil in cooking"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to coconut. Coconut is botanically a palm fruit and not a true nut, and allergy to it is uncommon. A positive result alone does not prove allergy. Discuss any reactions with your doctor.",
+      "card_summary": "A palm fruit used in chutneys, curries, sweets and cooking oil daily.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs"
+      ],
+      "caution": "Coconut is not a tree nut for most people. A positive coconut result does not mean you must avoid tree nuts.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    }
+  ]
+}

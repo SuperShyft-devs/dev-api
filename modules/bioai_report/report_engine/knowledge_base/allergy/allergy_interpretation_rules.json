@@ -1,0 +1,423 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "global_rules": [
+    {
+      "rule_id": "R_TOTAL_NOT_DIAGNOSTIC",
+      "title": "Total IgE is not diagnostic and does not indicate severity",
+      "statement": "Never present total IgE as proof of allergy, as a severity marker, or as a way to find the trigger. Interpret only against the reference interval printed by the laboratory.",
+      "applies_to": [
+        "ige_total"
+      ],
+      "evidence_refs": [
+        "E01"
+      ],
+      "enforcement": "Block any text that links a total IgE value to severity or diagnosis."
+    },
+    {
+      "rule_id": "R_SIGE_SENSITIZATION",
+      "title": "Specific IgE shows sensitization, not proven allergy",
+      "statement": "Always describe a positive specific IgE as sensitization. Never write that the person is allergic or has an allergy unless a clinician has confirmed it (context flag clinician_confirmed_food_allergy).",
+      "applies_to": [
+        "all"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "enforcement": "Validator rejects patient text that states allergy as established fact."
+    },
+    {
+      "rule_id": "R_CLASS_NOT_SEVERITY",
+      "title": "IgE class or value is not severity",
+      "statement": "Show the laboratory class or value as reported. Never convert a class, value or colour into mild, moderate or severe, and never rank allergens by severity.",
+      "applies_to": [
+        "all"
+      ],
+      "evidence_refs": [
+        "E01"
+      ],
+      "enforcement": "Ordering by value is for display only and must not be described as risk."
+    },
+    {
+      "rule_id": "R_NO_UNIVERSAL_CUTOFF",
+      "title": "No universal positivity cutoff",
+      "statement": "Do not apply a fixed cutoff such as 0.35 kU/L to every allergen. Positive and negative flags, classes and reference limits come from the laboratory report for each test. If the report gives no flag, the status is indeterminate.",
+      "applies_to": [
+        "all"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "enforcement": "The KB stores no numeric thresholds. Section Builder must read the flag from the Normalizer."
+    },
+    {
+      "rule_id": "R_NEG_NOT_SAFE",
+      "title": "A negative result is not proof of safety",
+      "statement": "Never write that a negative or low result makes a food, medicine, insect or animal safe. Allergy can exist with a negative blood test.",
+      "applies_to": [
+        "all"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E06"
+      ],
+      "enforcement": "Applies to all categories, and is strictest for drugs."
+    },
+    {
+      "rule_id": "R_NO_ELIMINATE_TOLERATED",
+      "title": "Do not advise eliminating a tolerated food on IgE alone",
+      "statement": "Never recommend avoiding a food the person eats without symptoms because of a positive IgE. Advise discussing with a doctor. Avoidance advice is allowed only when the clinician has confirmed food allergy (context flag clinician_confirmed_food_allergy).",
+      "applies_to": [
+        "food"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E04"
+      ],
+      "enforcement": "Recommendation library carries no avoidance advice for food without that flag."
+    },
+    {
+      "rule_id": "R_NO_UNSUPERVISED_CHALLENGE",
+      "title": "No home food challenges after a serious history",
+      "statement": "Never suggest trying or re-trying a food at home. Food challenges are done only under medical supervision. When history_of_serious_reaction is present, the supervised challenge recommendation is excluded.",
+      "applies_to": [
+        "food",
+        "drug"
+      ],
+      "evidence_refs": [
+        "E22",
+        "E05"
+      ],
+      "enforcement": "food_supervised_challenge is excluded when history_of_serious_reaction is true."
+    },
+    {
+      "rule_id": "R_DRUG_STRICT",
+      "title": "Drug allergy rules are stricter",
+      "statement": "Do not assume a validated assay exists for any drug. A negative result never means a drug is safe. Never advise starting, stopping, switching or retrying a medicine. Refer to a doctor or drug allergy specialist.",
+      "applies_to": [
+        "drug"
+      ],
+      "evidence_refs": [
+        "E06",
+        "E07",
+        "E23"
+      ],
+      "enforcement": "Every drug record carries C_DRUG and C_DRUG_ROUTE, and the drug recommendations avoid directive medicine advice."
+    },
+    {
+      "rule_id": "R_INSECT",
+      "title": "Insect nuances",
+      "statement": "Venom sensitization shows risk of a sting reaction only in the context of a history. Cockroach and mite results commonly co-occur. Do not give venom immunotherapy advice. Escalate only on a body wide sting reaction history.",
+      "applies_to": [
+        "insect"
+      ],
+      "evidence_refs": [
+        "E08",
+        "E10"
+      ],
+      "enforcement": "Emergency text appears only with history_of_serious_reaction or sting_reaction_beyond_local."
+    },
+    {
+      "rule_id": "R_PARASITE",
+      "title": "Parasite nuances",
+      "statement": "IgE to a parasite does not confirm current infection. Never advise self treatment with worm medicines. Anisakis can also cause true food allergy.",
+      "applies_to": [
+        "parasite"
+      ],
+      "evidence_refs": [
+        "E14",
+        "E15"
+      ],
+      "enforcement": "Parasite records carry not_diagnostic_of_infection."
+    },
+    {
+      "rule_id": "R_OCCUPATIONAL",
+      "title": "Occupational and contact nuances",
+      "statement": "Occupational materials matter when exposure is present. Contact skin reactions (for example to henna) are often not IgE mediated, so a blood test cannot decide them. Refer to occupational health or a dermatologist.",
+      "applies_to": [
+        "occupational"
+      ],
+      "evidence_refs": [
+        "E16",
+        "E20",
+        "E24"
+      ],
+      "enforcement": "Occupational recommendations require occupational_exposure unless they are product advice (latex)."
+    },
+    {
+      "rule_id": "R_EMERGENCY_GATED",
+      "title": "Emergency guidance only when history suggests anaphylaxis",
+      "statement": "Show emergency warning signs only when the person reports a serious reaction (history_of_serious_reaction) or a body wide sting reaction. Do not add alarm to routine sensitization findings.",
+      "applies_to": [
+        "all"
+      ],
+      "evidence_refs": [
+        "E05"
+      ],
+      "enforcement": "gen_emergency_signs requires history_of_serious_reaction."
+    },
+    {
+      "rule_id": "R_MISSING_NOT_NEGATIVE",
+      "title": "Missing, invalid or indeterminate results are not negative",
+      "statement": "A test with no value, an invalid value or an indeterminate flag must never be shown as negative, normal or clear.",
+      "applies_to": [
+        "all"
+      ],
+      "evidence_refs": [],
+      "enforcement": "Status derivation below enforces this."
+    },
+    {
+      "rule_id": "R_NO_NORMAL_IF_POSITIVE",
+      "title": "Never label a category normal if any test in it is positive",
+      "statement": "Category status uses the words defined in category_status_rules. The word Normal is not used for allergen categories at all.",
+      "applies_to": [
+        "all"
+      ],
+      "evidence_refs": [],
+      "enforcement": "Validator rejects the word Normal in allergen category status."
+    },
+    {
+      "rule_id": "R_UNVERIFIED_EXCLUDED",
+      "title": "Unverified claims stay out of patient text",
+      "statement": "Cross reactivity notes and other claims whose evidence status contains pending or unverified are held in the clinical review queue and are not shown to patients.",
+      "applies_to": [
+        "all"
+      ],
+      "evidence_refs": [],
+      "enforcement": "patient_note is null in these cases."
+    },
+    {
+      "rule_id": "R_NO_APPROVAL_CLAIM",
+      "title": "No medical approval is claimed",
+      "statement": "All content is marked pending clinical review. Do not describe it as medically approved or clinically validated until a qualified clinician signs it off.",
+      "applies_to": [
+        "all"
+      ],
+      "evidence_refs": [],
+      "enforcement": "clinical_review_status stays pending until sign off."
+    }
+  ],
+  "result_states": {
+    "positive": "The laboratory flagged the result as positive or above its own reporting threshold for this test.",
+    "negative_per_lab": "The laboratory reported the result as negative or below its own threshold. This is never shown as safe or normal.",
+    "indeterminate": "The result is borderline, flagged as equivocal, or the flag is missing. It is not negative.",
+    "invalid": "The value could not be parsed or is out of range. It is not negative.",
+    "missing": "The test was ordered but no result is present. It is not negative."
+  },
+  "category_status_rules": {
+    "sensitization_detected": {
+      "label": "Sensitization detected",
+      "when": "at least one test in the category is positive",
+      "note": "Never combine with any wording that implies normal."
+    },
+    "no_sensitization_detected": {
+      "label": "No sensitization detected",
+      "when": "every test in the category has a valid result and all are negative_per_lab",
+      "note": "This does not mean allergy is ruled out."
+    },
+    "incomplete": {
+      "label": "Results incomplete",
+      "when": "no test is positive and at least one test is indeterminate, invalid or missing",
+      "note": "Shown instead of any reassuring label."
+    },
+    "not_tested": {
+      "label": "Not tested",
+      "when": "no test in the category is present in the report",
+      "note": "The category is omitted from Page 3 or shown as not tested."
+    }
+  },
+  "status_derivation": {
+    "input": "Normalizer supplies per test: value, unit, laboratory class, laboratory flag, laboratory reference or threshold.",
+    "order": [
+      "missing",
+      "invalid",
+      "indeterminate",
+      "positive",
+      "negative_per_lab"
+    ],
+    "positive_source": "laboratory flag or class supplied with the report. The KB does not define a numeric threshold.",
+    "category_rollup": "See category_status_rules. positive in any member overrides everything else. The word Normal is never used for allergen categories."
+  },
+  "class_presentation": {
+    "show": "laboratory class and value exactly as reported",
+    "never": [
+      "map class to mild, moderate or severe",
+      "colour code by severity",
+      "rank allergens by risk",
+      "use class to choose recommendations"
+    ],
+    "ordering_for_display": "Order positives by laboratory value only for readability. Do not describe the order as importance."
+  },
+  "continuation_rules": {
+    "many_positives": "If more than five tests in one category are positive, list all in the breakdown but show one summary sentence, not one card each.",
+    "cross_reactivity_pairs": "When both tests of a cross reactivity pair are positive and the note is shown_to_patient, show the note once for the pair.",
+    "context_missing": "If a context flag is unknown treat it as false. Never infer a flag from a result value."
+  },
+  "context_vocabulary": {
+    "reported_symptoms_after_exposure": "Person reports symptoms that follow exposure to the allergen or setting.",
+    "history_of_serious_reaction": "Person reports breathing trouble, throat or face swelling, collapse or similar after exposure. Gates emergency text and excludes supervised challenge advice.",
+    "keeps_or_contacts_animals": "Person keeps or regularly handles animals or birds.",
+    "occupational_exposure": "Person handles the material at work or in a hobby.",
+    "reported_drug_reaction_history": "Person reports a past reaction to a medicine.",
+    "sting_reaction_beyond_local": "Person reports a body wide reaction to an insect sting.",
+    "oral_itching_with_raw_produce": "Person reports mouth or throat itching with raw fruit, vegetables or nuts.",
+    "delayed_symptoms_after_red_meat": "Person reports symptoms several hours after eating red meat.",
+    "clinician_confirmed_food_allergy": "A clinician has confirmed a food allergy. The only flag that allows avoidance wording for that food."
+  },
+  "caution_library": {
+    "C_SENS": {
+      "patient_text": "A positive blood test shows your immune system has made IgE to this substance. This is called sensitization. It does not prove that the substance is causing your symptoms.",
+      "evidence_refs": [],
+      "global_rule": "R_SIGE_SENSITIZATION"
+    },
+    "C_CLASS": {
+      "patient_text": "The class or value on your report shows how much IgE was found. It does not show how severe a reaction could be, and a higher value does not mean a worse reaction.",
+      "evidence_refs": [],
+      "global_rule": "R_CLASS_NOT_SEVERITY"
+    },
+    "C_NEG": {
+      "patient_text": "A negative or low result does not rule out an allergy, and it does not make something safe. Your history and your doctor's advice matter more than this test alone.",
+      "evidence_refs": [],
+      "global_rule": "R_NEG_NOT_SAFE"
+    },
+    "C_TOTAL": {
+      "patient_text": "Total IgE is a general marker. It cannot confirm allergy, cannot show which substance you react to, and cannot show how severe any allergy might be.",
+      "evidence_refs": [
+        "E01"
+      ],
+      "global_rule": "R_TOTAL_NOT_DIAGNOSTIC"
+    },
+    "C_ANIMAL": {
+      "patient_text": "A positive result may involve proteins that several animals share. It does not show that your own pet is the cause, so speak to an allergist before any decision about a pet.",
+      "evidence_refs": [],
+      "global_rule": "R_SIGE_SENSITIZATION"
+    },
+    "C_BIRD": {
+      "patient_text": "Feathers, droppings and bird products can contain different proteins. A positive result for one bird part does not show which bird or which part matters for you.",
+      "evidence_refs": [
+        "E11"
+      ],
+      "global_rule": "R_SIGE_SENSITIZATION"
+    },
+    "C_MITE": {
+      "patient_text": "Dust mite, storage mite and cockroach results often appear together, and they share a protein with shellfish. A positive result does not show which source is responsible.",
+      "evidence_refs": [
+        "E09",
+        "E10"
+      ],
+      "global_rule": "R_SIGE_SENSITIZATION"
+    },
+    "C_MIXED": {
+      "patient_text": "This test uses a mixture of materials. The result cannot say which part you react to, so it is less specific than a test for a single source.",
+      "evidence_refs": [],
+      "global_rule": "R_SIGE_SENSITIZATION"
+    },
+    "C_OCC": {
+      "patient_text": "These materials matter most if you touch or breathe them at work or during a hobby. A blood test alone cannot show whether your work is causing symptoms.",
+      "evidence_refs": [
+        "E16",
+        "E24"
+      ],
+      "global_rule": "R_OCCUPATIONAL"
+    },
+    "C_VENOM": {
+      "patient_text": "A positive venom result shows sensitization and does not prove you will react to the next sting. Anyone with a body wide reaction to a sting should see an allergist.",
+      "evidence_refs": [
+        "E08"
+      ],
+      "global_rule": "R_INSECT"
+    },
+    "C_INSECT_XR": {
+      "patient_text": "Cockroach results often appear together with dust mite results, so the true source can be hard to tell apart without your doctor's review.",
+      "evidence_refs": [
+        "E10"
+      ],
+      "global_rule": "R_INSECT"
+    },
+    "C_INSECT_OTHER": {
+      "patient_text": "Blood tests for mosquito, housefly and moth have limited published support. A positive result alone does not explain your symptoms, so discuss it with your doctor.",
+      "evidence_refs": [],
+      "global_rule": "R_INSECT"
+    },
+    "C_POLLEN": {
+      "patient_text": "Pollen results show sensitization. They matter most if nose, eye or chest symptoms follow the local pollen season. Pollen results can overlap with each other.",
+      "evidence_refs": [],
+      "global_rule": "R_SIGE_SENSITIZATION"
+    },
+    "C_MOULD": {
+      "patient_text": "Mould results show sensitization. Several moulds can share proteins, so one positive result may reflect another mould. Symptoms in damp seasons or damp rooms are useful clues.",
+      "evidence_refs": [
+        "E21"
+      ],
+      "global_rule": "R_SIGE_SENSITIZATION"
+    },
+    "C_YEAST": {
+      "patient_text": "Candida lives on normal skin and in the gut, so a positive result often does not mean an infection or a current problem. Your doctor will read it with your symptoms.",
+      "evidence_refs": [],
+      "global_rule": "R_SIGE_SENSITIZATION"
+    },
+    "C_DRUG": {
+      "patient_text": "Blood IgE tests are not validated for most medicines, and a negative result never means a medicine is safe. Never start, stop or retry a medicine because of this report.",
+      "evidence_refs": [
+        "E06",
+        "E23"
+      ],
+      "global_rule": "R_DRUG_STRICT"
+    },
+    "C_DRUG_ROUTE": {
+      "patient_text": "Many medicine reactions do not involve IgE, and some appear days later. A drug allergy specialist decides what testing or supervised steps are right for you.",
+      "evidence_refs": [
+        "E06",
+        "E07"
+      ],
+      "global_rule": "R_DRUG_STRICT"
+    },
+    "C_FOOD": {
+      "patient_text": "A positive food result does not mean you must avoid that food. Do not remove foods you eat without symptoms because of this test alone. Your doctor decides with your history.",
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "global_rule": "R_NO_ELIMINATE_TOLERATED"
+    },
+    "C_FOOD_LOWER_PERF": {
+      "patient_text": "Blood tests for this food type are less reliable and are often positive in people who eat these foods without trouble. Your history matters far more than this result.",
+      "evidence_refs": [
+        "E01"
+      ],
+      "global_rule": "R_NO_ELIMINATE_TOLERATED"
+    },
+    "C_PARASITE": {
+      "patient_text": "IgE to worm proteins may reflect past or present exposure and cannot tell which. Never take worm medicines because of this report, and let your doctor decide on further tests.",
+      "evidence_refs": [
+        "E14",
+        "E15"
+      ],
+      "global_rule": "R_PARASITE"
+    },
+    "C_ANISAKIS": {
+      "patient_text": "Anisakis can cause both infection and allergy after eating infected fish. Tell your doctor about hives, swelling or stomach pain after fish meals, especially raw or lightly cooked fish.",
+      "evidence_refs": [
+        "E14",
+        "E15"
+      ],
+      "global_rule": "R_PARASITE"
+    }
+  },
+  "recommendation_selection": {
+    "steps": [
+      "Collect positive allergen ids and their canonical categories from derived statuses.",
+      "Candidates are recommendations whose applicable_categories include a positive category or whose applicable_allergen_ids include a positive allergen.",
+      "Drop candidates whose required_context are not all true or whose exclusions are any true.",
+      "Sort by clinical_priority (safety_critical, important, routine), then specific before general, then display_priority, then id.",
+      "Keep the first per theme (theme is the dedupe key).",
+      "Allow at most one general (gen_) card.",
+      "Take up to four. Do not pad."
+    ],
+    "reference_implementation": "tests/selection_reference.py"
+  },
+  "clinical_review_status": "pending"
+}

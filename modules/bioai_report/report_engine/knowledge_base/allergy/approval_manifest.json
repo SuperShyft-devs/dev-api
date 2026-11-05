@@ -1,0 +1,16 @@
+{
+  "kb_version": "1.1.0",
+  "previous_kb_version": "1.0.0-draft",
+  "content_release": {
+    "status": "approved",
+    "authority": "project_owner",
+    "approver_name": null,
+    "recorded_on": "2026-10-16",
+    "covers": ["allergen_records", "total_ige", "recommendations", "interpretation_rules"],
+    "note": "Project-owner release of the existing 1.0.0-draft text. No clinician name or clinical sign-off date was supplied."
+  },
+  "qualified_clinical_approval": {
+    "status": "pending",
+    "reason": "The knowledge base distinguishes qualified clinical sign-off from project-owner content release. Clinical sign-off remains pending until a clinician is documented."
+  }
+}

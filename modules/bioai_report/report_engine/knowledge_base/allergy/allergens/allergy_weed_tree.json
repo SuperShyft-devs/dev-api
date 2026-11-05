@@ -1,0 +1,580 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "source_group": "allergy_weed_tree",
+  "source_group_display_order": 7,
+  "patient_group_name": "Weed and Tree Pollen",
+  "patient_group_explanation": "Pollen from weeds and trees, plus one farm crop.",
+  "group_caution_rule_ids": [
+    "C_SENS",
+    "C_CLASS",
+    "C_POLLEN"
+  ],
+  "test_count": 11,
+  "clinical_review_status": "pending",
+  "allergens": [
+    {
+      "allergen_id": "amaranthus_retroflexus",
+      "lab_test_name": "Amaranthus Retroflexus",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 1,
+      "aliases": [
+        "Redroot Pigweed"
+      ],
+      "common_name": "Redroot Pigweed",
+      "scientific_name": "Amaranthus retroflexus",
+      "canonical_category": "weed_pollen",
+      "allergen_type": "environmental",
+      "definition": "Amaranthus retroflexus, known as redroot pigweed, is a common weed of farmland, gardens and wasteland. It produces large amounts of fine pollen that spread by wind.",
+      "exposure_sources": [
+        "Farm fields and gardens",
+        "Wasteland and roadsides",
+        "Construction sites",
+        "Vegetable plots"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy, watery eyes",
+        "Itchy throat",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to pigweed pollen. It is most meaningful if symptoms appear in the season when these weeds flower or after time in fields and open land. This result does not confirm that pigweed causes your symptoms.",
+      "card_summary": "Pollen from a common weed of fields, gardens, roadsides and open wasteland.",
+      "recommendation_ids": [
+        "pollen_check_forecast",
+        "pollen_clean_up",
+        "pollen_indoor_air",
+        "pollen_food_link_note"
+      ],
+      "caution": "Pollen from related weeds can look similar to the immune system. A positive result may reflect another weed.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "regional_relevance_unverified"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "eucalyptus_spp",
+      "lab_test_name": "Eucalyptus Spp",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 2,
+      "aliases": [
+        "Eucalyptus Tree"
+      ],
+      "common_name": "Eucalyptus Tree",
+      "scientific_name": "Eucalyptus species",
+      "canonical_category": "tree_pollen",
+      "allergen_type": "environmental",
+      "definition": "Eucalyptus trees are tall evergreen trees planted along roads, in plantations and in gardens. This test uses a mix of eucalyptus species rather than one named tree.",
+      "exposure_sources": [
+        "Roadside and avenue trees",
+        "Plantations",
+        "Parks and gardens",
+        "Wood and leaf litter"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy, watery eyes",
+        "Itchy throat",
+        "Wheezing"
+      ],
+      "interpretation_insight": "This result shows IgE to eucalyptus pollen. If your symptoms are worse near these trees, mention it to your doctor. The test covers several species at once, so it cannot show which one matters for you.",
+      "card_summary": "Pollen from eucalyptus trees, which are widely planted for shade and timber.",
+      "recommendation_ids": [
+        "pollen_check_forecast",
+        "pollen_clean_up",
+        "pollen_indoor_air"
+      ],
+      "caution": "This test uses a mix of species, so the result is less specific. It does not show how severe a reaction might be.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "species_mix"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "xanthium_commune",
+      "lab_test_name": "Xanthium Commune",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 3,
+      "aliases": [
+        "Cocklebur"
+      ],
+      "common_name": "Cocklebur",
+      "scientific_name": "Xanthium (cocklebur)",
+      "canonical_category": "weed_pollen",
+      "allergen_type": "environmental",
+      "definition": "Xanthium, known as cocklebur, is a weed with spiny burs that grows in wasteland, riverbanks and field edges. It produces pollen that spreads by wind.",
+      "exposure_sources": [
+        "Wasteland and field edges",
+        "Riverbanks",
+        "Roadsides",
+        "Overgrown plots"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy, watery eyes",
+        "Itchy throat",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result suggests IgE to cocklebur pollen. It is most relevant in the flowering season of these weeds or after time in overgrown open land. Weed pollens are related, so you may react to others too.",
+      "card_summary": "Pollen from a spiny weed of wasteland, riverbanks, roadsides and waste ground.",
+      "recommendation_ids": [
+        "pollen_check_forecast",
+        "pollen_clean_up",
+        "pollen_indoor_air"
+      ],
+      "caution": "This name may be an older scientific name. The test may cover a related species, so interpret it cautiously.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "regional_relevance_unverified",
+        "taxonomy_check"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "morus_alba",
+      "lab_test_name": "Morus Alba",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 4,
+      "aliases": [
+        "White Mulberry"
+      ],
+      "common_name": "White Mulberry",
+      "scientific_name": "Morus alba",
+      "canonical_category": "tree_pollen",
+      "allergen_type": "environmental",
+      "definition": "Morus alba, the white mulberry, is a tree grown for its fruit and for its leaves used to feed silkworms. It is planted in gardens, roadsides and farms.",
+      "exposure_sources": [
+        "Gardens and roadsides",
+        "Farms and silk-rearing areas",
+        "Parks",
+        "Orchards"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy, watery eyes",
+        "Itchy throat",
+        "Wheezing"
+      ],
+      "interpretation_insight": "This result shows IgE to mulberry pollen. It is more meaningful if your symptoms occur when the tree is in flower or near mulberry plantings. It does not show an allergy to mulberry fruit or silk.",
+      "card_summary": "Pollen from the white mulberry tree, grown for fruit and silkworm leaves.",
+      "recommendation_ids": [
+        "pollen_check_forecast",
+        "pollen_clean_up",
+        "pollen_indoor_air"
+      ],
+      "caution": "Positive tree pollen results do not mean you must avoid the fruit. Food allergy is a separate question for your doctor.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "prosopis_juliflora",
+      "lab_test_name": "Prosopis Juliflora",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 5,
+      "aliases": [
+        "Mesquite (Vilayati Babool)"
+      ],
+      "common_name": "Mesquite (Vilayati Babool)",
+      "scientific_name": "Prosopis juliflora",
+      "canonical_category": "tree_pollen",
+      "allergen_type": "environmental",
+      "definition": "Prosopis juliflora, known as mesquite or vilayati babool, is a thorny tree that grows in dry regions and wasteland. It spreads easily and is common in many dry parts of India.",
+      "exposure_sources": [
+        "Dry wasteland",
+        "Roadsides and open land",
+        "Village outskirts",
+        "Fuelwood and fencing"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy, watery eyes",
+        "Itchy throat",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to mesquite pollen. This tree is common in dry areas, so exposure may be regular if you live near it. Symptoms that rise in the flowering season are a useful clue to share with your doctor.",
+      "card_summary": "Pollen from a thorny tree of dry regions, common on wasteland and roadsides.",
+      "recommendation_ids": [
+        "pollen_check_forecast",
+        "pollen_clean_up",
+        "pollen_indoor_air"
+      ],
+      "caution": "Mesquite pollen can look similar to other trees in the same family. A positive result alone does not show which tree is responsible.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "regional_relevance_unverified"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "nart_v1_artemisia_vulgaris",
+      "lab_test_name": "Nart V1 / Artemisia Vulgaris",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 6,
+      "aliases": [
+        "Mugwort (Artemisia vulgaris)"
+      ],
+      "common_name": "Mugwort (Artemisia vulgaris)",
+      "scientific_name": "Artemisia vulgaris",
+      "canonical_category": "weed_pollen",
+      "allergen_type": "environmental",
+      "definition": "Artemisia vulgaris is mugwort, a tall weed common on roadsides and wasteland. The test name refers to nArt v 1, a main mugwort pollen protein.",
+      "exposure_sources": [
+        "Roadsides and wasteland",
+        "Hill slopes",
+        "Field edges",
+        "Overgrown gardens"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy, watery eyes",
+        "Itchy throat",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to mugwort pollen protein. If you also notice itching after certain spices, mustard or peaches, tell your doctor, as these have been described in some mugwort-sensitized people. This result alone does not confirm a food allergy.",
+      "card_summary": "Pollen from mugwort, a common weed, tested through its main pollen protein.",
+      "recommendation_ids": [
+        "pollen_check_forecast",
+        "pollen_clean_up",
+        "pollen_indoor_air",
+        "pollen_food_link_note"
+      ],
+      "caution": "This test name refers to a purified protein and a plant together. Ask the laboratory exactly what was measured.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "mustard",
+          "peach"
+        ],
+        "patient_note": "Some mugwort-sensitized people also react to mustard, peach or certain spices. Tell your doctor if you notice itching after these foods.",
+        "held_note_for_review": null,
+        "evidence_status": "mugwort_spice_peach_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [
+        "component_or_extract_unclear",
+        "name_nonstandard"
+      ],
+      "evidence_refs": [
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "acacia_spp",
+      "lab_test_name": "Acacia Spp",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 7,
+      "aliases": [
+        "Acacia Trees"
+      ],
+      "common_name": "Acacia Trees",
+      "scientific_name": "Acacia species",
+      "canonical_category": "tree_pollen",
+      "allergen_type": "environmental",
+      "definition": "Acacia is a large group of thorny and non-thorny trees and shrubs. This test uses a mix of acacia species rather than a single named tree.",
+      "exposure_sources": [
+        "Roadsides and open land",
+        "Gardens and farm boundaries",
+        "Dry forests",
+        "Fencing and shade trees"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy, watery eyes",
+        "Itchy throat",
+        "Wheezing"
+      ],
+      "interpretation_insight": "This result shows IgE to acacia pollen. If your symptoms flare when these trees are flowering, tell your doctor. The test covers several species at once, so it cannot show which one matters for you.",
+      "card_summary": "Pollen from acacia trees and shrubs, tested as a mix of species.",
+      "recommendation_ids": [
+        "pollen_check_forecast",
+        "pollen_clean_up",
+        "pollen_indoor_air"
+      ],
+      "caution": "This test uses a mix of species, so the result is less specific. IgE class does not show symptom severity.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "species_mix"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "oak_wood",
+      "lab_test_name": "Oak Wood",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 8,
+      "aliases": [
+        "Oak (Wood or Pollen)"
+      ],
+      "common_name": "Oak (Wood or Pollen)",
+      "scientific_name": "Quercus species",
+      "canonical_category": "tree_pollen",
+      "allergen_type": "environmental",
+      "definition": "Oak is a hardwood tree used for timber and furniture. The test name says wood, so it may refer to wood dust, to tree pollen, or to both.",
+      "exposure_sources": [
+        "Carpentry and sawmills",
+        "Wood furniture work",
+        "Oak forests and parks",
+        "Wood shavings"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy, watery eyes",
+        "Itchy throat",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to an oak preparation. Because the extract type is unclear, the result is hard to interpret. If you work with timber, mention it to your doctor and ask the laboratory what was tested.",
+      "card_summary": "An oak extract that may represent wood dust, pollen or both together.",
+      "recommendation_ids": [
+        "pollen_check_forecast",
+        "pollen_clean_up",
+        "pollen_indoor_air"
+      ],
+      "caution": "The extract type is unclear, so the result cannot be linked to a clear exposure. Confirm the details with the laboratory.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "extract_unclear",
+        "name_ambiguous"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "salix_caprea",
+      "lab_test_name": "Salix Caprea",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 9,
+      "aliases": [
+        "Goat Willow"
+      ],
+      "common_name": "Goat Willow",
+      "scientific_name": "Salix caprea",
+      "canonical_category": "tree_pollen",
+      "allergen_type": "environmental",
+      "definition": "Salix caprea, a type of willow, is a tree found in cooler, hilly areas and near water. It flowers in early spring and releases pollen then.",
+      "exposure_sources": [
+        "Hill regions and riverbanks",
+        "Parks and gardens",
+        "Damp meadows",
+        "Cool-climate woodlands"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy, watery eyes",
+        "Itchy throat",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to willow pollen. This tree grows mainly in cooler areas, so the result may reflect sensitization to similar trees. Symptoms during willow flowering are a helpful clue for your doctor.",
+      "card_summary": "Pollen from a willow tree of cooler, hilly regions, streams and riverbanks.",
+      "recommendation_ids": [
+        "pollen_check_forecast",
+        "pollen_clean_up",
+        "pollen_indoor_air"
+      ],
+      "caution": "Tree pollens can look similar to each other. A positive result may reflect another tree.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "regional_relevance_unverified"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "chenopodium_album",
+      "lab_test_name": "Chenopodium Album",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 10,
+      "aliases": [
+        "Lamb's Quarters (Bathua)"
+      ],
+      "common_name": "Lamb's Quarters (Bathua)",
+      "scientific_name": "Chenopodium album",
+      "canonical_category": "weed_pollen",
+      "allergen_type": "environmental",
+      "definition": "Chenopodium album is a common weed known as lamb's quarters or bathua. It grows in fields and gardens, and its leaves are eaten as a vegetable in some regions.",
+      "exposure_sources": [
+        "Wheat and vegetable fields",
+        "Gardens and wasteland",
+        "Roadsides",
+        "Cooked leafy dishes"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy, watery eyes",
+        "Itchy throat",
+        "Wheezing"
+      ],
+      "interpretation_insight": "This result shows IgE to bathua pollen. It matters mainly for pollen-season symptoms. A small number of people sensitized to this weed react to melon. Do not avoid bathua as food unless a doctor advises it.",
+      "card_summary": "Pollen from a common weed whose leaves are also eaten as a vegetable.",
+      "recommendation_ids": [
+        "pollen_check_forecast",
+        "pollen_clean_up",
+        "pollen_indoor_air",
+        "pollen_food_link_note"
+      ],
+      "caution": "A pollen result does not mean the leafy vegetable causes allergy. Food reactions need separate review by a doctor.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "melon"
+        ],
+        "patient_note": "Some people sensitized to this weed also react to melon. Tell your doctor if melon causes mouth itching.",
+        "held_note_for_review": null,
+        "evidence_status": "goosefoot_melon_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "brassica_napus",
+      "lab_test_name": "Brassica Napus",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 11,
+      "aliases": [
+        "Rapeseed (Canola)"
+      ],
+      "common_name": "Rapeseed (Canola)",
+      "scientific_name": "Brassica napus",
+      "canonical_category": "crop_plant_pollen",
+      "allergen_type": "environmental",
+      "definition": "Brassica napus is rapeseed or canola, a crop grown for oilseed. The test name does not say whether it uses pollen or seed, so the exact source is unclear.",
+      "exposure_sources": [
+        "Rapeseed fields",
+        "Crop-growing areas",
+        "Cooking oils",
+        "Oilseed processing"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy, watery eyes",
+        "Itchy throat",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to a rapeseed preparation. If you live near flowering fields, notice whether symptoms rise in that season. Because the extract may be pollen or seed, ask the laboratory and your doctor before drawing any food conclusions.",
+      "card_summary": "A crop plant grown for oilseed, tested as pollen or seed extract.",
+      "recommendation_ids": [
+        "pollen_check_forecast",
+        "pollen_clean_up",
+        "pollen_indoor_air"
+      ],
+      "caution": "The extract type is unclear. Do not conclude anything about cooking oils or mustard from this result.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "extract_unclear",
+        "name_ambiguous"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    }
+  ]
+}

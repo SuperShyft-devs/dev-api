@@ -1,0 +1,2143 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "source_group": "allergy_veg",
+  "source_group_display_order": 8,
+  "patient_group_name": "Vegetables and Fruits",
+  "patient_group_explanation": "Common vegetables, fruits and rice.",
+  "group_caution_rule_ids": [
+    "C_SENS",
+    "C_CLASS",
+    "C_FOOD"
+  ],
+  "test_count": 40,
+  "clinical_review_status": "pending",
+  "allergens": [
+    {
+      "allergen_id": "egg_plant_aubergine",
+      "lab_test_name": "Egg Plant / Aubergine",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 1,
+      "aliases": [
+        "Brinjal",
+        "Brinjal (Eggplant)",
+        "Eggplant"
+      ],
+      "common_name": "Brinjal (Eggplant)",
+      "scientific_name": "Solanum melongena",
+      "canonical_category": "vegetables_nightshade",
+      "allergen_type": "food",
+      "definition": "Eggplant, also called brinjal or aubergine, is a purple or green vegetable used in curries, bharta and fried dishes. It belongs to the nightshade family along with tomato and potato.",
+      "exposure_sources": [
+        "Brinjal curry and bharta",
+        "Fried and stuffed dishes",
+        "Pickles and chutneys",
+        "Mixed vegetable dishes"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to eggplant. Many people have this result without any symptoms. In one South Indian hospital survey, eggplant was among foods people reported as triggers, but reported triggers are not proof of allergy. Do not stop eating it on this result alone.",
+      "card_summary": "A nightshade vegetable used in many Indian dishes such as bharta and curries.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "A positive blood result for eggplant does not show that it causes your symptoms. Only a clear history and a doctor's review can confirm this.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E18"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "onion",
+      "lab_test_name": "Onion",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 2,
+      "aliases": [],
+      "common_name": "Onion",
+      "scientific_name": "Allium cepa",
+      "canonical_category": "vegetables_allium",
+      "allergen_type": "food",
+      "definition": "Onion is a bulb vegetable used raw and cooked in nearly every Indian kitchen, in salads, curries, gravies and street foods. It has a sharp smell and taste.",
+      "exposure_sources": [
+        "Curries and gravies",
+        "Raw salads and chutneys",
+        "Fried snacks and pakoras",
+        "Pickles"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips",
+        "Skin rash"
+      ],
+      "interpretation_insight": "Your blood shows IgE to onion. This is not proof that eating onion is a problem. Because onion is in so many dishes, avoiding it without need would be hard and may be unnecessary. Share any past reactions with your doctor.",
+      "card_summary": "A bulb vegetable used in almost every Indian kitchen, raw or cooked.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "Raw and cooked onion may not behave the same way for every person. Do not remove it from your diet without medical advice.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "garlic",
+      "lab_test_name": "Garlic",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 3,
+      "aliases": [],
+      "common_name": "Garlic",
+      "scientific_name": "Allium sativum",
+      "canonical_category": "vegetables_allium",
+      "allergen_type": "food",
+      "definition": "Garlic is a strongly flavoured bulb used in cooking, pastes, chutneys and pickles. It is often used raw, fried, roasted or ground into spice mixes.",
+      "exposure_sources": [
+        "Garlic paste and chutneys",
+        "Curries and tadkas",
+        "Pickles",
+        "Spice blends and sauces"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth",
+        "Hives",
+        "Stomach upset",
+        "Skin rash",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to garlic. It does not prove allergy. Handling raw garlic can also irritate the skin, which is a different problem from allergy. If garlic has caused hives or swelling after eating, tell your doctor.",
+      "card_summary": "A strongly flavoured bulb used in pastes, tadkas, chutneys and spice blends.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "Skin irritation from raw garlic is common and is not the same as allergy. A blood test cannot tell the difference.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "cauliflower",
+      "lab_test_name": "Cauliflower",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 4,
+      "aliases": [],
+      "common_name": "Cauliflower",
+      "scientific_name": "Brassica oleracea var. botrytis",
+      "canonical_category": "vegetables_brassica",
+      "allergen_type": "food",
+      "definition": "Cauliflower is a white flower-head vegetable used in sabzis, parathas, pakoras, pickles and Indo-Chinese dishes. It belongs to the cabbage family of leafy and flowering vegetables.",
+      "exposure_sources": [
+        "Gobi sabzi and parathas",
+        "Pakoras and fritters",
+        "Pulao and mixed dishes",
+        "Pickles"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to cauliflower. Many people have such results without any reaction to the vegetable. If cauliflower has caused mouth itching, hives or stomach upset, mention it to your doctor. Do not stop eating it only for this reason.",
+      "card_summary": "A flower-head vegetable of the cabbage family, used in many Indian dishes.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "Cauliflower, cabbage and broccoli are related, but a positive result for one does not mean you react to the others.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "pumpkin",
+      "lab_test_name": "Pumpkin",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 5,
+      "aliases": [],
+      "common_name": "Pumpkin",
+      "scientific_name": "Cucurbita species",
+      "canonical_category": "vegetables_gourd",
+      "allergen_type": "food",
+      "definition": "Pumpkin is a large orange-fleshed vegetable cooked in sabzis, sambar, soups and sweets. It belongs to the gourd family, along with cucumber, melons and bottle gourd.",
+      "exposure_sources": [
+        "Pumpkin sabzi and sambar",
+        "Halwa and sweets",
+        "Soups and purees",
+        "Mixed vegetable dishes"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to pumpkin. Reactions to cooked pumpkin are uncommon, so many people with this result eat it without trouble. If you ever had symptoms after pumpkin, tell your doctor. This is separate from pumpkin seeds.",
+      "card_summary": "A large orange vegetable used in sabzis, sambar, soups and many sweets.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "A positive result for pumpkin flesh does not mean you react to pumpkin seeds, or the reverse. They are tested separately.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "red_radish",
+      "lab_test_name": "Red Radish",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 6,
+      "aliases": [],
+      "common_name": "Red Radish",
+      "scientific_name": "Raphanus sativus",
+      "canonical_category": "vegetables_brassica",
+      "allergen_type": "food",
+      "definition": "Red radish is a crunchy root vegetable eaten raw in salads and sometimes cooked. It has a peppery taste and belongs to the cabbage family.",
+      "exposure_sources": [
+        "Salads",
+        "Raw side dishes",
+        "Pickles",
+        "Parathas and stuffed breads"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to radish. Many people have this result and eat radish without problems. If radish has ever caused mouth tingling or hives, talk to your doctor. This result alone is not a reason to avoid it.",
+      "card_summary": "A peppery raw root vegetable of the cabbage family, often eaten in salads.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "Radish is related to mustard and cabbage, but a positive result for radish does not mean you must avoid those foods.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "sweet_potato",
+      "lab_test_name": "Sweet Potato",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 7,
+      "aliases": [],
+      "common_name": "Sweet Potato",
+      "scientific_name": "Ipomoea batatas",
+      "canonical_category": "vegetables_root",
+      "allergen_type": "food",
+      "definition": "Sweet potato is a sweet root vegetable that is boiled, roasted or fried. In India it is eaten as a street snack and during fasts and festivals.",
+      "exposure_sources": [
+        "Roasted street snacks",
+        "Boiled sweet potato",
+        "Chaats and fasting dishes",
+        "Fries and tikkis"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to sweet potato. Allergy to it is uncommon, so a positive blood test is more likely a sensitization marker. If you ever had symptoms after eating it, tell your doctor before making any change.",
+      "card_summary": "A sweet root vegetable eaten roasted, boiled, fried or in fasting dishes.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs"
+      ],
+      "caution": "Sweet potato is not related to regular potato. A positive result for one says nothing certain about the other.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "spinach",
+      "lab_test_name": "Spinach",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 8,
+      "aliases": [
+        "Palak",
+        "Spinach (Palak)"
+      ],
+      "common_name": "Spinach (Palak)",
+      "scientific_name": "Spinacia oleracea",
+      "canonical_category": "vegetables_leafy",
+      "allergen_type": "food",
+      "definition": "Spinach is a dark green leafy vegetable used in palak dishes, parathas, dals and soups. It is eaten cooked and sometimes raw in salads and smoothies.",
+      "exposure_sources": [
+        "Palak paneer and dal",
+        "Parathas",
+        "Soups and smoothies",
+        "Raw salads"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to spinach. Some people sensitized to Alternaria mould also show a positive result here, which does not always cause symptoms. If spinach has ever caused itching or swelling, tell your doctor.",
+      "card_summary": "A leafy green vegetable used in palak dishes, dals, soups and parathas.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "A spinach result may reflect sensitization to something else, such as a mould. It does not alone prove spinach allergy.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "alternaria_alternata"
+        ],
+        "patient_note": "Some people sensitized to Alternaria mould also react to spinach. Tell your doctor if spinach causes symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "alternaria_spinach_syndrome_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "lettuce",
+      "lab_test_name": "Lettuce",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 9,
+      "aliases": [],
+      "common_name": "Lettuce",
+      "scientific_name": "Lactuca sativa",
+      "canonical_category": "vegetables_leafy",
+      "allergen_type": "food",
+      "definition": "Lettuce is a soft leafy vegetable eaten raw in salads, sandwiches and burgers. It is rarely cooked in Indian homes and is often served with dips.",
+      "exposure_sources": [
+        "Salads",
+        "Sandwiches and wraps",
+        "Burgers",
+        "Garnishes"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to lettuce. Because lettuce is eaten raw, any reaction is more likely to be mouth itching. If you have this, mention it to your doctor, who may ask about pollen allergy. Do not remove lettuce without advice.",
+      "card_summary": "A soft leafy vegetable usually eaten raw in salads, burgers and sandwiches.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "pollen_food_link_note",
+        "food_ask_related_foods"
+      ],
+      "caution": "Raw leafy vegetables sometimes trigger mild mouth symptoms in pollen-allergic people. A positive result alone does not confirm this.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "cabbage",
+      "lab_test_name": "Cabbage",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 10,
+      "aliases": [],
+      "common_name": "Cabbage",
+      "scientific_name": "Brassica oleracea var. capitata",
+      "canonical_category": "vegetables_brassica",
+      "allergen_type": "food",
+      "definition": "Cabbage is a leafy round vegetable used in sabzis, salads, parathas and Indo-Chinese dishes. It belongs to the same family as cauliflower, broccoli and radish.",
+      "exposure_sources": [
+        "Cabbage sabzi and parathas",
+        "Salads and coleslaw",
+        "Indo-Chinese dishes",
+        "Pickles"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to cabbage. In one South Indian hospital survey, cabbage was among foods people most often reported as triggers, but reports are not proof of allergy. Do not stop cabbage because of this result alone.",
+      "card_summary": "A leafy round vegetable used in sabzis, salads, parathas and Indo-Chinese dishes.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "Reported food triggers are not the same as confirmed allergy. A doctor's review of your history is the key step.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E18"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "cucumber",
+      "lab_test_name": "Cucumber",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 11,
+      "aliases": [],
+      "common_name": "Cucumber",
+      "scientific_name": "Cucumis sativus",
+      "canonical_category": "vegetables_gourd",
+      "allergen_type": "food",
+      "definition": "Cucumber is a watery vegetable eaten raw in salads, raita and as a snack. It belongs to the gourd family, along with melons and pumpkin.",
+      "exposure_sources": [
+        "Salads and raita",
+        "Raw snacks",
+        "Pickles",
+        "Cooling drinks and sandwiches"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to cucumber. Mouth itching after raw cucumber can occur in some pollen-allergic people. If this happens to you, tell your doctor. A positive blood test alone is not a reason to avoid it.",
+      "card_summary": "A watery gourd-family vegetable eaten raw in salads, raita, sandwiches and drinks.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "pollen_food_link_note",
+        "food_ask_related_foods"
+      ],
+      "caution": "Cucumber, melon and pumpkin are botanically related, but one positive result does not mean reactions to the others.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "carrot",
+      "lab_test_name": "Carrot",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 12,
+      "aliases": [],
+      "common_name": "Carrot",
+      "scientific_name": "Daucus carota",
+      "canonical_category": "vegetables_root",
+      "allergen_type": "food",
+      "definition": "Carrot is an orange root vegetable eaten raw and cooked in salads, halwa, sabzis, soups and juices. It is also grated into many Indian sweets and snacks.",
+      "exposure_sources": [
+        "Raw salads and juices",
+        "Gajar halwa",
+        "Sabzis and pulao",
+        "Soups"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to carrot. Raw carrot can cause mouth itching in some people with pollen allergy, while cooked carrot is often tolerated. If you notice this, tell your doctor rather than avoiding carrot yourself.",
+      "card_summary": "An orange root vegetable eaten raw or cooked, including in gajar halwa.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "pollen_food_link_note",
+        "food_ask_related_foods"
+      ],
+      "caution": "Raw and cooked carrot may be tolerated differently. A positive blood test does not show which applies to you.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "french_bean",
+      "lab_test_name": "French Bean",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 13,
+      "aliases": [],
+      "common_name": "French Bean",
+      "scientific_name": "Phaseolus vulgaris",
+      "canonical_category": "legumes_pulses",
+      "allergen_type": "food",
+      "definition": "French beans are slender green pods cooked in sabzis, stir-fries and mixed vegetable dishes. They belong to the legume family, along with peas, lentils and peanuts.",
+      "exposure_sources": [
+        "Beans sabzi and poriyal",
+        "Mixed vegetable dishes",
+        "Stir-fries",
+        "Pulao"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to French bean. Legume results can overlap, and many people are sensitized to legumes without any reaction. Share any symptoms after beans with your doctor before you change your diet.",
+      "card_summary": "Green bean pods from the legume family, cooked in sabzis and stir-fries.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "Legumes are related, but a positive result for one does not mean you react to others such as peanuts or lentils.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "broccoli",
+      "lab_test_name": "Broccoli",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 14,
+      "aliases": [],
+      "common_name": "Broccoli",
+      "scientific_name": "Brassica oleracea var. italica",
+      "canonical_category": "vegetables_brassica",
+      "allergen_type": "food",
+      "definition": "Broccoli is a green flowering vegetable of the cabbage family. It is steamed, stir-fried, baked or added to soups, salads, pastas, wraps and Indo-Chinese dishes.",
+      "exposure_sources": [
+        "Steamed or stir-fried dishes",
+        "Soups",
+        "Salads",
+        "Mixed vegetable dishes"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to broccoli. Many people have this result without reacting to the vegetable. If broccoli has caused itching, hives or stomach upset, tell your doctor. A positive blood test is not a reason to stop eating it.",
+      "card_summary": "A green flowering vegetable of the cabbage family, eaten steamed or stir-fried.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "A positive result for broccoli does not mean you must avoid cabbage or cauliflower. Each food should be judged by your own reactions.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "tomato",
+      "lab_test_name": "Tomato",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 15,
+      "aliases": [],
+      "common_name": "Tomato",
+      "scientific_name": "Solanum lycopersicum",
+      "canonical_category": "vegetables_nightshade",
+      "allergen_type": "food",
+      "definition": "Tomato is a red fruit used as a vegetable in gravies, chutneys, soups and salads. It is eaten both raw and cooked, and is found in sauces and ketchup.",
+      "exposure_sources": [
+        "Gravies and curries",
+        "Chutneys and ketchup",
+        "Salads and soups",
+        "Pasta sauces"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to tomato. Because tomato is in so many dishes, avoiding it unnecessarily can be hard. If tomatoes cause mouth itching, lip swelling or hives, tell your doctor. Do not remove it from your diet only because of this result.",
+      "card_summary": "A red fruit used as a vegetable in gravies, chutneys and salads.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "Tomato can irritate the mouth through acidity, which is not allergy. A blood test cannot tell the difference.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "beet",
+      "lab_test_name": "Beet",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 16,
+      "aliases": [
+        "Beetroot"
+      ],
+      "common_name": "Beetroot",
+      "scientific_name": "Beta vulgaris",
+      "canonical_category": "vegetables_root",
+      "allergen_type": "food",
+      "definition": "Beetroot is a deep red root vegetable eaten in salads, sabzis, juices and raita. It colours food pink or red, and can colour urine as well.",
+      "exposure_sources": [
+        "Salads and raita",
+        "Juices",
+        "Sabzis and cutlets",
+        "Soups"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to beetroot. Beetroot can turn urine pink or red, which is harmless and not an allergy. If you have had a real reaction after eating it, such as hives or swelling, tell your doctor.",
+      "card_summary": "A deep red root vegetable eaten in salads, juices, raita and sabzis.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs"
+      ],
+      "caution": "Pink or red urine after beetroot is normal and not a sign of allergy. A positive result should be discussed with a doctor.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "potato",
+      "lab_test_name": "Potato",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 17,
+      "aliases": [],
+      "common_name": "Potato",
+      "scientific_name": "Solanum tuberosum",
+      "canonical_category": "vegetables_nightshade",
+      "allergen_type": "food",
+      "definition": "Potato is a starchy tuber that is a staple in Indian kitchens. It is boiled, fried or baked in sabzis, snacks, chaats, curries and parathas.",
+      "exposure_sources": [
+        "Aloo sabzi and parathas",
+        "Chips and fries",
+        "Samosas and tikkis",
+        "Curries and gravies"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to potato. Because potato is used so widely, stopping it without good reason could be hard. If potatoes have caused itching, hives or swelling after eating, tell your doctor soon.",
+      "card_summary": "A starchy tuber used daily in sabzis, snacks, chaats, curries and parathas.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "Raw and cooked potato may behave differently. A positive result alone does not prove that you react to cooked potato.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "date",
+      "lab_test_name": "Date",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 18,
+      "aliases": [],
+      "common_name": "Date",
+      "scientific_name": "Phoenix dactylifera",
+      "canonical_category": "fruits_other",
+      "allergen_type": "food",
+      "definition": "Dates are sweet brown fruits eaten fresh or dried. They are eaten during fasts, in sweets and with milk, and are sometimes added to desserts.",
+      "exposure_sources": [
+        "Fresh or dried dates",
+        "Sweets and laddoos",
+        "Dessert fillings",
+        "Dry fruit mixes"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to date. Reactions to dates are uncommon. If dried dates ever caused symptoms, note that sulphites used to preserve dried fruit can also cause reactions and are not an allergy to dates. Discuss with your doctor.",
+      "card_summary": "A sweet fruit eaten fresh or dried, popular during fasts and in sweets.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "Dried fruit sometimes contains added preservatives. Reactions may not be due to the fruit itself.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "apricot",
+      "lab_test_name": "Apricot",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 19,
+      "aliases": [],
+      "common_name": "Apricot",
+      "scientific_name": "Prunus armeniaca",
+      "canonical_category": "fruits_rosaceae",
+      "allergen_type": "food",
+      "definition": "Apricot is a small orange stone fruit eaten fresh or dried as khubani. It belongs to the rose family, together with peach, plum, almond and cherry.",
+      "exposure_sources": [
+        "Fresh or dried apricots",
+        "Jams and juices",
+        "Dry fruit mixes",
+        "Desserts"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to apricot. People with pollen allergy sometimes get an itchy mouth after raw stone fruits. If this happens, tell your doctor. A positive result alone does not mean you must avoid apricots.",
+      "card_summary": "A small orange stone fruit of the rose family, eaten fresh or dried.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "pollen_food_link_note",
+        "food_ask_related_foods"
+      ],
+      "caution": "Stone fruits are related, so results often appear together. Each fruit should be judged by your own reactions.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "cherry",
+      "lab_test_name": "Cherry",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 20,
+      "aliases": [],
+      "common_name": "Cherry",
+      "scientific_name": "Prunus species",
+      "canonical_category": "fruits_rosaceae",
+      "allergen_type": "food",
+      "definition": "Cherry is a small red stone fruit eaten fresh or used in desserts, cakes and drinks. It belongs to the rose family, with peach, plum and apricot.",
+      "exposure_sources": [
+        "Fresh cherries",
+        "Cakes and desserts",
+        "Juices and syrups",
+        "Jams"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to cherry. Raw stone fruits can cause mouth itching in some pollen-allergic people. If you notice this, tell your doctor. The result alone is not a reason to avoid cherries entirely.",
+      "card_summary": "A small red stone fruit of the rose family used in desserts and drinks.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "pollen_food_link_note",
+        "food_ask_related_foods"
+      ],
+      "caution": "Cherry is related to peach, plum and apricot. A positive result may overlap with them.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "pineapple",
+      "lab_test_name": "Pineapple",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 21,
+      "aliases": [],
+      "common_name": "Pineapple",
+      "scientific_name": "Ananas comosus",
+      "canonical_category": "fruits_tropical",
+      "allergen_type": "food",
+      "definition": "Pineapple is a tropical fruit eaten fresh, in juices, salads and desserts. It can make the mouth tingle or feel sore because of its natural enzymes.",
+      "exposure_sources": [
+        "Fresh pineapple",
+        "Juices and drinks",
+        "Fruit salads and desserts",
+        "Pizzas and canned fruit"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to pineapple. Pineapple can make the mouth tingle or feel sore because of natural enzymes, which is not an allergy. If you have had hives or swelling after eating it, tell your doctor.",
+      "card_summary": "A tropical fruit eaten fresh or juiced that can tingle the mouth naturally.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "Mouth tingling from pineapple can be harmless irritation. A blood test cannot tell it apart from allergy.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "plum",
+      "lab_test_name": "Plum",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 22,
+      "aliases": [],
+      "common_name": "Plum",
+      "scientific_name": "Prunus domestica",
+      "canonical_category": "fruits_rosaceae",
+      "allergen_type": "food",
+      "definition": "Plum is a smooth-skinned stone fruit eaten fresh or dried as prunes. It belongs to the rose family with peach, apricot, almond, apple and cherry.",
+      "exposure_sources": [
+        "Fresh plums",
+        "Dried plums",
+        "Jams and preserves",
+        "Desserts"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to plum. Mouth itching after raw plums happens in some pollen-allergic people. If this applies to you, tell your doctor. A positive blood test alone is not a reason to avoid plums.",
+      "card_summary": "A smooth-skinned stone fruit of the rose family, eaten fresh or dried.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "pollen_food_link_note",
+        "food_ask_related_foods"
+      ],
+      "caution": "Plum, peach and cherry results often overlap. Judge each food by your own reactions and your doctor's advice.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "orange",
+      "lab_test_name": "Orange",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 23,
+      "aliases": [],
+      "common_name": "Orange",
+      "scientific_name": "Citrus sinensis",
+      "canonical_category": "fruits_citrus",
+      "allergen_type": "food",
+      "definition": "Orange is a juicy citrus fruit eaten fresh or as juice. It is a common source of vitamin C and is used in desserts and drinks.",
+      "exposure_sources": [
+        "Fresh oranges and juice",
+        "Desserts and drinks",
+        "Marmalades",
+        "Fruit salads"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to orange. Citrus can cause mouth soreness through acidity, which is not allergy. If you had hives or lip swelling after orange, tell your doctor. Do not avoid fruits on this report alone.",
+      "card_summary": "A juicy citrus fruit eaten fresh, as juice, in salads or in desserts.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "The acid in citrus can irritate lips and mouth without being an allergy. A blood test cannot tell them apart.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "grape",
+      "lab_test_name": "Grape",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 24,
+      "aliases": [],
+      "common_name": "Grape",
+      "scientific_name": "Vitis vinifera",
+      "canonical_category": "fruits_other",
+      "allergen_type": "food",
+      "definition": "Grapes are small juicy fruits eaten fresh or dried as raisins. They are also made into juice, jams and wine, and are common in fruit salads.",
+      "exposure_sources": [
+        "Fresh grapes",
+        "Juice and jams",
+        "Raisins and dry fruit mixes",
+        "Fruit salads"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to grape. If grapes have caused itching or swelling, tell your doctor. Raisins are tested separately. Do not stop eating grapes or raisins just because of this one positive blood result.",
+      "card_summary": "A small juicy fruit eaten fresh, as juice or dried as raisins.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "Grape and raisin results may overlap since raisins are dried grapes. Neither alone confirms allergy.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "pomegranate",
+      "lab_test_name": "Pomegranate",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 25,
+      "aliases": [],
+      "common_name": "Pomegranate",
+      "scientific_name": "Punica granatum",
+      "canonical_category": "fruits_other",
+      "allergen_type": "food",
+      "definition": "Pomegranate is a fruit filled with juicy red seeds, eaten fresh or as juice. It is used in chutneys, raita, salads, chaat, sauces and desserts.",
+      "exposure_sources": [
+        "Fresh seeds and juice",
+        "Raitas and chutneys",
+        "Desserts and salads",
+        "Anardana (dried seeds)"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to pomegranate. Reactions to this fruit are uncommon. If it has ever caused itching, hives or swelling, tell your doctor. A positive result is not a reason to stop eating it.",
+      "card_summary": "A fruit with juicy red seeds, eaten fresh, as juice or dried.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs"
+      ],
+      "caution": "Pomegranate results are not commonly studied. Interpret them with care and focus on your own history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "guava",
+      "lab_test_name": "Guava",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 26,
+      "aliases": [],
+      "common_name": "Guava",
+      "scientific_name": "Psidium guajava",
+      "canonical_category": "fruits_tropical",
+      "allergen_type": "food",
+      "definition": "Guava is a tropical fruit with a fragrant, sweet flesh, eaten fresh with salt, in chaat, as juice or made into jam, jelly and candy.",
+      "exposure_sources": [
+        "Fresh guava",
+        "Chaat and masala guava",
+        "Juices and jams",
+        "Desserts"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to guava. Reactions to guava are uncommon. If it has caused itching or swelling, tell your doctor. A positive result alone is not a reason to avoid it entirely, so seek advice.",
+      "card_summary": "A fragrant tropical fruit eaten fresh, as chaat, juice, jam or candy.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs"
+      ],
+      "caution": "Guava has limited allergy information, so interpret the result carefully and focus on your own reactions.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "cranberry",
+      "lab_test_name": "Cranberry",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 27,
+      "aliases": [],
+      "common_name": "Cranberry",
+      "scientific_name": "Vaccinium macrocarpon",
+      "canonical_category": "fruits_other",
+      "allergen_type": "food",
+      "definition": "Cranberry is a tart red berry usually eaten dried or as juice. It is added to cereals, salads, baked goods, trail mixes, sauces and drinks.",
+      "exposure_sources": [
+        "Dried cranberries",
+        "Cranberry juice",
+        "Muesli and baked goods",
+        "Salads"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to cranberry. Reactions are uncommon. If dried cranberries or juice ever caused symptoms, tell your doctor, as added ingredients in these products can also cause reactions in some people too.",
+      "card_summary": "A tart red berry usually eaten dried, in cereals or as juice.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs"
+      ],
+      "caution": "Cranberry products often contain other ingredients. The cause of a reaction may not be the berry itself.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "fig",
+      "lab_test_name": "Fig",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 28,
+      "aliases": [
+        "Anjeer",
+        "Fig (Anjeer)"
+      ],
+      "common_name": "Fig (Anjeer)",
+      "scientific_name": "Ficus carica",
+      "canonical_category": "fruits_other",
+      "allergen_type": "food",
+      "definition": "Fig is a soft sweet fruit eaten fresh or dried as anjeer. It is added to desserts, dry fruit mixes and milk, and is soaked overnight by many people.",
+      "exposure_sources": [
+        "Fresh figs",
+        "Dried anjeer",
+        "Dry fruit mixes",
+        "Desserts"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to fig. If figs have ever caused mouth itching, hives or swelling, tell your doctor. Fig can also appear in the lists for latex-related reactions, so your doctor may ask about latex.",
+      "card_summary": "A soft sweet fruit eaten fresh or dried as anjeer in many foods.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "A positive fig result does not prove allergy. Do not stop eating figs on this result alone.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "latex"
+        ],
+        "patient_note": null,
+        "held_note_for_review": "Latex-related fruit reactions have been described for several fruits. Ask your doctor whether latex is relevant to you.",
+        "evidence_status": "latex_fruit_syndrome_E13_fig_unverified",
+        "shown_to_patient": false
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E13"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "olive",
+      "lab_test_name": "Olive",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 29,
+      "aliases": [],
+      "common_name": "Olive",
+      "scientific_name": "Olea europaea",
+      "canonical_category": "fruits_other",
+      "allergen_type": "food",
+      "definition": "Olive is a small fruit eaten as a pickled snack, in salads, on pizzas and sandwiches, in pasta, or pressed to make olive oil for cooking.",
+      "exposure_sources": [
+        "Pickled olives",
+        "Olive oil",
+        "Pizzas and salads",
+        "Tapenade and spreads"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to olive. Reactions to olives are uncommon. If olives or olive oil ever caused symptoms, tell your doctor. Do not stop using them based on this result alone, since it is not proof.",
+      "card_summary": "A small fruit eaten pickled, on pizzas or pressed into olive oil.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs"
+      ],
+      "caution": "Olive results are not commonly studied. Treat them carefully and focus on your own reactions.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "watermelon",
+      "lab_test_name": "Watermelon",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 30,
+      "aliases": [],
+      "common_name": "Watermelon",
+      "scientific_name": "Citrullus lanatus",
+      "canonical_category": "fruits_melons",
+      "allergen_type": "food",
+      "definition": "Watermelon is a large juicy summer fruit eaten fresh or as juice. It is related to melons, cucumber and pumpkin, and is very common in Indian summers.",
+      "exposure_sources": [
+        "Fresh slices",
+        "Juices and smoothies",
+        "Fruit salads",
+        "Summer drinks"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to watermelon. Itching in the mouth after raw watermelon is seen in some pollen-allergic people. If this happens, tell your doctor. A blood result alone is not a reason to avoid it.",
+      "card_summary": "A large juicy summer fruit related to melons, cucumber, pumpkin and gourds.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "pollen_food_link_note",
+        "food_ask_related_foods"
+      ],
+      "caution": "Melon and watermelon are related but not identical. A positive result for one does not prove a reaction to the other.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "lychee",
+      "lab_test_name": "Lychee",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 31,
+      "aliases": [],
+      "common_name": "Lychee",
+      "scientific_name": "Litchi chinensis",
+      "canonical_category": "fruits_tropical",
+      "allergen_type": "food",
+      "definition": "Lychee is a small tropical fruit with rough red skin and sweet, juicy white flesh. It is eaten fresh in summer and used in drinks and desserts.",
+      "exposure_sources": [
+        "Fresh lychee",
+        "Juices and desserts",
+        "Fruit salads",
+        "Canned lychee"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to lychee. Reactions are uncommon. If lychee ever caused itching, hives or swelling, tell your doctor. Do not avoid it based on this result alone, and eat it in moderate amounts.",
+      "card_summary": "A small sweet tropical fruit with rough red skin and juicy flesh.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs"
+      ],
+      "caution": "Lychee has limited allergy information, so this result needs careful interpretation by your doctor along with your own experience.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "papaya",
+      "lab_test_name": "Papaya",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 32,
+      "aliases": [],
+      "common_name": "Papaya",
+      "scientific_name": "Carica papaya",
+      "canonical_category": "fruits_tropical",
+      "allergen_type": "food",
+      "definition": "Papaya is a soft orange tropical fruit eaten fresh, in salads and juices. Raw green papaya is also cooked in some dishes and used in home remedies.",
+      "exposure_sources": [
+        "Fresh papaya",
+        "Salads and juices",
+        "Raw papaya sabzi",
+        "Desserts and smoothies"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to papaya. Some people with latex allergy also react to papaya. If you handle latex gloves at work, or papaya has caused mouth itching, tell your doctor. A positive blood test alone does not mean papaya is unsafe.",
+      "card_summary": "A soft orange tropical fruit eaten fresh, in salads or as juice.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "latex_fruit_note"
+      ],
+      "caution": "A positive result does not confirm allergy. If you have reactions to latex products, mention it to your doctor.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "latex"
+        ],
+        "patient_note": "Some people with latex reactions also react to certain fruits. Tell your doctor if this fruit has ever caused symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "latex_fruit_syndrome_E13",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E13"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "strawberry",
+      "lab_test_name": "Strawberry",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 33,
+      "aliases": [],
+      "common_name": "Strawberry",
+      "scientific_name": "Fragaria x ananassa",
+      "canonical_category": "fruits_rosaceae",
+      "allergen_type": "food",
+      "definition": "Strawberry is a red berry eaten fresh or used in jams, ice creams, cakes and drinks. It belongs to the rose family, along with apple, peach and cherry.",
+      "exposure_sources": [
+        "Fresh strawberries",
+        "Ice cream and milkshakes",
+        "Jams and cakes",
+        "Juices"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to strawberry. Mouth itching or a skin rash after strawberries can have several causes. If this happens to you, tell your doctor rather than avoiding strawberries on your own. Keep a note.",
+      "card_summary": "A red berry of the rose family used fresh, in desserts and in drinks.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "pollen_food_link_note",
+        "food_ask_related_foods"
+      ],
+      "caution": "Skin rashes after strawberries are sometimes due to other causes. A blood test cannot show the cause.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "mango",
+      "lab_test_name": "Mango",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 34,
+      "aliases": [],
+      "common_name": "Mango",
+      "scientific_name": "Mangifera indica",
+      "canonical_category": "fruits_tropical",
+      "allergen_type": "food",
+      "definition": "Mango is a sweet tropical fruit eaten fresh, as pulp, in pickles or in drinks and desserts. It is a favourite of the Indian summer season.",
+      "exposure_sources": [
+        "Fresh mango and aamras",
+        "Pickles and chutneys",
+        "Lassi and milkshakes",
+        "Desserts"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth",
+        "Lip swelling",
+        "Skin rash around mouth",
+        "Hives",
+        "Stomach upset"
+      ],
+      "interpretation_insight": "This result shows IgE to mango. Mango skin and sap can irritate the lips and skin, which is different from food allergy. If you get a rash after eating or peeling mangoes, mention it to your doctor and do not stop eating mango on this result alone.",
+      "card_summary": "A sweet summer fruit eaten fresh, as pulp, in pickles or in drinks.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "Skin irritation from mango skin and sap is not the same as food allergy. A blood result cannot tell the difference.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "apple",
+      "lab_test_name": "Apple",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 35,
+      "aliases": [],
+      "common_name": "Apple",
+      "scientific_name": "Malus domestica",
+      "canonical_category": "fruits_rosaceae",
+      "allergen_type": "food",
+      "definition": "Apple is a crisp fruit eaten fresh, as juice or in desserts. It belongs to the rose family with pear, peach and cherry, and is common in lunch boxes.",
+      "exposure_sources": [
+        "Fresh apples",
+        "Juices and smoothies",
+        "Desserts and pies",
+        "Salads"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to apple. People allergic to birch pollen sometimes get an itchy mouth from raw apple, and cooked apple is often tolerated. If you notice this, tell your doctor instead of avoiding apple on your own.",
+      "card_summary": "A crisp fruit of the rose family, eaten fresh, as juice or in desserts.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "pollen_food_link_note",
+        "food_ask_related_foods"
+      ],
+      "caution": "Raw and cooked apples may behave differently in pollen-allergic people. A blood test cannot show which applies to you.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [],
+        "patient_note": "Some people allergic to birch pollen react to raw apple. Tell your doctor if raw apple makes your mouth itch.",
+        "held_note_for_review": null,
+        "evidence_status": "birch_apple_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "banana",
+      "lab_test_name": "Banana",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 36,
+      "aliases": [],
+      "common_name": "Banana",
+      "scientific_name": "Musa species",
+      "canonical_category": "fruits_tropical",
+      "allergen_type": "food",
+      "definition": "Banana is a soft sweet fruit eaten fresh, in shakes and desserts. Raw banana is also cooked in some dishes and dried into chips and powders.",
+      "exposure_sources": [
+        "Fresh banana",
+        "Shakes and desserts",
+        "Chips and snacks",
+        "Raw banana sabzi"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to banana. Some people with latex allergy also react to banana. If you have reactions to latex gloves or banana has caused itching or swelling, tell your doctor. A positive blood test alone does not prove allergy.",
+      "card_summary": "A soft sweet fruit eaten fresh, in shakes, desserts or as chips.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "latex_fruit_note"
+      ],
+      "caution": "If you also have reactions to latex, tell your doctor. Do not avoid banana on this result alone.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "latex"
+        ],
+        "patient_note": "Some people with latex reactions also react to certain fruits. Tell your doctor if this fruit has ever caused symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "latex_fruit_syndrome_E13",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E13"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "kiwi",
+      "lab_test_name": "Kiwi",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 37,
+      "aliases": [],
+      "common_name": "Kiwi",
+      "scientific_name": "Actinidia species",
+      "canonical_category": "fruits_tropical",
+      "allergen_type": "food",
+      "definition": "Kiwi is a green fruit with fuzzy brown skin, eaten fresh or in smoothies, salads and desserts. It is often recommended as a vitamin C source.",
+      "exposure_sources": [
+        "Fresh kiwi",
+        "Smoothies and juices",
+        "Fruit salads",
+        "Desserts"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to kiwi. Kiwi is among fruits linked to latex-related reactions, and it can cause mouth itching in some pollen-allergic people. If this is you, tell your doctor. A positive result alone does not prove allergy.",
+      "card_summary": "A green fruit with fuzzy skin, eaten fresh or in smoothies and desserts.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "latex_fruit_note"
+      ],
+      "caution": "A positive result does not prove allergy. If you have latex reactions or mouth itching with kiwi, tell your doctor.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "latex"
+        ],
+        "patient_note": "Some people with latex reactions also react to certain fruits. Tell your doctor if this fruit has ever caused symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "latex_fruit_syndrome_E13",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E13"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "melon",
+      "lab_test_name": "Melon",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 38,
+      "aliases": [],
+      "common_name": "Melon",
+      "scientific_name": "Cucumis melo",
+      "canonical_category": "fruits_melons",
+      "allergen_type": "food",
+      "definition": "Melon covers sweet fruits such as muskmelon and cantaloupe. It is eaten fresh in summer, as juice, in ice creams, in milkshakes or in fruit salads.",
+      "exposure_sources": [
+        "Fresh slices",
+        "Juices",
+        "Fruit salads",
+        "Summer desserts"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to melon. Some people sensitized to certain weed pollens, such as bathua, also react to melon. If melon makes your mouth itch, tell your doctor. A blood test alone does not prove allergy.",
+      "card_summary": "A sweet summer fruit such as muskmelon, eaten fresh or as juice.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "pollen_food_link_note",
+        "food_ask_related_foods"
+      ],
+      "caution": "Melon and watermelon are related but not identical. A positive result for one does not confirm a reaction to the other.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "chenopodium_album"
+        ],
+        "patient_note": "Some people sensitized to bathua weed pollen also react to melon. Tell your doctor if melon causes mouth itching.",
+        "held_note_for_review": null,
+        "evidence_status": "goosefoot_melon_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "peach",
+      "lab_test_name": "Peach",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 39,
+      "aliases": [],
+      "common_name": "Peach",
+      "scientific_name": "Prunus persica",
+      "canonical_category": "fruits_rosaceae",
+      "allergen_type": "food",
+      "definition": "Peach is a soft fuzzy-skinned stone fruit eaten fresh, canned or in juices and desserts. It belongs to the rose family with apple, plum and cherry.",
+      "exposure_sources": [
+        "Fresh peaches",
+        "Canned peaches",
+        "Juices and jams",
+        "Desserts"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Tingling lips",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to peach. Peach is a fruit where reactions sometimes link to pollen sensitization, including mugwort pollen. If peach makes your mouth itch, tell your doctor. A positive result alone does not prove allergy.",
+      "card_summary": "A soft fuzzy stone fruit of the rose family, eaten fresh or canned.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "pollen_food_link_note",
+        "food_ask_related_foods"
+      ],
+      "caution": "In some people, a peach result reflects sensitization to pollen and not to peach itself. Discuss it with a doctor.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "nart_v1_artemisia_vulgaris"
+        ],
+        "patient_note": "Some people sensitized to mugwort pollen also react to peach. Tell your doctor if peach causes mouth itching.",
+        "held_note_for_review": null,
+        "evidence_status": "mugwort_peach_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "rice",
+      "lab_test_name": "Rice",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 40,
+      "aliases": [],
+      "common_name": "Rice",
+      "scientific_name": "Oryza sativa",
+      "canonical_category": "cereals_grains",
+      "allergen_type": "food",
+      "definition": "Rice is a staple grain eaten boiled, as pulao, biryani, idli, dosa and many other dishes across India. Allergy to rice is uncommon in Indian adults.",
+      "exposure_sources": [
+        "Boiled rice and pulao",
+        "Idli, dosa and batters",
+        "Rice flour and snacks",
+        "Kheer and desserts"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips",
+        "Skin rash"
+      ],
+      "interpretation_insight": "A positive result shows IgE to rice. This can occur in people sensitized to grass pollen, and many such people eat rice without any problem. Because rice is a staple, do not remove it without medical advice.",
+      "card_summary": "A staple grain eaten daily in many forms across India and Asia.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "A positive rice result is often a marker of grass pollen sensitization and not proof of rice allergy. Do not stop eating rice without medical advice.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "cynodon_dactylon",
+          "phleum_pratense"
+        ],
+        "patient_note": null,
+        "held_note_for_review": "A positive rice result may sometimes reflect grass pollen sensitization. Your doctor can help sort this out.",
+        "evidence_status": "grass_cereal_link_pending",
+        "shown_to_patient": false
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    }
+  ]
+}

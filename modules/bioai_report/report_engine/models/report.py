@@ -11,6 +11,13 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
+from modules.bioai_report.report_engine.models.allergy import (
+    AllergyAvailability,
+    AllergyBreakdown,
+    AllergyDetailedInsights,
+    AllergyOverview,
+)
+
 
 class PatientInfo(BaseModel):
     """Patient demographics and metabolic snapshot for the report."""
@@ -269,8 +276,29 @@ class BioReport(BaseModel):
     individual_cancer_information: list[IndividualCancerInformation] = Field(
         default_factory=list
     )
-    detailed_cancer_screening: DetailedCancerScreening
+    detailed_cancer_screening: DetailedCancerScreening | None = None
+    cancer_results_available: bool | None = None
+    allergy_results_available: bool | None = None
+    allergy_availability: AllergyAvailability | None = None
+    allergy_overview: AllergyOverview | None = None
+    allergy_detailed_insights: AllergyDetailedInsights | None = None
+    allergy_breakdown: AllergyBreakdown | None = None
     report_metadata: ReportMetadata
 
     def to_dict(self) -> dict[str, Any]:
-        return self.model_dump(mode="json")
+        payload = self.model_dump(mode="json")
+        for key in (
+            "detailed_cancer_screening",
+            "cancer_results_available",
+            "allergy_results_available",
+            "allergy_availability",
+            "allergy_overview",
+            "allergy_detailed_insights",
+            "allergy_breakdown",
+        ):
+            if payload.get(key) is None:
+                payload.pop(key, None)
+        if payload.get("cancer_results_available") is False:
+            payload.pop("individual_cancer_information", None)
+            payload.pop("detailed_cancer_screening", None)
+        return payload

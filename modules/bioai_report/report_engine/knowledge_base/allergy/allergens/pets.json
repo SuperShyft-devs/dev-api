@@ -1,0 +1,1156 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "source_group": "pets",
+  "source_group_display_order": 1,
+  "patient_group_name": "Animals and Pets",
+  "patient_group_explanation": "Skin, hair, dander, feathers and droppings from pets and farm animals.",
+  "group_caution_rule_ids": [
+    "C_SENS",
+    "C_CLASS",
+    "C_ANIMAL"
+  ],
+  "test_count": 21,
+  "clinical_review_status": "pending",
+  "allergens": [
+    {
+      "allergen_id": "pigeon_droppings",
+      "lab_test_name": "Pigeon Droppings",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 1,
+      "aliases": [],
+      "common_name": "Pigeon Droppings",
+      "scientific_name": null,
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "definition": "Pigeon droppings are the dried waste of pigeons, which often roost on rooftops, balconies and old buildings. Dust from dried droppings can carry bird proteins that some people breathe in.",
+      "exposure_sources": [
+        "Balconies and window ledges",
+        "Rooftops and old buildings",
+        "Pigeon feeding spots",
+        "Pigeon lofts and coops"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result suggests your immune system has made IgE to proteins in pigeon droppings. This does not confirm that pigeons cause your symptoms. It is most useful when symptoms follow time spent near pigeons, roosting sites or cleaning pigeon waste.",
+      "card_summary": "Dust from dried pigeon droppings, common on balconies, ledges and old buildings.",
+      "recommendation_ids": [
+        "bird_cage_cleaning",
+        "animal_clean_surfaces",
+        "bird_cough_review",
+        "animal_wash_hands"
+      ],
+      "caution": "Droppings are a mixed material, so this test cannot show which pigeon protein you react to. A positive result also says little about how strong a reaction may be.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_BIRD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "egg_yolk_elisa",
+          "whole_egg_hen"
+        ],
+        "patient_note": "Some people who react to bird feathers or droppings also react to egg yolk. Tell your doctor if eggs have ever bothered you.",
+        "held_note_for_review": null,
+        "evidence_status": "bird_egg_syndrome_described_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [
+        "mixed_extract"
+      ],
+      "evidence_refs": [
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "pigeon_feathers",
+      "lab_test_name": "Pigeon Feathers",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 2,
+      "aliases": [],
+      "common_name": "Pigeon Feathers",
+      "scientific_name": null,
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "definition": "Pigeon feathers shed tiny particles of feather dust and skin proteins into the air. People who keep pigeons or live near roosting birds may breathe this dust regularly.",
+      "exposure_sources": [
+        "Pigeon lofts and coops",
+        "Balconies with roosting pigeons",
+        "Feather pillows and quilts",
+        "Dusty old buildings"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Itchy, watery eyes",
+        "Blocked nose",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "Your blood shows IgE to pigeon feather proteins. That means sensitization, not proven allergy. If you keep pigeons or clean areas where they roost, think about whether symptoms ease after time away and share that pattern with your doctor.",
+      "card_summary": "Feather dust from pigeons, mainly relevant to people who keep or live near pigeons.",
+      "recommendation_ids": [
+        "bird_cage_cleaning",
+        "animal_bedroom_free",
+        "animal_wash_hands",
+        "bird_cough_review"
+      ],
+      "caution": "Results to feathers and droppings may overlap. A positive result does not show which exposure matters, so symptom timing around birds is more informative.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_BIRD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "egg_yolk_elisa",
+          "whole_egg_hen"
+        ],
+        "patient_note": "Some people who react to bird feathers or droppings also react to egg yolk. Tell your doctor if eggs have ever bothered you.",
+        "held_note_for_review": null,
+        "evidence_status": "bird_egg_syndrome_described_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "turkey_feathers",
+      "lab_test_name": "Turkey Feathers",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 3,
+      "aliases": [],
+      "common_name": "Turkey Feathers",
+      "scientific_name": "Meleagris gallopavo",
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "definition": "Turkey feathers come from farmed or pet turkeys and can release feather dust and skin proteins. Exposure is mostly limited to poultry farms, processing units and feather products.",
+      "exposure_sources": [
+        "Poultry farms and sheds",
+        "Poultry processing units",
+        "Feather-filled bedding",
+        "Feather decorations"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result means IgE to turkey feather proteins was found. Most people have little contact with turkey feathers, so a positive result may reflect similar proteins in other birds. Symptoms around poultry work or feather products are the most useful clue.",
+      "card_summary": "Feather dust from turkeys, mostly met on poultry farms or in feather products.",
+      "recommendation_ids": [
+        "farm_animal_protection",
+        "bird_cage_cleaning",
+        "animal_wash_hands",
+        "occ_health_review"
+      ],
+      "caution": "Bird feather proteins can look similar to each other, so a positive result may reflect another bird. It does not prove turkeys are the trigger.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_BIRD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "egg_yolk_elisa",
+          "whole_egg_hen"
+        ],
+        "patient_note": "Some people who react to bird feathers or droppings also react to egg yolk. Tell your doctor if eggs have ever bothered you.",
+        "held_note_for_review": null,
+        "evidence_status": "bird_egg_syndrome_described_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "epithelium_serum_proteins_prot_mouse",
+      "lab_test_name": "Epithelium + Serum Proteins Prot. Mouse",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 4,
+      "aliases": [
+        "Mouse (Skin, Hair and Serum Proteins)"
+      ],
+      "common_name": "Mouse (Skin, Hair and Serum Proteins)",
+      "scientific_name": "Mus musculus",
+      "canonical_category": "animal_epithelia_dander",
+      "allergen_type": "animal",
+      "definition": "Mouse allergens come from skin, hair, urine and body proteins of mice. Exposure can happen with pet mice, laboratory work or rodent-infested homes and stores.",
+      "exposure_sources": [
+        "Pet or laboratory mice",
+        "Mouse-infested kitchens and stores",
+        "Animal houses and labs",
+        "Dusty storage rooms"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny nose",
+        "Itchy eyes",
+        "Cough",
+        "Skin itching"
+      ],
+      "interpretation_insight": "A positive result shows IgE to mouse proteins. This is most relevant if you handle mice at work or have seen mice at home. The test name looks unusual, so ask the laboratory exactly which extract was used.",
+      "card_summary": "Proteins from mouse skin, hair and body fluids, relevant to pet owners and lab workers.",
+      "recommendation_ids": [
+        "rodent_exposure_control",
+        "animal_clean_surfaces",
+        "occ_review_exposure",
+        "animal_wash_hands"
+      ],
+      "caution": "This test name is not standard, so the exact extract is unclear. Interpret with caution and confirm details with the laboratory.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_ANIMAL"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "extract_unclear",
+        "name_nonstandard"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "pig_epithelium",
+      "lab_test_name": "Pig Epithelium",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 5,
+      "aliases": [
+        "Pig Skin and Hair"
+      ],
+      "common_name": "Pig Skin and Hair",
+      "scientific_name": "Sus scrofa domesticus",
+      "canonical_category": "animal_epithelia_dander",
+      "allergen_type": "animal",
+      "definition": "Pig epithelium means skin cells and hair from pigs. Most exposure happens on pig farms, in slaughter units or during work with pig products rather than at home.",
+      "exposure_sources": [
+        "Pig farms and sheds",
+        "Meat processing units",
+        "Animal handling work"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny nose",
+        "Itchy eyes",
+        "Cough",
+        "Skin itching"
+      ],
+      "interpretation_insight": "A positive result shows IgE to pig skin and hair proteins. This is mainly relevant if you work with pigs. It does not show allergy to pork meat, which is tested separately and may behave differently.",
+      "card_summary": "Pig skin and hair proteins, mainly relevant to farm and meat-industry work.",
+      "recommendation_ids": [
+        "farm_animal_protection",
+        "occ_review_exposure",
+        "animal_wash_hands"
+      ],
+      "caution": "A positive result for pig skin does not mean you must avoid pork. Meat allergy is a separate question that needs a doctor's review.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_ANIMAL"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "goose_feathers",
+      "lab_test_name": "Goose Feathers",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 6,
+      "aliases": [],
+      "common_name": "Goose Feathers",
+      "scientific_name": null,
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "definition": "Goose feathers and down are used in pillows, quilts and jackets. Dust from these products or from goose keeping can carry bird proteins that some people breathe in.",
+      "exposure_sources": [
+        "Pillows and quilts with down",
+        "Winter jackets with feather filling",
+        "Poultry or goose farms",
+        "Feather dusters"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "Your blood shows IgE to goose feather proteins. If your symptoms are worse at night or after using feather bedding, that could be a useful clue. This result alone does not prove the feathers are responsible.",
+      "card_summary": "Goose feather and down dust, found in pillows, quilts and winter jackets.",
+      "recommendation_ids": [
+        "animal_bedroom_free",
+        "animal_clean_surfaces",
+        "hdm_wash_bedding",
+        "gen_note_symptoms"
+      ],
+      "caution": "Many people with feather bedding also have dust mites in the same bedding. Both can cause similar symptoms, so a positive result needs context.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_BIRD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "egg_yolk_elisa",
+          "whole_egg_hen"
+        ],
+        "patient_note": "Some people who react to bird feathers or droppings also react to egg yolk. Tell your doctor if eggs have ever bothered you.",
+        "held_note_for_review": null,
+        "evidence_status": "bird_egg_syndrome_described_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "cat_epithelium",
+      "lab_test_name": "Cat Epithelium",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 7,
+      "aliases": [
+        "Cat Skin and Hair"
+      ],
+      "common_name": "Cat Skin and Hair",
+      "scientific_name": "Felis catus",
+      "canonical_category": "animal_epithelia_dander",
+      "allergen_type": "animal",
+      "definition": "Cat epithelium means skin cells and hair from cats. Cats spread tiny allergen particles through fur, saliva and skin, and these can stay in homes for a long time.",
+      "exposure_sources": [
+        "Homes with cats",
+        "Cat bedding and sofas",
+        "Houses of friends with cats",
+        "Clothing from cat owners"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny nose",
+        "Itchy, watery eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to cat proteins. It is more meaningful if you notice sneezing, itchy eyes or chest tightness around cats. You can be sensitized without symptoms, so your own experience matters most.",
+      "card_summary": "Skin and hair proteins from cats, which spread widely through homes and clothes.",
+      "recommendation_ids": [
+        "animal_no_rehoming_without_review",
+        "animal_bedroom_free",
+        "animal_clean_surfaces",
+        "animal_wash_hands"
+      ],
+      "caution": "A positive result does not prove that your cat is the cause of your symptoms. Discuss any decision about a pet with an allergist.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_ANIMAL"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "pork"
+        ],
+        "patient_note": "A small group of people sensitized to cats also react to pork. Tell your doctor if pork has ever caused symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "cat_pork_syndrome_described_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [
+        "overlaps_cat_dander"
+      ],
+      "evidence_refs": [
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "cat_dander",
+      "lab_test_name": "Cat Dander",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 8,
+      "aliases": [],
+      "common_name": "Cat Dander",
+      "scientific_name": "Felis catus",
+      "canonical_category": "animal_epithelia_dander",
+      "allergen_type": "animal",
+      "definition": "Cat dander is made of tiny flakes of cat skin along with saliva proteins that dry on fur. It can float in the air and stick to clothes, sofas and curtains.",
+      "exposure_sources": [
+        "Homes with cats",
+        "Upholstery and curtains",
+        "Visitors' clothing",
+        "Schools and offices with cat owners"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "This result shows IgE to cat dander. Because dander clings to clothes, you can meet it even in homes without cats. Check whether symptoms start soon after visiting cat owners, then share that pattern with your doctor.",
+      "card_summary": "Cat skin flakes and saliva proteins, easily carried on clothes and furniture.",
+      "recommendation_ids": [
+        "animal_no_rehoming_without_review",
+        "animal_clean_surfaces",
+        "animal_bedroom_free",
+        "gen_see_allergist"
+      ],
+      "caution": "Cat epithelium and dander tests largely look at the same exposure. Two positives do not mean two separate allergies.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_ANIMAL"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "pork"
+        ],
+        "patient_note": "A small group of people sensitized to cats also react to pork. Tell your doctor if pork has ever caused symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "cat_pork_syndrome_described_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [
+        "overlaps_cat_epithelium"
+      ],
+      "evidence_refs": [
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "budgerigar_dropping",
+      "lab_test_name": "Budgerigar Dropping",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 9,
+      "aliases": [
+        "Budgerigar Droppings"
+      ],
+      "common_name": "Budgerigar Droppings",
+      "scientific_name": "Melopsittacus undulatus",
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "definition": "Budgerigars are small pet parrots often kept in cages at home. Their dried droppings can turn into fine dust that may be breathed in when cages are cleaned.",
+      "exposure_sources": [
+        "Cage trays and liners",
+        "Areas around the bird cage",
+        "Pet shops and aviaries",
+        "Dusty cage covers"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to budgerigar droppings. This is most relevant if you keep or clean up after pet birds. It does not prove allergy on its own. If you often cough around the cage, mention this to your doctor.",
+      "card_summary": "Dust from dried budgerigar droppings, linked to cleaning cages, aviaries and bird rooms.",
+      "recommendation_ids": [
+        "bird_cage_cleaning",
+        "bird_cough_review",
+        "animal_wash_hands",
+        "animal_no_rehoming_without_review"
+      ],
+      "caution": "This test looks at droppings only, while feathers and body proteins are tested separately. One positive does not predict the others.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_BIRD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "egg_yolk_elisa",
+          "whole_egg_hen"
+        ],
+        "patient_note": "Some people who react to bird feathers or droppings also react to egg yolk. Tell your doctor if eggs have ever bothered you.",
+        "held_note_for_review": null,
+        "evidence_status": "bird_egg_syndrome_described_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "dog_epithelium",
+      "lab_test_name": "Dog Epithelium",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 10,
+      "aliases": [
+        "Dog Skin and Hair"
+      ],
+      "common_name": "Dog Skin and Hair",
+      "scientific_name": "Canis lupus familiaris",
+      "canonical_category": "animal_epithelia_dander",
+      "allergen_type": "animal",
+      "definition": "Dog epithelium means skin cells and hair from dogs. Dogs carry allergen particles in fur, skin and saliva, which can spread to furniture, floors and clothing.",
+      "exposure_sources": [
+        "Homes with dogs",
+        "Dog beds and sofas",
+        "Cars used by dog owners",
+        "Dog kennels and grooming areas"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to dog proteins. It is most useful if you have sneezing or itchy eyes around dogs. Many people with a positive blood test have no symptoms at all, so your own experience is important.",
+      "card_summary": "Skin and hair proteins from dogs, found on fur, furniture and floors.",
+      "recommendation_ids": [
+        "animal_no_rehoming_without_review",
+        "animal_bedroom_free",
+        "animal_clean_surfaces",
+        "animal_wash_hands"
+      ],
+      "caution": "Allergen levels differ between individual dogs, so a positive result does not mean every dog will affect you equally.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_ANIMAL"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "overlaps_dog_dander"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "budgerigar_feathers",
+      "lab_test_name": "Budgerigar Feathers",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 11,
+      "aliases": [],
+      "common_name": "Budgerigar Feathers",
+      "scientific_name": "Melopsittacus undulatus",
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "definition": "Budgerigar feathers release fine feather dust and skin proteins into the air. Pet owners and pet-shop workers are the people most likely to be exposed.",
+      "exposure_sources": [
+        "Pet budgerigars at home",
+        "Pet shops and aviaries",
+        "Cage bottoms and perches",
+        "Feather dust on nearby furniture"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "Your blood shows IgE to budgerigar feather proteins. If you keep birds, notice whether your symptoms ease when you are away from them. A positive result alone does not prove the birds are causing your symptoms.",
+      "card_summary": "Feather dust from pet budgerigars, relevant to bird keepers and pet-shop workers.",
+      "recommendation_ids": [
+        "bird_cage_cleaning",
+        "animal_bedroom_free",
+        "bird_cough_review",
+        "animal_wash_hands"
+      ],
+      "caution": "Feather, dropping and serum protein tests for the same bird can overlap. Several positives may reflect one underlying sensitization.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_BIRD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "egg_yolk_elisa",
+          "whole_egg_hen"
+        ],
+        "patient_note": "Some people who react to bird feathers or droppings also react to egg yolk. Tell your doctor if eggs have ever bothered you.",
+        "held_note_for_review": null,
+        "evidence_status": "bird_egg_syndrome_described_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "dog_dander",
+      "lab_test_name": "Dog Dander",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 12,
+      "aliases": [],
+      "common_name": "Dog Dander",
+      "scientific_name": "Canis lupus familiaris",
+      "canonical_category": "animal_epithelia_dander",
+      "allergen_type": "animal",
+      "definition": "Dog dander is made of tiny flakes of dog skin and dried saliva. These flakes are light, stay in the air and settle on soft furnishings, carpets and clothes.",
+      "exposure_sources": [
+        "Homes with dogs",
+        "Sofas and carpets",
+        "Visitors' clothing",
+        "Pet grooming shops"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "This result shows IgE to dog dander. Because dander travels on clothing, you can meet it away from dogs. If symptoms flare soon after being around dogs, note it in a diary and share it with your doctor.",
+      "card_summary": "Dog skin flakes and dried saliva that spread easily through homes and clothes.",
+      "recommendation_ids": [
+        "animal_no_rehoming_without_review",
+        "animal_clean_surfaces",
+        "animal_bedroom_free",
+        "gen_note_symptoms"
+      ],
+      "caution": "Dog epithelium and dander tests overlap heavily. Two positives do not necessarily mean two separate problems.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_ANIMAL"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "overlaps_dog_epithelium"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "canarian_feathers",
+      "lab_test_name": "Canarian Feathers",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 13,
+      "aliases": [
+        "Canary Feathers"
+      ],
+      "common_name": "Canary Feathers",
+      "scientific_name": "Serinus canaria",
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "definition": "Canaries are small songbirds often kept as pets in cages. Their feathers and dried droppings can release fine dust that may be breathed in during cleaning.",
+      "exposure_sources": [
+        "Pet canaries at home",
+        "Bird cages and perches",
+        "Pet shops",
+        "Bird-seed storage areas"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result suggests IgE to canary feather proteins. This matters mainly if you keep canaries or spend time in rooms with them. It does not prove allergy. Look for a pattern between bird contact and your symptoms.",
+      "card_summary": "Feather dust from canaries, mainly relevant to people who keep them as pets.",
+      "recommendation_ids": [
+        "bird_cage_cleaning",
+        "animal_bedroom_free",
+        "animal_wash_hands",
+        "bird_cough_review"
+      ],
+      "caution": "Bird proteins can look alike to the immune system, so another bird may be the real trigger. The result does not identify the bird.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_BIRD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "egg_yolk_elisa",
+          "whole_egg_hen"
+        ],
+        "patient_note": "Some people who react to bird feathers or droppings also react to egg yolk. Tell your doctor if eggs have ever bothered you.",
+        "held_note_for_review": null,
+        "evidence_status": "bird_egg_syndrome_described_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "budgerigar_serum_proteins",
+      "lab_test_name": "Budgerigar Serum Proteins",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 14,
+      "aliases": [
+        "Budgerigar Blood Proteins"
+      ],
+      "common_name": "Budgerigar Blood Proteins",
+      "scientific_name": "Melopsittacus undulatus",
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "definition": "Budgerigar serum proteins are proteins from the bird's blood that also end up in feather dust and droppings. They are a recognised source of bird-related sensitization.",
+      "exposure_sources": [
+        "Pet budgerigars at home",
+        "Cage areas and bird droppings",
+        "Pet shops",
+        "Feather dust on furniture"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "Your blood shows IgE to proteins from budgerigar serum. People can react to these proteins when they breathe in feather dust. This does not confirm allergy, but it is worth mentioning if birds are part of your home or work.",
+      "card_summary": "Blood proteins from budgerigars that also appear in their feather dust and droppings.",
+      "recommendation_ids": [
+        "bird_cage_cleaning",
+        "animal_clean_surfaces",
+        "animal_wash_hands",
+        "bird_cough_review"
+      ],
+      "caution": "Some serum proteins are similar between birds and, in a few people, to egg yolk. A positive result is not a diagnosis.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_BIRD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "egg_yolk_elisa",
+          "whole_egg_hen"
+        ],
+        "patient_note": "Some people who react to bird feathers or droppings also react to egg yolk. Tell your doctor if eggs have ever bothered you.",
+        "held_note_for_review": null,
+        "evidence_status": "bird_egg_syndrome_described_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "rabbit_epithelium",
+      "lab_test_name": "Rabbit Epithelium",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 15,
+      "aliases": [
+        "Rabbit Skin and Hair"
+      ],
+      "common_name": "Rabbit Skin and Hair",
+      "scientific_name": "Oryctolagus cuniculus",
+      "canonical_category": "animal_epithelia_dander",
+      "allergen_type": "animal",
+      "definition": "Rabbit epithelium means skin cells and hair from rabbits. People may meet it through pet rabbits, rabbit farming, animal shops or laboratory work with rabbits.",
+      "exposure_sources": [
+        "Pet rabbits",
+        "Rabbit hutches and bedding",
+        "Hay and straw used for rabbits",
+        "Laboratory animal rooms"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny nose",
+        "Itchy eyes",
+        "Cough",
+        "Skin itching"
+      ],
+      "interpretation_insight": "A positive result shows IgE to rabbit proteins. It matters most if you keep rabbits or handle them at work. If symptoms start while cleaning hutches, remember that hay dust can also cause similar symptoms.",
+      "card_summary": "Rabbit skin and hair proteins, relevant to pet owners and animal handlers.",
+      "recommendation_ids": [
+        "animal_clean_surfaces",
+        "animal_wash_hands",
+        "animal_no_rehoming_without_review",
+        "occ_review_exposure"
+      ],
+      "caution": "Rabbit bedding such as hay is dusty and can cause symptoms independently of the rabbit. The result alone cannot separate these causes.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_ANIMAL"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "goat_epithelium",
+      "lab_test_name": "Goat Epithelium",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 16,
+      "aliases": [
+        "Goat Skin and Hair"
+      ],
+      "common_name": "Goat Skin and Hair",
+      "scientific_name": "Capra hircus",
+      "canonical_category": "animal_epithelia_dander",
+      "allergen_type": "animal",
+      "definition": "Goat epithelium means skin cells and hair from goats. Exposure is common in villages, farms and animal markets, and for people who keep goats at home.",
+      "exposure_sources": [
+        "Goat sheds and farms",
+        "Village and farm settings",
+        "Animal markets",
+        "Goat hair products"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to goat skin and hair proteins. It is most relevant if you keep goats or live near livestock. It does not show allergy to goat meat, which is a separate question for your doctor.",
+      "card_summary": "Goat skin and hair proteins, relevant to people living or working near goats.",
+      "recommendation_ids": [
+        "farm_animal_protection",
+        "animal_wash_hands",
+        "occ_review_exposure",
+        "animal_clean_surfaces"
+      ],
+      "caution": "Proteins from different farm animals can overlap, so a positive result may reflect another animal. Your doctor will read it with your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_ANIMAL"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "chicken_feathers",
+      "lab_test_name": "Chicken Feathers",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 17,
+      "aliases": [],
+      "common_name": "Chicken Feathers",
+      "scientific_name": "Gallus gallus domesticus",
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "definition": "Chicken feathers release dust and skin proteins into the air in poultry sheds, markets and backyard coops. Feather dust may also come from feather-filled items.",
+      "exposure_sources": [
+        "Backyard coops and poultry farms",
+        "Live poultry markets",
+        "Poultry processing units",
+        "Feather dusters and bedding"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result suggests IgE to chicken feather proteins. If you work around poultry or keep hens, notice whether symptoms improve away from the birds. This result does not mean you must avoid eating chicken or eggs.",
+      "card_summary": "Feather dust from chickens, relevant to poultry work, markets and backyard coops.",
+      "recommendation_ids": [
+        "farm_animal_protection",
+        "bird_cage_cleaning",
+        "animal_wash_hands",
+        "occ_review_exposure"
+      ],
+      "caution": "Sensitization to chicken feathers does not mean you will react to chicken meat. A small number of people also react to egg yolk.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_BIRD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "egg_yolk_elisa",
+          "whole_egg_hen"
+        ],
+        "patient_note": "Some people who react to bird feathers or droppings also react to egg yolk. Tell your doctor if eggs have ever bothered you.",
+        "held_note_for_review": null,
+        "evidence_status": "bird_egg_syndrome_described_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "chicken_droppings",
+      "lab_test_name": "Chicken Droppings",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 18,
+      "aliases": [],
+      "common_name": "Chicken Droppings",
+      "scientific_name": "Gallus gallus domesticus",
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "definition": "Chicken droppings dry into dust inside coops, sheds and farm yards. This dust can be stirred up when floors are swept or litter is moved.",
+      "exposure_sources": [
+        "Backyard coops and poultry sheds",
+        "Poultry litter and manure",
+        "Farm yards",
+        "Garden manure"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "Your blood shows IgE to chicken droppings. This matters most if you clean coops or handle poultry manure, which can create a lot of dust. A positive result does not prove allergy, so note when your symptoms appear.",
+      "card_summary": "Dried chicken droppings dust, linked to cleaning coops, poultry farms and handling manure.",
+      "recommendation_ids": [
+        "farm_animal_protection",
+        "bird_cage_cleaning",
+        "animal_wash_hands",
+        "occ_health_review"
+      ],
+      "caution": "Droppings and manure contain a mixture of materials, including moulds. The test cannot show which part causes any symptoms.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_BIRD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "egg_yolk_elisa",
+          "whole_egg_hen"
+        ],
+        "patient_note": "Some people who react to bird feathers or droppings also react to egg yolk. Tell your doctor if eggs have ever bothered you.",
+        "held_note_for_review": null,
+        "evidence_status": "bird_egg_syndrome_described_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [
+        "mixed_extract"
+      ],
+      "evidence_refs": [
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "sheep_epithelium",
+      "lab_test_name": "Sheep Epithelium",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 19,
+      "aliases": [
+        "Sheep Skin and Hair"
+      ],
+      "common_name": "Sheep Skin and Hair",
+      "scientific_name": "Ovis aries",
+      "canonical_category": "animal_epithelia_dander",
+      "allergen_type": "animal",
+      "definition": "Sheep epithelium means skin cells and hair from sheep. Exposure occurs on farms, in wool handling, at animal markets, during festivals and near livestock sheds.",
+      "exposure_sources": [
+        "Sheep farms and sheds",
+        "Livestock markets",
+        "Shearing and wool handling",
+        "Rural areas with sheep"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny nose",
+        "Itchy eyes",
+        "Cough",
+        "Skin itching"
+      ],
+      "interpretation_insight": "A positive result shows IgE to sheep skin and hair proteins. This is mainly relevant for people working with sheep or wool. It does not prove allergy to mutton or wool, which are tested separately and may differ.",
+      "card_summary": "Sheep skin and hair proteins, mainly relevant to farm and wool work.",
+      "recommendation_ids": [
+        "farm_animal_protection",
+        "occ_review_exposure",
+        "animal_wash_hands"
+      ],
+      "caution": "Proteins from different farm animals can overlap, so a positive result may reflect another animal. Your doctor will read it with your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_ANIMAL"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "duck_feathers",
+      "lab_test_name": "Duck Feathers",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 20,
+      "aliases": [],
+      "common_name": "Duck Feathers",
+      "scientific_name": null,
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "definition": "Duck feathers and down are used in pillows, quilts and winter jackets. People may also meet feather dust at duck farms, ponds or in poultry markets.",
+      "exposure_sources": [
+        "Pillows and quilts with down",
+        "Duck farms and ponds",
+        "Poultry markets",
+        "Winter clothing with feather filling"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "This result shows IgE to duck feather proteins. If your symptoms are worse after lying on feather pillows or cleaning duck areas, share that with your doctor. A positive test alone does not prove allergy.",
+      "card_summary": "Duck feather and down dust, found in bedding, jackets and poultry settings.",
+      "recommendation_ids": [
+        "animal_bedroom_free",
+        "animal_clean_surfaces",
+        "hdm_wash_bedding",
+        "gen_note_symptoms"
+      ],
+      "caution": "Feather bedding often also holds dust mites. Both can cause similar symptoms, so a positive feather result needs context.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_BIRD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "egg_yolk_elisa",
+          "whole_egg_hen"
+        ],
+        "patient_note": "Some people who react to bird feathers or droppings also react to egg yolk. Tell your doctor if eggs have ever bothered you.",
+        "held_note_for_review": null,
+        "evidence_status": "bird_egg_syndrome_described_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "cow_dander",
+      "lab_test_name": "Cow Dander",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 21,
+      "aliases": [],
+      "common_name": "Cow Dander",
+      "scientific_name": "Bos taurus",
+      "canonical_category": "animal_epithelia_dander",
+      "allergen_type": "animal",
+      "definition": "Cow dander is made of skin flakes and hair from cattle. It is a common exposure for dairy workers, farmers and people living close to cattle sheds.",
+      "exposure_sources": [
+        "Dairy farms and cattle sheds",
+        "Village homes near cattle",
+        "Milking areas",
+        "Animal feed and bedding"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to cow dander. It matters mainly if you work or live around cattle. It does not mean you are allergic to milk or beef, which are tested separately and behave differently.",
+      "card_summary": "Skin flakes and hair proteins from cattle, relevant to farm and dairy settings.",
+      "recommendation_ids": [
+        "farm_animal_protection",
+        "animal_wash_hands",
+        "occ_review_exposure",
+        "animal_clean_surfaces"
+      ],
+      "caution": "Cow dander sensitization does not mean you must avoid milk or beef. Do not change your diet because of this result.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_ANIMAL"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    }
+  ]
+}

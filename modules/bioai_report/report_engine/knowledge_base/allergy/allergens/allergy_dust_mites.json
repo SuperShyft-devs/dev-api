@@ -1,0 +1,799 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "source_group": "allergy_dust_mites",
+  "source_group_display_order": 3,
+  "patient_group_name": "Dust Mites and Dusts",
+  "patient_group_explanation": "Mites and mixed dusts found in homes, stores and workplaces.",
+  "group_caution_rule_ids": [
+    "C_SENS",
+    "C_CLASS",
+    "C_MITE"
+  ],
+  "test_count": 13,
+  "clinical_review_status": "pending",
+  "allergens": [
+    {
+      "allergen_id": "euroglyphus_maynei",
+      "lab_test_name": "Euroglyphus Maynei",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 1,
+      "aliases": [
+        "House Dust Mite (Euroglyphus maynei)"
+      ],
+      "common_name": "House Dust Mite (Euroglyphus maynei)",
+      "scientific_name": "Euroglyphus maynei",
+      "canonical_category": "house_dust_mites",
+      "allergen_type": "environmental",
+      "definition": "Euroglyphus maynei is a microscopic mite that lives in house dust, bedding and carpets. It is related to the better known dust mites and thrives in warm, humid rooms.",
+      "exposure_sources": [
+        "Mattresses and pillows",
+        "Carpets and rugs",
+        "Upholstered sofas",
+        "Soft furnishings"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "Your blood shows IgE to this house dust mite. Related mites are very common and can cause similar symptoms, so a positive result may reflect sensitization to several mites at once. Night-time or early-morning sneezing and a blocked nose may be a clue.",
+      "card_summary": "A microscopic mite living in bedding, carpets, mattresses, pillows and soft furnishings.",
+      "recommendation_ids": [
+        "hdm_wash_bedding",
+        "hdm_mattress_covers",
+        "hdm_reduce_humidity",
+        "hdm_damp_dusting",
+        "hdm_soft_furnishings"
+      ],
+      "caution": "Dust mite results often occur together. A positive result does not show which mite matters, and it does not tell you how severe symptoms will be.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MITE"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "shrimp",
+          "crab",
+          "lobster",
+          "blatella_germanica"
+        ],
+        "patient_note": "Dust mites share a protein with shellfish and cockroach, so positive results to these can appear together. Tell your doctor if shellfish has ever caused symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "tropomyosin_link_E09_E10",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E09",
+        "E10",
+        "E19"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "tyrophagus_putrescentiae",
+      "lab_test_name": "Tyrophagus Putrescentiae",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 2,
+      "aliases": [
+        "Storage Mite (Tyrophagus putrescentiae)"
+      ],
+      "common_name": "Storage Mite (Tyrophagus putrescentiae)",
+      "scientific_name": "Tyrophagus putrescentiae",
+      "canonical_category": "storage_mites",
+      "allergen_type": "environmental",
+      "definition": "Storage mites are tiny organisms found in stored grains, flour and damp storage areas. Some people may develop sneezing, coughing or breathing symptoms after exposure to them.",
+      "exposure_sources": [
+        "Stored grains and flour",
+        "Dried foods in damp storage",
+        "Pulses and dry fruit stores",
+        "Animal feed and hay"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "Your blood test may show sensitization to this storage mite. This finding does not confirm that it is causing symptoms. It is more useful if you notice reactions when handling stored food, flour sacks or dusty storage areas.",
+      "card_summary": "A mite associated with stored foods, grains, dry fish and damp storage environments.",
+      "recommendation_ids": [
+        "safe_dry_food_storage",
+        "storage_moisture_control",
+        "reduce_storage_dust",
+        "check_flour_before_use",
+        "dust_cleaning_mask"
+      ],
+      "caution": "Storage mites are different from bedroom dust mites, but their proteins can be similar. Positive results to both groups can happen together.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MITE"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "shrimp",
+          "crab",
+          "lobster",
+          "blatella_germanica"
+        ],
+        "patient_note": "Dust mites share a protein with shellfish and cockroach, so positive results to these can appear together. Tell your doctor if shellfish has ever caused symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "tropomyosin_link_E09_E10",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E10",
+        "E09"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "tobacco_dust",
+      "lab_test_name": "Tobacco Dust",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 3,
+      "aliases": [
+        "Tobacco Leaf Dust"
+      ],
+      "common_name": "Tobacco Leaf Dust",
+      "scientific_name": "Nicotiana tabacum",
+      "canonical_category": "plant_fibres_and_dusts",
+      "allergen_type": "occupational",
+      "definition": "Tobacco dust is fine dust from dried tobacco leaves. It is not a mite. People may breathe it in at tobacco farms, factories and shops.",
+      "exposure_sources": [
+        "Tobacco farms and curing barns",
+        "Cigarette and bidi factories",
+        "Tobacco shops",
+        "Handling loose tobacco leaf"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to tobacco leaf dust. It is mainly relevant if you work with tobacco or handle it often. The test is about leaf dust, not cigarette smoke, so a positive result says little about smoking itself.",
+      "card_summary": "Dust from dried tobacco leaves, relevant to tobacco farming, bidi making and manufacturing.",
+      "recommendation_ids": [
+        "occ_review_exposure",
+        "occ_health_review",
+        "fibre_dust_control",
+        "dust_cleaning_mask"
+      ],
+      "caution": "This test is listed under dust mites in the laboratory catalogue but tobacco is a plant, not a mite. Interpret it as a plant dust result.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_OCC",
+        "C_MIXED"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence",
+        "source_group_mismatch"
+      ],
+      "evidence_refs": [
+        "E16",
+        "E24"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "lepidoglyphus_destructor",
+      "lab_test_name": "Lepidoglyphus Destructor",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 4,
+      "aliases": [
+        "Storage Mite (Lepidoglyphus destructor)"
+      ],
+      "common_name": "Storage Mite (Lepidoglyphus destructor)",
+      "scientific_name": "Lepidoglyphus destructor",
+      "canonical_category": "storage_mites",
+      "allergen_type": "environmental",
+      "definition": "Lepidoglyphus destructor is a storage mite found in hay, straw, grain and animal feed. Farm workers and people handling feed may breathe in its dust.",
+      "exposure_sources": [
+        "Hay and straw",
+        "Stored grain",
+        "Animal feed",
+        "Barns and farm stores"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result suggests IgE to this storage mite. It is most relevant if you work with hay, grain or animal feed. If symptoms start in barns or feed stores, tell your doctor and note when they occur.",
+      "card_summary": "A storage mite common in hay, grain, flour, dry fruit and animal feed.",
+      "recommendation_ids": [
+        "safe_dry_food_storage",
+        "storage_moisture_control",
+        "reduce_storage_dust",
+        "hay_dust_handling",
+        "dust_cleaning_mask"
+      ],
+      "caution": "Hay and grain dust also contains moulds and plant material. The result alone cannot show which part of the dust causes symptoms.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MITE"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "shrimp",
+          "crab",
+          "lobster",
+          "blatella_germanica"
+        ],
+        "patient_note": "Dust mites share a protein with shellfish and cockroach, so positive results to these can appear together. Tell your doctor if shellfish has ever caused symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "tropomyosin_link_E09_E10",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E10",
+        "E09"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "house_dust_ifci_1",
+      "lab_test_name": "House Dust – IFCI 1",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 5,
+      "aliases": [
+        "Mixed House Dust (IFCI 1)"
+      ],
+      "common_name": "Mixed House Dust (IFCI 1)",
+      "scientific_name": null,
+      "canonical_category": "mixed_environmental_dusts",
+      "allergen_type": "environmental",
+      "definition": "House dust is a mixture of many small materials, including fibres, skin flakes, mites, moulds and pollen. This test uses a prepared house dust extract.",
+      "exposure_sources": [
+        "Bedrooms and living rooms",
+        "Carpets and curtains",
+        "Fans and shelves",
+        "Closed storage spaces"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to something in a mixed house dust extract. Because house dust holds many materials, the test cannot say which one you react to. Results for dust mites may help explain it better.",
+      "card_summary": "A mixed extract of ordinary household dust containing many different materials and mites.",
+      "recommendation_ids": [
+        "hdm_damp_dusting",
+        "hdm_reduce_humidity",
+        "dust_cleaning_mask",
+        "gen_note_symptoms"
+      ],
+      "caution": "The meaning of the code 'IFCI 1' is not defined in the catalogue. Ask the laboratory what this extract contains before relying on it.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MIXED"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "mixed_extract",
+        "name_code_unexplained"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "dermatophagoides_microceras",
+      "lab_test_name": "Dermatophagoides Microceras",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 6,
+      "aliases": [
+        "House Dust Mite (Dermatophagoides microceras)"
+      ],
+      "common_name": "House Dust Mite (Dermatophagoides microceras)",
+      "scientific_name": "Dermatophagoides microceras",
+      "canonical_category": "house_dust_mites",
+      "allergen_type": "environmental",
+      "definition": "Dermatophagoides microceras is a house dust mite related to the two most commonly studied dust mites. It lives in bedding, carpets and dusty corners of homes.",
+      "exposure_sources": [
+        "Mattresses and pillows",
+        "Carpets and rugs",
+        "Sofas and curtains",
+        "Soft toys"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "Your blood shows IgE to this dust mite. This species is closely related to common dust mites, so it may be positive when they are too. Look for a link between your symptoms and bedrooms or dusty cleaning.",
+      "card_summary": "A house dust mite related to the most common dust mites in homes.",
+      "recommendation_ids": [
+        "hdm_wash_bedding",
+        "hdm_mattress_covers",
+        "hdm_reduce_humidity",
+        "hdm_damp_dusting",
+        "hdm_soft_furnishings"
+      ],
+      "caution": "This mite is less often studied than other dust mites. Interpret the result together with the main dust mite results.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MITE"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "shrimp",
+          "crab",
+          "lobster",
+          "blatella_germanica"
+        ],
+        "patient_note": "Dust mites share a protein with shellfish and cockroach, so positive results to these can appear together. Tell your doctor if shellfish has ever caused symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "tropomyosin_link_E09_E10",
+        "shown_to_patient": true
+      },
+      "review_flags": [
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E09",
+        "E10",
+        "E19"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "acarus_siro",
+      "lab_test_name": "Acarus Siro",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 7,
+      "aliases": [
+        "Flour Mite (Acarus siro)"
+      ],
+      "common_name": "Flour Mite (Acarus siro)",
+      "scientific_name": "Acarus siro",
+      "canonical_category": "storage_mites",
+      "allergen_type": "environmental",
+      "definition": "Acarus siro is a storage mite known as the flour mite. It lives in flour, grain, cereals and other dry foods that are stored in damp or warm conditions.",
+      "exposure_sources": [
+        "Flour and grain stores",
+        "Cereals and dry foods",
+        "Mouldy or damp pantries",
+        "Animal feed"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result suggests IgE to the flour mite. Bakers, millers and people who store large amounts of flour or grain may be most exposed. This does not prove that the mite is causing your symptoms.",
+      "card_summary": "The flour mite, found in damp stores of flour, grain and cereals.",
+      "recommendation_ids": [
+        "safe_dry_food_storage",
+        "storage_moisture_control",
+        "check_flour_before_use",
+        "reduce_storage_dust",
+        "dust_cleaning_mask"
+      ],
+      "caution": "Storage mite results often come together. A positive result does not show which species matters or how strong a reaction might be.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MITE"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "shrimp",
+          "crab",
+          "lobster",
+          "blatella_germanica"
+        ],
+        "patient_note": "Dust mites share a protein with shellfish and cockroach, so positive results to these can appear together. Tell your doctor if shellfish has ever caused symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "tropomyosin_link_E09_E10",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E10",
+        "E09"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "blomia_tropicalis",
+      "lab_test_name": "Blomia Tropicalis",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 8,
+      "aliases": [
+        "Tropical Dust Mite (Blomia tropicalis)"
+      ],
+      "common_name": "Tropical Dust Mite (Blomia tropicalis)",
+      "scientific_name": "Blomia tropicalis",
+      "canonical_category": "house_dust_mites",
+      "allergen_type": "environmental",
+      "definition": "Blomia tropicalis is a tiny mite found in house dust in warm, humid regions. It lives in mattresses, carpets and stored foods and is common in tropical climates.",
+      "exposure_sources": [
+        "Mattresses and bedding",
+        "Carpets and sofas",
+        "Humid kitchens and stores",
+        "Stored dry foods"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "This result shows IgE to a mite that thrives in warm, humid places. Dust mites are a major trigger of allergic asthma in tropical regions. Positive results here are more meaningful if your symptoms are worse indoors or during humid months.",
+      "card_summary": "A mite that thrives in warm, humid homes in tropical regions like India.",
+      "recommendation_ids": [
+        "hdm_wash_bedding",
+        "hdm_mattress_covers",
+        "hdm_reduce_humidity",
+        "hdm_damp_dusting",
+        "hdm_soft_furnishings"
+      ],
+      "caution": "People are often sensitized to this mite and to common dust mites together. The result does not show which one causes symptoms.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MITE"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "shrimp",
+          "crab",
+          "lobster",
+          "blatella_germanica"
+        ],
+        "patient_note": "Dust mites share a protein with shellfish and cockroach, so positive results to these can appear together. Tell your doctor if shellfish has ever caused symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "tropomyosin_link_E09_E10",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E09",
+        "E10",
+        "E19"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "glycyphagus_domesticus",
+      "lab_test_name": "Glycyphagus Domesticus",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 9,
+      "aliases": [
+        "House and Storage Mite (Glycyphagus domesticus)"
+      ],
+      "common_name": "House and Storage Mite (Glycyphagus domesticus)",
+      "scientific_name": "Glycyphagus domesticus",
+      "canonical_category": "storage_mites",
+      "allergen_type": "environmental",
+      "definition": "Glycyphagus domesticus is a mite found in homes and food stores, especially in damp conditions. It can live in furniture, mattresses, carpets and stored foods.",
+      "exposure_sources": [
+        "Damp furniture and mattresses",
+        "Stored dry foods",
+        "Damp cupboards",
+        "Old mouldy bedding"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result suggests IgE to this mite. It likes damp spaces, so damp cupboards, old bedding or storage rooms may be relevant. If your symptoms are worse in humid weather, share that with your doctor.",
+      "card_summary": "A mite found in damp homes, furniture, mattresses, carpets and stored food.",
+      "recommendation_ids": [
+        "storage_moisture_control",
+        "hdm_reduce_humidity",
+        "safe_dry_food_storage",
+        "reduce_storage_dust",
+        "dust_cleaning_mask"
+      ],
+      "caution": "Mite results often overlap. A positive result does not tell you which mite is responsible.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MITE"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "shrimp",
+          "crab",
+          "lobster",
+          "blatella_germanica"
+        ],
+        "patient_note": "Dust mites share a protein with shellfish and cockroach, so positive results to these can appear together. Tell your doctor if shellfish has ever caused symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "tropomyosin_link_E09_E10",
+        "shown_to_patient": true
+      },
+      "review_flags": [
+        "category_judgement"
+      ],
+      "evidence_refs": [
+        "E10",
+        "E09"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "dermatophagoides_farinae",
+      "lab_test_name": "Dermatophagoides Farinae",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 10,
+      "aliases": [
+        "House Dust Mite (D. farinae)"
+      ],
+      "common_name": "House Dust Mite (D. farinae)",
+      "scientific_name": "Dermatophagoides farinae",
+      "canonical_category": "house_dust_mites",
+      "allergen_type": "environmental",
+      "definition": "Dermatophagoides farinae is one of the best-studied house dust mites. It lives in mattresses, pillows, carpets and soft furnishings and feeds on shed skin flakes.",
+      "exposure_sources": [
+        "Mattresses and pillows",
+        "Carpets and rugs",
+        "Sofas and curtains",
+        "Soft toys"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to a major house dust mite. This is among the most common sensitizations worldwide. It supports, but does not prove, that dust mites contribute to symptoms such as a blocked nose or night cough.",
+      "card_summary": "A major house dust mite living in bedding, carpets and soft furnishings.",
+      "recommendation_ids": [
+        "hdm_wash_bedding",
+        "hdm_mattress_covers",
+        "hdm_reduce_humidity",
+        "hdm_damp_dusting",
+        "hdm_soft_furnishings",
+        "dust_cleaning_mask"
+      ],
+      "caution": "Dust mite sensitization is common even in people without symptoms. IgE class does not show how severe symptoms will be.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MITE"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "shrimp",
+          "crab",
+          "lobster",
+          "blatella_germanica"
+        ],
+        "patient_note": "Dust mites share a protein with shellfish and cockroach, so positive results to these can appear together. Tell your doctor if shellfish has ever caused symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "tropomyosin_link_E09_E10",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E09",
+        "E10",
+        "E19"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "dermatophagoides_pteronyssinus",
+      "lab_test_name": "Dermatophagoides Pteronyssinus",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 11,
+      "aliases": [
+        "House Dust Mite (D. pteronyssinus)"
+      ],
+      "common_name": "House Dust Mite (D. pteronyssinus)",
+      "scientific_name": "Dermatophagoides pteronyssinus",
+      "canonical_category": "house_dust_mites",
+      "allergen_type": "environmental",
+      "definition": "Dermatophagoides pteronyssinus is one of the most widely studied house dust mites. It thrives in humid homes and lives in bedding, carpets, sofas and upholstery.",
+      "exposure_sources": [
+        "Mattresses and pillows",
+        "Carpets and rugs",
+        "Sofas and curtains",
+        "Soft toys"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "Your blood shows IgE to a major house dust mite. In humid climates it is often relevant to long-lasting nose and chest symptoms. A positive result is most useful if symptoms are worse in bedrooms or during dusting.",
+      "card_summary": "A major house dust mite that thrives in humid homes and bedding.",
+      "recommendation_ids": [
+        "hdm_wash_bedding",
+        "hdm_mattress_covers",
+        "hdm_reduce_humidity",
+        "hdm_damp_dusting",
+        "hdm_soft_furnishings",
+        "dust_cleaning_mask"
+      ],
+      "caution": "Many people have this sensitization without symptoms. Class does not reflect severity, and treatment decisions should rest on your symptoms.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MITE"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "shrimp",
+          "crab",
+          "lobster",
+          "blatella_germanica"
+        ],
+        "patient_note": "Dust mites share a protein with shellfish and cockroach, so positive results to these can appear together. Tell your doctor if shellfish has ever caused symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "tropomyosin_link_E09_E10",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E09",
+        "E10",
+        "E19"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "hay_dust",
+      "lab_test_name": "Hay Dust",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 12,
+      "aliases": [],
+      "common_name": "Hay Dust",
+      "scientific_name": null,
+      "canonical_category": "mixed_environmental_dusts",
+      "allergen_type": "environmental",
+      "definition": "Hay dust is a mixture of tiny pieces of dried grass and plants, along with moulds and mites that grow in stored hay. It becomes airborne when hay is moved or shaken.",
+      "exposure_sources": [
+        "Hay barns and stables",
+        "Cattle and goat sheds",
+        "Straw bedding",
+        "Farms during harvest"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to something in hay dust. Hay dust is a mixture of plant material, moulds and mites, so the test cannot say which part you react to. It is most relevant if you work with hay or animal bedding.",
+      "card_summary": "A mixed dust from stored hay that includes plant parts, moulds and mites.",
+      "recommendation_ids": [
+        "hay_dust_handling",
+        "dust_cleaning_mask",
+        "mould_avoid_decay_sites",
+        "occ_review_exposure"
+      ],
+      "caution": "Hay dust is a mixed extract, so the result is less specific than tests for single allergens. Grass pollen and mould results may help explain it.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MIXED"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "mixed_extract"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "books_dust",
+      "lab_test_name": "Books Dust",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 13,
+      "aliases": [
+        "Book Dust"
+      ],
+      "common_name": "Book Dust",
+      "scientific_name": null,
+      "canonical_category": "mixed_environmental_dusts",
+      "allergen_type": "environmental",
+      "definition": "Book dust is a mixture of dust that collects on old books, papers and shelves. It can contain mites, moulds and paper fibres, especially in damp or poorly ventilated rooms.",
+      "exposure_sources": [
+        "Old books and files",
+        "Libraries and archives",
+        "Dusty shelves",
+        "Damp storage rooms"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to something in book dust. This mixture can include mites and moulds, so results for those may help explain it. Symptoms in libraries, archives or when handling old paper are the most useful clue.",
+      "card_summary": "A mixed dust from old books and papers that can include mites and moulds.",
+      "recommendation_ids": [
+        "book_dust_handling",
+        "hdm_reduce_humidity",
+        "dust_cleaning_mask",
+        "occ_review_exposure"
+      ],
+      "caution": "Book dust is a mixture, so the test cannot show which component causes symptoms. Mite and mould results may be more specific.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MIXED"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "mixed_extract"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    }
+  ]
+}

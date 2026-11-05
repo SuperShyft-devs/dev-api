@@ -212,10 +212,40 @@ class BioReportService:
             or assessment.get("id")
             or instance_id
         )
+        allergy_booking = None
+        allergy_status = "resolved"
+        allergy_reason = None
+        cancer_booked = False
+        allergy_booked = False
+        if db is not None:
+            from modules.bioai_report.report_engine.builders.allergy_builder import panels_booked
+            from modules.bioai_report.report_engine.services.allergy_booking import (
+                load_booking_for_assessment,
+            )
+
+            allergy_status, allergy_booking, allergy_reason = await load_booking_for_assessment(
+                db,
+                assessment_instance_id=instance_id,
+            )
+            if allergy_status == "not_found":
+                allergy_booking = None
+                allergy_status = "resolved"
+                allergy_reason = None
+            elif allergy_booking is not None:
+                cancer_booked, allergy_booked = panels_booked(
+                    allergy_booking.get("blood_parameters")
+                )
         return await asyncio.to_thread(
             self.generate_from_assessment,
             assessment,
             record_id=record_id,
+            allergy_booking=allergy_booking if allergy_booked or allergy_status != "resolved" else None,
+            assessment_instance_id=instance_id,
+            allergy_resolution_status=allergy_status,
+            allergy_resolution_reason=allergy_reason,
+            include_cancer=cancer_booked if db is not None else None,
+            cancer_results_available=cancer_booked if db is not None else None,
+            allergy_results_available=allergy_booked if db is not None else None,
         )
 
     async def generate_from_assessment_with_enrichment(
@@ -276,10 +306,24 @@ class BioReportService:
         assessment: dict[str, Any],
         *,
         record_id: str | None = None,
+        allergy_booking: dict[str, Any] | None = None,
+        assessment_instance_id: int | None = None,
+        allergy_resolution_status: str = "resolved",
+        allergy_resolution_reason: str | None = None,
+        include_cancer: bool | None = None,
+        cancer_results_available: bool | None = None,
+        allergy_results_available: bool | None = None,
     ) -> BioReport:
         """Assemble a BioReport from an already-merged assessment dict (sync / unit tests)."""
         return build_bioreport(
             assessment,
             record_id=record_id,
             kb_store=self._kb_store,
+            allergy_booking=allergy_booking,
+            assessment_instance_id=assessment_instance_id,
+            allergy_resolution_status=allergy_resolution_status,
+            allergy_resolution_reason=allergy_resolution_reason,
+            include_cancer=include_cancer,
+            cancer_results_available=cancer_results_available,
+            allergy_results_available=allergy_results_available,
         )

@@ -1,0 +1,179 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "source_group": "allergy_parasites",
+  "source_group_display_order": 14,
+  "patient_group_name": "Parasites",
+  "patient_group_explanation": "Worms that can infect people and may produce IgE.",
+  "group_caution_rule_ids": [
+    "C_SENS",
+    "C_CLASS",
+    "C_PARASITE"
+  ],
+  "test_count": 3,
+  "clinical_review_status": "pending",
+  "allergens": [
+    {
+      "allergen_id": "ascaris",
+      "lab_test_name": "Ascaris",
+      "source_group": "allergy_parasites",
+      "source_group_display_order": 14,
+      "position_in_source_group": 1,
+      "aliases": [
+        "Roundworm (Ascaris)"
+      ],
+      "common_name": "Roundworm (Ascaris)",
+      "scientific_name": "Ascaris lumbricoides",
+      "canonical_category": "parasitic_worms",
+      "allergen_type": "parasite",
+      "definition": "Ascaris is a large intestinal roundworm. People pick it up from soil, unwashed hands or raw vegetables that carry worm eggs from contaminated ground or water.",
+      "exposure_sources": [
+        "Contaminated soil and water",
+        "Unwashed vegetables and fruit",
+        "Unwashed hands after play or gardening",
+        "Areas with poor sanitation"
+      ],
+      "typical_symptoms": [
+        "Stomach pain",
+        "Loose stools",
+        "Itching",
+        "Hives",
+        "Cough"
+      ],
+      "interpretation_insight": "This result shows IgE to Ascaris proteins. It may reflect past or present exposure, and it cannot tell which. A positive result does not confirm a current worm infection. Your doctor decides whether stool tests or treatment are needed.",
+      "card_summary": "A large intestinal roundworm spread through soil, water, raw vegetables and unwashed hands.",
+      "recommendation_ids": [
+        "parasite_doctor_review",
+        "parasite_hand_hygiene",
+        "gen_note_symptoms",
+        "gen_see_allergist"
+      ],
+      "caution": "Do not take worm medicines on your own because of this result. Your doctor will decide if further checks are needed.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_PARASITE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "not_diagnostic_of_infection"
+      ],
+      "evidence_refs": [
+        "E14",
+        "E15"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "toxocara_canis",
+      "lab_test_name": "Toxocara Canis",
+      "source_group": "allergy_parasites",
+      "source_group_display_order": 14,
+      "position_in_source_group": 2,
+      "aliases": [
+        "Dog Roundworm (Toxocara canis)"
+      ],
+      "common_name": "Dog Roundworm (Toxocara canis)",
+      "scientific_name": "Toxocara canis",
+      "canonical_category": "parasitic_worms",
+      "allergen_type": "parasite",
+      "definition": "Toxocara canis is a roundworm of dogs. People can swallow its eggs from soil, sandpits or unwashed hands, especially children, dog owners and gardeners in parks.",
+      "exposure_sources": [
+        "Soil, parks and sandpits",
+        "Puppies and dog faeces",
+        "Unwashed vegetables",
+        "Unwashed hands after pet contact"
+      ],
+      "typical_symptoms": [
+        "Stomach pain",
+        "Loose stools",
+        "Itching",
+        "Hives",
+        "Cough"
+      ],
+      "interpretation_insight": "This result shows IgE to Toxocara proteins. It may reflect past or present exposure, and it cannot tell which. A positive result does not confirm a current infection. Your doctor decides whether further checks or treatment are needed.",
+      "card_summary": "A dog roundworm whose eggs spread through soil, pets and unwashed hands.",
+      "recommendation_ids": [
+        "parasite_doctor_review",
+        "parasite_hand_hygiene",
+        "parasite_pet_care",
+        "gen_note_symptoms"
+      ],
+      "caution": "Do not take worm medicines on your own because of this result. Tell your doctor if you keep dogs or have had eye or liver symptoms.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_PARASITE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "not_diagnostic_of_infection"
+      ],
+      "evidence_refs": [
+        "E14",
+        "E15"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "anisakis",
+      "lab_test_name": "Anisakis",
+      "source_group": "allergy_parasites",
+      "source_group_display_order": 14,
+      "position_in_source_group": 3,
+      "aliases": [
+        "Fish Worm (Anisakis)"
+      ],
+      "common_name": "Fish Worm (Anisakis)",
+      "scientific_name": "Anisakis simplex complex",
+      "canonical_category": "fish_parasite_anisakis",
+      "allergen_type": "parasite",
+      "definition": "Anisakis is a small worm found in some sea fish. Eating raw, lightly cooked or pickled infected fish can cause stomach illness or allergy in some people.",
+      "exposure_sources": [
+        "Raw or undercooked sea fish",
+        "Pickled or marinated fish",
+        "Sushi and sashimi",
+        "Poorly cleaned fresh fish"
+      ],
+      "typical_symptoms": [
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain",
+        "Vomiting",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "This result shows IgE to Anisakis. It can occur after eating infected fish, and a positive result alone does not prove allergy or infection. Tell your doctor if fish meals cause hives, swelling or stomach pain.",
+      "card_summary": "A worm found in some sea fish, linked to raw fish meals.",
+      "recommendation_ids": [
+        "parasite_doctor_review",
+        "anisakis_fish_handling",
+        "food_review_past_reactions",
+        "gen_emergency_signs",
+        "gen_see_allergist"
+      ],
+      "caution": "Do not stop eating fish based on this result alone. Tell your doctor about reactions after fish, especially if they were serious.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_PARASITE",
+        "C_ANISAKIS"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "not_diagnostic_of_infection",
+        "serious_reaction_possible"
+      ],
+      "evidence_refs": [
+        "E14",
+        "E15"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    }
+  ]
+}

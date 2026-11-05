@@ -1,0 +1,1870 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "selection": {
+    "max_cards": 4,
+    "priority_order": [
+      "safety_critical",
+      "important",
+      "routine"
+    ],
+    "dedupe_key": "theme",
+    "max_general_cards": 1,
+    "general_recommendation_prefix": "gen_",
+    "gating": "required_context must all be true, exclusions must all be false",
+    "never_pad": true
+  },
+  "context_flags": [
+    "clinician_confirmed_food_allergy",
+    "delayed_symptoms_after_red_meat",
+    "history_of_serious_reaction",
+    "keeps_or_contacts_animals",
+    "occupational_exposure",
+    "oral_itching_with_raw_produce",
+    "reported_drug_reaction_history",
+    "reported_symptoms_after_exposure",
+    "sting_reaction_beyond_local"
+  ],
+  "themes": [
+    "animal_cleaning",
+    "animal_decision",
+    "animal_exposure",
+    "animal_hygiene",
+    "clinical_review",
+    "drug_decision",
+    "drug_record",
+    "dust_cleaning",
+    "emergency",
+    "fish_safety",
+    "food_cross_reactivity",
+    "food_decision",
+    "food_diagnosis",
+    "food_management",
+    "hdm_bedding",
+    "insect_prevention",
+    "latex_management",
+    "moisture_control",
+    "mould_exposure",
+    "mould_source",
+    "occupational_exposure",
+    "occupational_review",
+    "parasite_hygiene",
+    "pest_control",
+    "pollen_exposure",
+    "pollen_hygiene",
+    "pollen_indoor",
+    "pollen_timing",
+    "storage_food",
+    "symptom_diary",
+    "venom_prevention"
+  ],
+  "recommendation_count": 70,
+  "recommendations": [
+    {
+      "recommendation_id": "gen_note_symptoms",
+      "title": "Note When Symptoms Happen",
+      "description": "Keep a short diary of symptoms, where you were and what you were doing. It helps your doctor link this result to real-life reactions.",
+      "applicable_categories": [
+        "vegetables_allium",
+        "vegetables_brassica",
+        "vegetables_nightshade",
+        "vegetables_gourd",
+        "vegetables_leafy",
+        "vegetables_root",
+        "legumes_pulses",
+        "fruits_rosaceae",
+        "fruits_citrus",
+        "fruits_melons",
+        "fruits_tropical",
+        "fruits_other",
+        "cereals_grains",
+        "fish",
+        "shellfish_crustaceans",
+        "red_meat_and_pork",
+        "poultry_meat",
+        "hen_egg",
+        "milk_and_dairy",
+        "peanut",
+        "tree_nuts",
+        "coconut_products",
+        "edible_seeds",
+        "culinary_spices",
+        "culinary_herbs",
+        "spice_mixtures",
+        "coffee_tea_cocoa",
+        "edible_fungi_and_yeast_foods",
+        "grass_pollen",
+        "weed_pollen",
+        "tree_pollen",
+        "crop_plant_pollen",
+        "animal_epithelia_dander",
+        "bird_feathers_droppings",
+        "house_dust_mites",
+        "storage_mites",
+        "mixed_environmental_dusts",
+        "moulds",
+        "yeasts_and_candida",
+        "cockroach",
+        "other_insects",
+        "parasitic_worms",
+        "fish_parasite_anisakis",
+        "plant_fibres_and_dusts",
+        "animal_fibres_and_silk",
+        "natural_rubber_latex",
+        "henna_cosmetic_plant"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 8,
+      "theme": "symptom_diary",
+      "evidence_refs": [
+        "GENERAL_PENDING",
+        "E01"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "gen_see_allergist",
+      "title": "Discuss Results With an Allergist",
+      "description": "Share this report with an allergist or your doctor, especially if you have regular symptoms. They can decide whether more tests are useful.",
+      "applicable_categories": [
+        "vegetables_allium",
+        "vegetables_brassica",
+        "vegetables_nightshade",
+        "vegetables_gourd",
+        "vegetables_leafy",
+        "vegetables_root",
+        "legumes_pulses",
+        "fruits_rosaceae",
+        "fruits_citrus",
+        "fruits_melons",
+        "fruits_tropical",
+        "fruits_other",
+        "cereals_grains",
+        "fish",
+        "shellfish_crustaceans",
+        "red_meat_and_pork",
+        "poultry_meat",
+        "hen_egg",
+        "milk_and_dairy",
+        "peanut",
+        "tree_nuts",
+        "coconut_products",
+        "edible_seeds",
+        "culinary_spices",
+        "culinary_herbs",
+        "spice_mixtures",
+        "coffee_tea_cocoa",
+        "edible_fungi_and_yeast_foods",
+        "beta_lactam_antibiotics",
+        "other_antibiotics",
+        "nsaids_and_analgesics",
+        "local_anaesthetics",
+        "vitamins_and_other_medicines",
+        "grass_pollen",
+        "weed_pollen",
+        "tree_pollen",
+        "crop_plant_pollen",
+        "animal_epithelia_dander",
+        "bird_feathers_droppings",
+        "plant_fibres_and_dusts",
+        "animal_fibres_and_silk",
+        "natural_rubber_latex",
+        "henna_cosmetic_plant",
+        "house_dust_mites",
+        "storage_mites",
+        "mixed_environmental_dusts",
+        "moulds",
+        "yeasts_and_candida",
+        "stinging_insect_venoms",
+        "cockroach",
+        "other_insects",
+        "parasitic_worms",
+        "fish_parasite_anisakis"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "reported_symptoms_after_exposure"
+      ],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 5,
+      "theme": "clinical_review",
+      "evidence_refs": [
+        "E02",
+        "E01"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "gen_emergency_signs",
+      "title": "Know Emergency Warning Signs",
+      "description": "If you ever have trouble breathing, throat or face swelling, fainting or widespread hives after exposure, call emergency services at once.",
+      "applicable_categories": [
+        "vegetables_allium",
+        "vegetables_brassica",
+        "vegetables_nightshade",
+        "vegetables_gourd",
+        "vegetables_leafy",
+        "vegetables_root",
+        "legumes_pulses",
+        "fruits_rosaceae",
+        "fruits_citrus",
+        "fruits_melons",
+        "fruits_tropical",
+        "fruits_other",
+        "cereals_grains",
+        "fish",
+        "shellfish_crustaceans",
+        "red_meat_and_pork",
+        "poultry_meat",
+        "hen_egg",
+        "milk_and_dairy",
+        "peanut",
+        "tree_nuts",
+        "coconut_products",
+        "edible_seeds",
+        "culinary_spices",
+        "culinary_herbs",
+        "spice_mixtures",
+        "coffee_tea_cocoa",
+        "edible_fungi_and_yeast_foods",
+        "beta_lactam_antibiotics",
+        "other_antibiotics",
+        "nsaids_and_analgesics",
+        "local_anaesthetics",
+        "vitamins_and_other_medicines",
+        "stinging_insect_venoms",
+        "natural_rubber_latex",
+        "fish_parasite_anisakis"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "history_of_serious_reaction"
+      ],
+      "exclusions": [],
+      "clinical_priority": "safety_critical",
+      "display_priority": 1,
+      "theme": "emergency",
+      "evidence_refs": [
+        "E05"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "animal_bedroom_free",
+      "title": "Keep Animals Out of the Bedroom",
+      "description": "If you share your home with an animal, keep it out of the bedroom so you sleep in a space with less hair and dander.",
+      "applicable_categories": [
+        "animal_epithelia_dander",
+        "bird_feathers_droppings"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "keeps_or_contacts_animals"
+      ],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 3,
+      "theme": "animal_exposure",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "animal_clean_surfaces",
+      "title": "Clean Animal Hair and Bedding Often",
+      "description": "Wipe surfaces with a damp cloth, vacuum regularly and wash animal bedding often to remove hair, dander and dried droppings.",
+      "applicable_categories": [
+        "animal_epithelia_dander",
+        "bird_feathers_droppings"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "keeps_or_contacts_animals"
+      ],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 4,
+      "theme": "animal_cleaning",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "animal_wash_hands",
+      "title": "Wash Hands After Handling Animals",
+      "description": "Wash your hands with soap after touching animals, bedding or feathers, and avoid touching your eyes or face before washing.",
+      "applicable_categories": [
+        "animal_epithelia_dander",
+        "bird_feathers_droppings"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "keeps_or_contacts_animals"
+      ],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 5,
+      "theme": "animal_hygiene",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "animal_no_rehoming_without_review",
+      "title": "Get Advice Before Rehoming a Pet",
+      "description": "A positive blood test alone does not prove a pet is causing symptoms. Speak to an allergist before making any decision about a loved pet.",
+      "applicable_categories": [
+        "animal_epithelia_dander",
+        "bird_feathers_droppings"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "keeps_or_contacts_animals"
+      ],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 2,
+      "theme": "animal_decision",
+      "evidence_refs": [
+        "E02"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "farm_animal_protection",
+      "title": "Protect Yourself Around Farm Animals",
+      "description": "When cleaning sheds or handling cattle, goats, sheep or pigs, use gloves and a well-fitted mask and work in a ventilated area.",
+      "applicable_categories": [
+        "animal_epithelia_dander",
+        "bird_feathers_droppings"
+      ],
+      "applicable_allergen_ids": [
+        "cow_dander",
+        "goat_epithelium",
+        "sheep_epithelium",
+        "pig_epithelium"
+      ],
+      "required_context": [
+        "keeps_or_contacts_animals"
+      ],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 4,
+      "theme": "animal_exposure",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "bird_cage_cleaning",
+      "title": "Clean Cages and Lofts Carefully",
+      "description": "Clean bird cages, coops and lofts in open air when possible. Damp-wipe surfaces instead of sweeping, and wear a mask while cleaning.",
+      "applicable_categories": [
+        "bird_feathers_droppings"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "keeps_or_contacts_animals"
+      ],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 3,
+      "theme": "animal_cleaning",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "bird_cough_review",
+      "title": "See a Doctor for Lasting Cough Near Birds",
+      "description": "If you have a cough or breathlessness that keeps returning after time with birds, ask a doctor to check your lungs.",
+      "applicable_categories": [
+        "bird_feathers_droppings"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "reported_symptoms_after_exposure"
+      ],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 2,
+      "theme": "clinical_review",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": "Bird-related lung conditions are not IgE-mediated; wording kept non-diagnostic. Needs a cited source."
+    },
+    {
+      "recommendation_id": "rodent_exposure_control",
+      "title": "Limit Contact With Mice and Their Droppings",
+      "description": "In homes or labs, keep mice and bedding contained, use gloves, and clean with a damp cloth rather than dry sweeping.",
+      "applicable_categories": [
+        "animal_epithelia_dander"
+      ],
+      "applicable_allergen_ids": [
+        "epithelium_serum_proteins_prot_mouse"
+      ],
+      "required_context": [
+        "keeps_or_contacts_animals"
+      ],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 4,
+      "theme": "animal_exposure",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "hdm_wash_bedding",
+      "title": "Wash Bedding Regularly",
+      "description": "Wash sheets and pillow covers every week in hot water, following the fabric label, and dry them fully in sunlight or a dryer.",
+      "applicable_categories": [
+        "house_dust_mites"
+      ],
+      "applicable_allergen_ids": [
+        "goose_feathers",
+        "duck_feathers"
+      ],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 2,
+      "theme": "hdm_bedding",
+      "evidence_refs": [
+        "E19",
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": "Cochrane review (eczema) found only very low quality evidence for avoidance measures; keep wording practical and non-promissory."
+    },
+    {
+      "recommendation_id": "hdm_mattress_covers",
+      "title": "Use Dust-Proof Mattress and Pillow Covers",
+      "description": "Zipped covers made for dust mites can limit contact with mites living in mattresses and pillows. Wipe them clean every few weeks.",
+      "applicable_categories": [
+        "house_dust_mites"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 3,
+      "theme": "hdm_bedding",
+      "evidence_refs": [
+        "E19"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "hdm_reduce_humidity",
+      "title": "Keep Rooms Dry and Airy",
+      "description": "Mites like humid rooms. Open windows when outdoor air is dry, use fans or a dehumidifier if available, and dry clothes outdoors.",
+      "applicable_categories": [
+        "house_dust_mites",
+        "storage_mites",
+        "moulds",
+        "mixed_environmental_dusts"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 3,
+      "theme": "moisture_control",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "hdm_damp_dusting",
+      "title": "Dust With a Damp Cloth",
+      "description": "Wipe shelves, fans and furniture with a slightly damp cloth, as dry dusting can lift dust into the air.",
+      "applicable_categories": [
+        "house_dust_mites",
+        "mixed_environmental_dusts"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 4,
+      "theme": "dust_cleaning",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "hdm_soft_furnishings",
+      "title": "Cut Down Dust-Collecting Items",
+      "description": "Limit heavy curtains, thick carpets and many soft toys in the bedroom, and wash or air out the ones you keep.",
+      "applicable_categories": [
+        "house_dust_mites"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 5,
+      "theme": "hdm_bedding",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "dust_cleaning_mask",
+      "title": "Wear a Mask While Cleaning",
+      "description": "Wearing a mask while sweeping, dusting or clearing store rooms may reduce sneezing and coughing from stirred-up dust.",
+      "applicable_categories": [
+        "house_dust_mites",
+        "storage_mites",
+        "mixed_environmental_dusts",
+        "plant_fibres_and_dusts"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 6,
+      "theme": "dust_cleaning",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "safe_dry_food_storage",
+      "title": "Store Dry Foods Properly",
+      "description": "Keep grains, flour and cereals in clean, sealed containers and protect them from dampness.",
+      "applicable_categories": [
+        "storage_mites"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 2,
+      "theme": "storage_food",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "storage_moisture_control",
+      "title": "Keep Storage Areas Dry",
+      "description": "Store sacks and containers off damp floors and away from leaking walls, and let kitchen cupboards air out regularly.",
+      "applicable_categories": [
+        "storage_mites"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 3,
+      "theme": "moisture_control",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "reduce_storage_dust",
+      "title": "Reduce Dust in Store Rooms",
+      "description": "Clean cupboards and store rooms regularly, and avoid shaking out old flour, grain sacks or spilled cereals indoors.",
+      "applicable_categories": [
+        "storage_mites"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 4,
+      "theme": "dust_cleaning",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "check_flour_before_use",
+      "title": "Check Flour and Grains Before Use",
+      "description": "Throw away flour, grains or cereals that look clumpy, smell musty or show tiny moving specks. Buy smaller quantities when possible.",
+      "applicable_categories": [
+        "storage_mites"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 3,
+      "theme": "storage_food",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "hay_dust_handling",
+      "title": "Take Care Around Hay and Straw",
+      "description": "Handle hay, straw and animal feed outdoors where you can, keep them dry, and wear a mask when moving or shaking them.",
+      "applicable_categories": [
+        "mixed_environmental_dusts"
+      ],
+      "applicable_allergen_ids": [
+        "hay_dust",
+        "lepidoglyphus_destructor"
+      ],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 3,
+      "theme": "dust_cleaning",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "book_dust_handling",
+      "title": "Dust Books and Shelves Gently",
+      "description": "Wipe books and shelves with a damp cloth, keep storage areas dry, and wear a mask when handling very old or musty paper.",
+      "applicable_categories": [
+        "mixed_environmental_dusts"
+      ],
+      "applicable_allergen_ids": [
+        "books_dust"
+      ],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 3,
+      "theme": "dust_cleaning",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "pollen_check_forecast",
+      "title": "Check Local Pollen and Air Quality",
+      "description": "On days when outdoor pollen or dust is likely to be high, plan outdoor activity for times when you notice fewer symptoms.",
+      "applicable_categories": [
+        "grass_pollen",
+        "weed_pollen",
+        "tree_pollen",
+        "crop_plant_pollen",
+        "vegetables_leafy",
+        "vegetables_gourd",
+        "vegetables_root",
+        "fruits_rosaceae",
+        "fruits_melons",
+        "tree_nuts",
+        "moulds"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 2,
+      "theme": "pollen_timing",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "pollen_clean_up",
+      "title": "Rinse Off After Time Outdoors",
+      "description": "Wash your face and hair and change clothes after long periods outside to remove pollen you may carry indoors.",
+      "applicable_categories": [
+        "grass_pollen",
+        "weed_pollen",
+        "tree_pollen",
+        "crop_plant_pollen",
+        "vegetables_leafy",
+        "vegetables_gourd",
+        "vegetables_root",
+        "fruits_rosaceae",
+        "fruits_melons",
+        "tree_nuts",
+        "moulds"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 3,
+      "theme": "pollen_hygiene",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "pollen_indoor_air",
+      "title": "Limit Pollen Indoors in Your Peak Season",
+      "description": "On days when symptoms are worse, keep windows closed during high-pollen hours and dry clothes indoors or in a dryer.",
+      "applicable_categories": [
+        "grass_pollen",
+        "weed_pollen",
+        "tree_pollen",
+        "crop_plant_pollen",
+        "vegetables_leafy",
+        "vegetables_gourd",
+        "vegetables_root",
+        "fruits_rosaceae",
+        "fruits_melons",
+        "tree_nuts",
+        "moulds"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 4,
+      "theme": "pollen_indoor",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "grass_cutting_care",
+      "title": "Take Care With Cut Grass and Lawns",
+      "description": "Avoid mowing or playing on freshly cut grass during your symptom season, or wear a mask and glasses if you must.",
+      "applicable_categories": [
+        "grass_pollen"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 4,
+      "theme": "pollen_exposure",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "pollen_food_link_note",
+      "title": "Tell Your Doctor About Itchy Mouth With Raw Produce",
+      "description": "If raw fruit or vegetables make your mouth or throat itch, tell your doctor. Pollen allergy can sometimes be linked to such reactions.",
+      "applicable_categories": [
+        "grass_pollen",
+        "weed_pollen",
+        "tree_pollen",
+        "crop_plant_pollen",
+        "vegetables_leafy",
+        "vegetables_gourd",
+        "vegetables_root",
+        "fruits_rosaceae",
+        "fruits_melons",
+        "tree_nuts",
+        "moulds"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "oral_itching_with_raw_produce"
+      ],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 3,
+      "theme": "food_cross_reactivity",
+      "evidence_refs": [
+        "E11"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "mould_fix_damp",
+      "title": "Fix Leaks and Damp Walls",
+      "description": "Repair leaking pipes, roofs and damp walls promptly, as moulds grow where surfaces stay wet.",
+      "applicable_categories": [
+        "moulds"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 2,
+      "theme": "mould_source",
+      "evidence_refs": [
+        "E21",
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "mould_ventilate",
+      "title": "Ventilate Kitchen and Bathrooms",
+      "description": "Use exhaust fans or open windows while cooking and bathing, and wipe away water from windows and tiles.",
+      "applicable_categories": [
+        "moulds"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 3,
+      "theme": "moisture_control",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "mould_clean_small_patches",
+      "title": "Clean Small Mould Patches Safely",
+      "description": "Clean small patches with detergent and water, wearing gloves and a mask. For large areas, ask a professional to help.",
+      "applicable_categories": [
+        "moulds"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 4,
+      "theme": "mould_source",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "mould_avoid_decay_sites",
+      "title": "Avoid Damp Leaf Piles and Mouldy Storage",
+      "description": "Stay away from compost heaps, rotting leaves, damp basements and mouldy stored items, especially if they worsen your symptoms.",
+      "applicable_categories": [
+        "moulds"
+      ],
+      "applicable_allergen_ids": [
+        "hay_dust"
+      ],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 5,
+      "theme": "mould_exposure",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "candida_doctor_review",
+      "title": "Ask Your Doctor What This Result Means",
+      "description": "Candida normally lives on skin and in the gut. This result alone does not show infection or allergy, so ask your doctor to interpret it.",
+      "applicable_categories": [
+        "yeasts_and_candida"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 2,
+      "theme": "clinical_review",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": "Needs a cited source for the clinical relevance of Candida-specific IgE."
+    },
+    {
+      "recommendation_id": "venom_avoid_stings",
+      "title": "Reduce the Chance of Stings",
+      "description": "Wear shoes outdoors, keep food and drinks covered outside, and stay calm and move away slowly if a bee or wasp is near.",
+      "applicable_categories": [
+        "stinging_insect_venoms"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 3,
+      "theme": "venom_prevention",
+      "evidence_refs": [
+        "E08"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "venom_nest_safety",
+      "title": "Leave Nests to Professionals",
+      "description": "Do not try to remove hives or nests yourself. Ask trained pest or bee-removal services to deal with them.",
+      "applicable_categories": [
+        "stinging_insect_venoms"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 5,
+      "theme": "venom_prevention",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "venom_reaction_review",
+      "title": "See an Allergist After a Strong Sting Reaction",
+      "description": "If a sting ever caused hives away from the sting, swelling of the face or breathing trouble, ask an allergist for a proper review.",
+      "applicable_categories": [
+        "stinging_insect_venoms"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "sting_reaction_beyond_local"
+      ],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 1,
+      "theme": "clinical_review",
+      "evidence_refs": [
+        "E08"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "cockroach_seal_food",
+      "title": "Store Food in Sealed Containers",
+      "description": "Keep food, pet food and rubbish covered or sealed so cockroaches have less to eat, and take out waste daily.",
+      "applicable_categories": [
+        "cockroach"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 2,
+      "theme": "pest_control",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "cockroach_pest_control",
+      "title": "Control Cockroaches at the Source",
+      "description": "Seal cracks, fix leaks and use pest control methods as needed. Clean kitchens, drains and under appliances regularly.",
+      "applicable_categories": [
+        "cockroach"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 3,
+      "theme": "pest_control",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "mosquito_bite_prevention",
+      "title": "Prevent Mosquito Bites",
+      "description": "Use nets, screens and repellents suitable for your age, and remove standing water around the home where mosquitoes breed.",
+      "applicable_categories": [
+        "other_insects"
+      ],
+      "applicable_allergen_ids": [
+        "aedes_communis"
+      ],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 3,
+      "theme": "insect_prevention",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "housefly_cover_food",
+      "title": "Keep Food and Waste Covered",
+      "description": "Cover cooked food, keep bins closed and use window screens to reduce houseflies in kitchens and eating areas.",
+      "applicable_categories": [
+        "other_insects"
+      ],
+      "applicable_allergen_ids": [
+        "housefly_musca_domestica"
+      ],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 3,
+      "theme": "insect_prevention",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "moth_light_screens",
+      "title": "Reduce Moths Indoors",
+      "description": "Use window screens and avoid leaving bright lights on near open windows at night, as moths are drawn to light.",
+      "applicable_categories": [
+        "other_insects"
+      ],
+      "applicable_allergen_ids": [
+        "heterocera_mix"
+      ],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 4,
+      "theme": "insect_prevention",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "food_keep_eating_tolerated",
+      "title": "Keep Eating Foods You Tolerate",
+      "description": "Do not stop a food you eat without problems just because of this result. Ask your doctor before removing foods from your diet.",
+      "applicable_categories": [
+        "vegetables_allium",
+        "vegetables_brassica",
+        "vegetables_nightshade",
+        "vegetables_gourd",
+        "vegetables_leafy",
+        "vegetables_root",
+        "legumes_pulses",
+        "fruits_rosaceae",
+        "fruits_citrus",
+        "fruits_melons",
+        "fruits_tropical",
+        "fruits_other",
+        "cereals_grains",
+        "fish",
+        "shellfish_crustaceans",
+        "red_meat_and_pork",
+        "poultry_meat",
+        "hen_egg",
+        "milk_and_dairy",
+        "peanut",
+        "tree_nuts",
+        "coconut_products",
+        "edible_seeds",
+        "culinary_spices",
+        "culinary_herbs",
+        "spice_mixtures",
+        "coffee_tea_cocoa",
+        "edible_fungi_and_yeast_foods"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [
+        "history_of_serious_reaction"
+      ],
+      "clinical_priority": "safety_critical",
+      "display_priority": 1,
+      "theme": "food_decision",
+      "evidence_refs": [
+        "E02",
+        "E03"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "food_review_past_reactions",
+      "title": "Think Back to Past Reactions",
+      "description": "Ask yourself whether this food ever caused symptoms soon after eating. Share your answer with your doctor, as history matters more than this result alone.",
+      "applicable_categories": [
+        "vegetables_allium",
+        "vegetables_brassica",
+        "vegetables_nightshade",
+        "vegetables_gourd",
+        "vegetables_leafy",
+        "vegetables_root",
+        "legumes_pulses",
+        "fruits_rosaceae",
+        "fruits_citrus",
+        "fruits_melons",
+        "fruits_tropical",
+        "fruits_other",
+        "cereals_grains",
+        "fish",
+        "shellfish_crustaceans",
+        "red_meat_and_pork",
+        "poultry_meat",
+        "hen_egg",
+        "milk_and_dairy",
+        "peanut",
+        "tree_nuts",
+        "coconut_products",
+        "edible_seeds",
+        "culinary_spices",
+        "culinary_herbs",
+        "spice_mixtures",
+        "coffee_tea_cocoa",
+        "edible_fungi_and_yeast_foods"
+      ],
+      "applicable_allergen_ids": [
+        "anisakis"
+      ],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 2,
+      "theme": "clinical_review",
+      "evidence_refs": [
+        "E02",
+        "E03"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "food_supervised_challenge",
+      "title": "Ask About a Supervised Food Challenge",
+      "description": "If the picture is unclear, an allergist may suggest eating the food under medical supervision. Never try this at home.",
+      "applicable_categories": [
+        "vegetables_allium",
+        "vegetables_brassica",
+        "vegetables_nightshade",
+        "vegetables_gourd",
+        "vegetables_leafy",
+        "vegetables_root",
+        "legumes_pulses",
+        "fruits_rosaceae",
+        "fruits_citrus",
+        "fruits_melons",
+        "fruits_tropical",
+        "fruits_other",
+        "cereals_grains",
+        "fish",
+        "shellfish_crustaceans",
+        "red_meat_and_pork",
+        "poultry_meat",
+        "hen_egg",
+        "milk_and_dairy",
+        "peanut",
+        "tree_nuts",
+        "coconut_products",
+        "edible_seeds",
+        "culinary_spices",
+        "culinary_herbs",
+        "spice_mixtures",
+        "coffee_tea_cocoa",
+        "edible_fungi_and_yeast_foods"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [
+        "history_of_serious_reaction"
+      ],
+      "clinical_priority": "important",
+      "display_priority": 4,
+      "theme": "food_diagnosis",
+      "evidence_refs": [
+        "E02",
+        "E22"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "food_no_home_challenge",
+      "title": "Do Not Test Foods at Home After a Serious Reaction",
+      "description": "If this food ever caused a serious reaction, avoid eating it again until an allergist has assessed you in a medical setting.",
+      "applicable_categories": [
+        "vegetables_allium",
+        "vegetables_brassica",
+        "vegetables_nightshade",
+        "vegetables_gourd",
+        "vegetables_leafy",
+        "vegetables_root",
+        "legumes_pulses",
+        "fruits_rosaceae",
+        "fruits_citrus",
+        "fruits_melons",
+        "fruits_tropical",
+        "fruits_other",
+        "cereals_grains",
+        "fish",
+        "shellfish_crustaceans",
+        "red_meat_and_pork",
+        "poultry_meat",
+        "hen_egg",
+        "milk_and_dairy",
+        "peanut",
+        "tree_nuts",
+        "coconut_products",
+        "edible_seeds",
+        "culinary_spices",
+        "culinary_herbs",
+        "spice_mixtures",
+        "coffee_tea_cocoa",
+        "edible_fungi_and_yeast_foods"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "history_of_serious_reaction"
+      ],
+      "exclusions": [],
+      "clinical_priority": "safety_critical",
+      "display_priority": 1,
+      "theme": "food_decision",
+      "evidence_refs": [
+        "E02",
+        "E05"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "food_ask_related_foods",
+      "title": "Ask Which Related Foods Need Care",
+      "description": "Some foods share similar proteins. Ask your doctor whether any related foods need caution, rather than avoiding them on your own.",
+      "applicable_categories": [
+        "vegetables_allium",
+        "vegetables_brassica",
+        "vegetables_nightshade",
+        "vegetables_gourd",
+        "vegetables_leafy",
+        "vegetables_root",
+        "legumes_pulses",
+        "fruits_rosaceae",
+        "fruits_citrus",
+        "fruits_melons",
+        "fruits_tropical",
+        "fruits_other",
+        "cereals_grains",
+        "fish",
+        "shellfish_crustaceans",
+        "red_meat_and_pork",
+        "poultry_meat",
+        "hen_egg",
+        "milk_and_dairy",
+        "peanut",
+        "tree_nuts",
+        "coconut_products",
+        "edible_seeds",
+        "culinary_spices",
+        "culinary_herbs",
+        "spice_mixtures",
+        "coffee_tea_cocoa",
+        "edible_fungi_and_yeast_foods"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 5,
+      "theme": "food_cross_reactivity",
+      "evidence_refs": [
+        "E01",
+        "E11"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "food_label_reading",
+      "title": "Read Food Labels if Allergy Is Confirmed",
+      "description": "If a doctor confirms an allergy to this food, check ingredient labels and ask about ingredients when eating out.",
+      "applicable_categories": [
+        "vegetables_allium",
+        "vegetables_brassica",
+        "vegetables_nightshade",
+        "vegetables_gourd",
+        "vegetables_leafy",
+        "vegetables_root",
+        "legumes_pulses",
+        "fruits_rosaceae",
+        "fruits_citrus",
+        "fruits_melons",
+        "fruits_tropical",
+        "fruits_other",
+        "cereals_grains",
+        "fish",
+        "shellfish_crustaceans",
+        "red_meat_and_pork",
+        "poultry_meat",
+        "hen_egg",
+        "milk_and_dairy",
+        "peanut",
+        "tree_nuts",
+        "coconut_products",
+        "edible_seeds",
+        "culinary_spices",
+        "culinary_herbs",
+        "spice_mixtures",
+        "coffee_tea_cocoa",
+        "edible_fungi_and_yeast_foods"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "clinician_confirmed_food_allergy"
+      ],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 3,
+      "theme": "food_management",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "meat_delayed_reaction_review",
+      "title": "Report Reactions That Start Hours Later",
+      "description": "If symptoms after red meat start several hours after eating, tell your doctor. Some meat allergies cause delayed reactions linked to tick bites.",
+      "applicable_categories": [
+        "red_meat_and_pork"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "delayed_symptoms_after_red_meat"
+      ],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 2,
+      "theme": "clinical_review",
+      "evidence_refs": [
+        "E17"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "shellfish_mite_link_note",
+      "title": "Ask About the Dust Mite Link",
+      "description": "Shellfish and dust mites share a similar protein, so a positive shellfish result may sometimes reflect mite sensitization. Your doctor can help sort this out.",
+      "applicable_categories": [
+        "shellfish_crustaceans"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 4,
+      "theme": "food_cross_reactivity",
+      "evidence_refs": [
+        "E09",
+        "E11"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "spice_pollen_link_note",
+      "title": "Mention Pollen Allergy When Reviewing Spices",
+      "description": "Some spice reactions are linked to pollen allergy, such as mugwort. Tell your doctor if you have hay fever or itching after spices.",
+      "applicable_categories": [
+        "culinary_spices",
+        "culinary_herbs",
+        "spice_mixtures"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 4,
+      "theme": "food_cross_reactivity",
+      "evidence_refs": [
+        "E11"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "beverage_symptom_review",
+      "title": "Link Symptoms to Specific Drinks and Treats",
+      "description": "Note whether symptoms really follow coffee, tea or chocolate. Many reactions to these have other causes, so discuss them with your doctor.",
+      "applicable_categories": [
+        "coffee_tea_cocoa"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 4,
+      "theme": "clinical_review",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "drug_no_self_change",
+      "title": "Do Not Change Your Medicines on Your Own",
+      "description": "Do not stop, restart or try any medicine again based on this report. Always ask your doctor or pharmacist first.",
+      "applicable_categories": [
+        "beta_lactam_antibiotics",
+        "other_antibiotics",
+        "nsaids_and_analgesics",
+        "local_anaesthetics",
+        "vitamins_and_other_medicines"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "safety_critical",
+      "display_priority": 1,
+      "theme": "drug_decision",
+      "evidence_refs": [
+        "E06",
+        "E07"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "drug_formal_review",
+      "title": "Ask for a Proper Drug Allergy Assessment",
+      "description": "Only a specialist can judge whether a medicine caused a past reaction. Ask your doctor about referral to an allergist.",
+      "applicable_categories": [
+        "beta_lactam_antibiotics",
+        "other_antibiotics",
+        "nsaids_and_analgesics",
+        "local_anaesthetics",
+        "vitamins_and_other_medicines"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "reported_drug_reaction_history"
+      ],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 2,
+      "theme": "clinical_review",
+      "evidence_refs": [
+        "E06",
+        "E07"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "drug_record_reactions",
+      "title": "Keep a Record of Medicine Reactions",
+      "description": "Write down the medicine, date, dose, symptoms and how soon they started. This record helps your doctor far more than a blood test alone.",
+      "applicable_categories": [
+        "beta_lactam_antibiotics",
+        "other_antibiotics",
+        "nsaids_and_analgesics",
+        "local_anaesthetics",
+        "vitamins_and_other_medicines"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "reported_drug_reaction_history"
+      ],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 3,
+      "theme": "drug_record",
+      "evidence_refs": [
+        "E06"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "drug_tell_providers",
+      "title": "Tell Your Healthcare Providers",
+      "description": "Tell your doctors, dentist and pharmacist about any medicine reaction you remember, so they can choose treatments carefully.",
+      "applicable_categories": [
+        "beta_lactam_antibiotics",
+        "other_antibiotics",
+        "nsaids_and_analgesics",
+        "local_anaesthetics",
+        "vitamins_and_other_medicines"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "reported_drug_reaction_history"
+      ],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 4,
+      "theme": "drug_record",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "drug_betalactam_review",
+      "title": "Ask About Proper Penicillin Allergy Testing",
+      "description": "If you think you are allergic to penicillin or similar antibiotics, ask an allergist about proper testing instead of relying on this blood test.",
+      "applicable_categories": [
+        "beta_lactam_antibiotics"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "reported_drug_reaction_history"
+      ],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 2,
+      "theme": "clinical_review",
+      "evidence_refs": [
+        "E07"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "drug_pain_reliever_review",
+      "title": "Ask Which Pain Relievers Are Safe",
+      "description": "Reactions to pain relievers can have different causes. Ask your doctor which alternatives are safe for you before using any.",
+      "applicable_categories": [
+        "nsaids_and_analgesics"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 2,
+      "theme": "clinical_review",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": "NSAID/paracetamol cross-reactivity statements require a cited source before expansion."
+    },
+    {
+      "recommendation_id": "drug_topical_patch_testing",
+      "title": "Ask About Skin Patch Testing",
+      "description": "Rashes after numbing creams or sprays are often checked with skin patch tests by a dermatologist or allergist.",
+      "applicable_categories": [
+        "local_anaesthetics"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "reported_drug_reaction_history"
+      ],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 2,
+      "theme": "clinical_review",
+      "evidence_refs": [
+        "E20"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "drug_vitamin_ingredients",
+      "title": "Mention All Ingredients to Your Doctor",
+      "description": "If you reacted to a vitamin product, tell your doctor the exact product. Other ingredients can also be responsible.",
+      "applicable_categories": [
+        "vitamins_and_other_medicines"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "reported_drug_reaction_history"
+      ],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 2,
+      "theme": "clinical_review",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": "Needs a cited source."
+    },
+    {
+      "recommendation_id": "occ_review_exposure",
+      "title": "Look at Where Symptoms Happen",
+      "description": "Notice whether symptoms improve on holidays or weekends away from work or hobby materials. Share this pattern with your doctor.",
+      "applicable_categories": [
+        "plant_fibres_and_dusts",
+        "animal_fibres_and_silk",
+        "natural_rubber_latex",
+        "henna_cosmetic_plant",
+        "animal_epithelia_dander",
+        "bird_feathers_droppings",
+        "mixed_environmental_dusts"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "occupational_exposure"
+      ],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 2,
+      "theme": "occupational_review",
+      "evidence_refs": [
+        "E16"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "occ_health_review",
+      "title": "Speak to an Occupational Health Doctor",
+      "description": "If symptoms seem linked to your job, an occupational health doctor can assess exposure and suggest safe ways to work.",
+      "applicable_categories": [
+        "plant_fibres_and_dusts",
+        "animal_fibres_and_silk",
+        "natural_rubber_latex",
+        "henna_cosmetic_plant",
+        "animal_epithelia_dander",
+        "bird_feathers_droppings",
+        "mixed_environmental_dusts"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "occupational_exposure"
+      ],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 3,
+      "theme": "occupational_review",
+      "evidence_refs": [
+        "E16"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "latex_free_choices",
+      "title": "Choose Latex-Free Products",
+      "description": "If latex bothers you, ask for non-latex gloves and products at work and when visiting clinics or dentists.",
+      "applicable_categories": [
+        "natural_rubber_latex"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 2,
+      "theme": "latex_management",
+      "evidence_refs": [
+        "E12"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "latex_fruit_note",
+      "title": "Tell Your Doctor About Fruit Reactions",
+      "description": "Some people with latex reactions also react to fruits such as banana, kiwi or papaya. Tell your doctor if this happens to you.",
+      "applicable_categories": [
+        "natural_rubber_latex",
+        "fruits_tropical"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 4,
+      "theme": "food_cross_reactivity",
+      "evidence_refs": [
+        "E13"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "henna_patch_testing",
+      "title": "Ask About Patch Testing for Henna Reactions",
+      "description": "If henna products cause skin redness, itching or swelling, ask a dermatologist whether patch testing is appropriate.",
+      "applicable_categories": [
+        "henna_cosmetic_plant"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 2,
+      "theme": "clinical_review",
+      "evidence_refs": [
+        "E16"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "fibre_dust_control",
+      "title": "Reduce Fibre Dust and Skin Contact",
+      "description": "Use good ventilation, gloves and washing after handling rough fibres or dusty materials, and avoid shaking them out indoors.",
+      "applicable_categories": [
+        "plant_fibres_and_dusts",
+        "animal_fibres_and_silk"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [
+        "occupational_exposure"
+      ],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 4,
+      "theme": "occupational_exposure",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "parasite_doctor_review",
+      "title": "Ask Your Doctor What This Result Means",
+      "description": "This result can reflect past or present exposure to the parasite, or similar proteins. Your doctor will decide whether further checks are needed.",
+      "applicable_categories": [
+        "parasitic_worms",
+        "fish_parasite_anisakis"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 1,
+      "theme": "clinical_review",
+      "evidence_refs": [
+        "E14",
+        "E15"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "parasite_hand_hygiene",
+      "title": "Wash Hands and Produce Well",
+      "description": "Wash hands before eating and after using the toilet, gardening or handling pets, and wash fruit and vegetables well.",
+      "applicable_categories": [
+        "parasitic_worms"
+      ],
+      "applicable_allergen_ids": [],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 3,
+      "theme": "parasite_hygiene",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "parasite_pet_care",
+      "title": "Follow Your Vet's Deworming Advice",
+      "description": "Regular deworming of pets as advised by a vet, and washing hands after handling soil or pets, helps limit worm exposure.",
+      "applicable_categories": [
+        "parasitic_worms"
+      ],
+      "applicable_allergen_ids": [
+        "toxocara_canis"
+      ],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "routine",
+      "display_priority": 4,
+      "theme": "parasite_hygiene",
+      "evidence_refs": [
+        "GENERAL_PENDING"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "anisakis_fish_handling",
+      "title": "Handle and Cook Fish Carefully",
+      "description": "Buy fish from trusted sellers and cook it well. Cooking lowers infection risk but may not remove allergen proteins, so discuss symptoms with a doctor.",
+      "applicable_categories": [
+        "fish_parasite_anisakis"
+      ],
+      "applicable_allergen_ids": [
+        "anisakis"
+      ],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 3,
+      "theme": "fish_safety",
+      "evidence_refs": [
+        "E15"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": null
+    },
+    {
+      "recommendation_id": "ige_interpret_with_doctor",
+      "title": "Read Total IgE With Your Doctor",
+      "description": "Total IgE alone cannot explain symptoms. Share your report with your doctor, who can read it with your history and the specific IgE results.",
+      "applicable_categories": [
+        "total_ige"
+      ],
+      "applicable_allergen_ids": [
+        "ige_total"
+      ],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 1,
+      "theme": "clinical_review",
+      "evidence_refs": [
+        "E01"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": "Statement that total IgE alone cannot confirm or exclude allergy is tied to E01 (diagnosis rests on history plus specific IgE or skin test). Reviewer to confirm."
+    }
+  ]
+}

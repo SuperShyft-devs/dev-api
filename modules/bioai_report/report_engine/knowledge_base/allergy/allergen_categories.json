@@ -1,0 +1,1855 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "note": "source_groups follow the laboratory catalogue and drive Page 3 grouping order. canonical_categories are assigned independently by scientific type, and drive recommendation matching.",
+  "source_groups": [
+    {
+      "source_group": "pets",
+      "display_order": 1,
+      "patient_name": "Animals and Pets",
+      "explanation": "Skin, hair, dander, feathers and droppings from pets and farm animals.",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_ANIMAL"
+      ],
+      "test_count": 21
+    },
+    {
+      "source_group": "allergy_drugs",
+      "display_order": 2,
+      "patient_name": "Medicines",
+      "explanation": "Antibiotics, pain relievers, numbing medicines and vitamins.",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "test_count": 24
+    },
+    {
+      "source_group": "allergy_dust_mites",
+      "display_order": 3,
+      "patient_name": "Dust Mites and Dusts",
+      "explanation": "Mites and mixed dusts found in homes, stores and workplaces.",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MITE"
+      ],
+      "test_count": 13
+    },
+    {
+      "source_group": "allergy_insects",
+      "display_order": 4,
+      "patient_name": "Insects",
+      "explanation": "Stinging insects, cockroaches, mosquitoes, flies and moths.",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS"
+      ],
+      "test_count": 6
+    },
+    {
+      "source_group": "allergy_grass",
+      "display_order": 5,
+      "patient_name": "Grass Pollen",
+      "explanation": "Pollen from different grasses.",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "test_count": 8
+    },
+    {
+      "source_group": "allergy_moulds_yeast",
+      "display_order": 6,
+      "patient_name": "Moulds and Yeast",
+      "explanation": "Mould spores and yeast found in damp places and on the body.",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MOULD"
+      ],
+      "test_count": 10
+    },
+    {
+      "source_group": "allergy_weed_tree",
+      "display_order": 7,
+      "patient_name": "Weed and Tree Pollen",
+      "explanation": "Pollen from weeds and trees, plus one farm crop.",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "test_count": 11
+    },
+    {
+      "source_group": "allergy_veg",
+      "display_order": 8,
+      "patient_name": "Vegetables and Fruits",
+      "explanation": "Common vegetables, fruits and rice.",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "test_count": 40
+    },
+    {
+      "source_group": "allergy_non_veg",
+      "display_order": 9,
+      "patient_name": "Meat, Fish and Eggs",
+      "explanation": "Fish, meats, shellfish and egg parts.",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "test_count": 17
+    },
+    {
+      "source_group": "allergy_dairy",
+      "display_order": 10,
+      "patient_name": "Dairy and Related Foods",
+      "explanation": "Milk products plus coffee, tea, chocolate, tofu, yeast and mushrooms.",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "test_count": 12
+    },
+    {
+      "source_group": "allergy_seeds_nuts_legumes",
+      "display_order": 11,
+      "patient_name": "Nuts, Seeds, Grains and Legumes",
+      "explanation": "Nuts, seeds, grains, pulses and dried fruit.",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "test_count": 21
+    },
+    {
+      "source_group": "allergy_spices",
+      "display_order": 12,
+      "patient_name": "Spices and Herbs",
+      "explanation": "Common spices, herbs and curry blends.",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "test_count": 19
+    },
+    {
+      "source_group": "allergy_occupational",
+      "display_order": 13,
+      "patient_name": "Work and Contact Materials",
+      "explanation": "Latex, fibres, silk, wool and henna that people touch or handle.",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_OCC"
+      ],
+      "test_count": 6
+    },
+    {
+      "source_group": "allergy_parasites",
+      "display_order": 14,
+      "patient_name": "Parasites",
+      "explanation": "Worms that can infect people and may produce IgE.",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_PARASITE"
+      ],
+      "test_count": 3
+    },
+    {
+      "source_group": "ige",
+      "display_order": 15,
+      "patient_name": "Total IgE",
+      "explanation": "A single general blood marker that counts all IgE antibodies.",
+      "caution_rule_ids": [
+        "C_TOTAL"
+      ],
+      "test_count": 1
+    }
+  ],
+  "canonical_categories": [
+    {
+      "category_id": "animal_epithelia_dander",
+      "patient_name": "Animal Skin, Hair and Dander",
+      "explanation": "Tiny flakes of skin, hair and body proteins from furry animals can float in the air and settle on surfaces.",
+      "allergen_type": "animal",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_ANIMAL"
+      ],
+      "member_allergen_ids": [
+        "epithelium_serum_proteins_prot_mouse",
+        "pig_epithelium",
+        "cat_epithelium",
+        "cat_dander",
+        "dog_epithelium",
+        "dog_dander",
+        "rabbit_epithelium",
+        "goat_epithelium",
+        "sheep_epithelium",
+        "cow_dander"
+      ],
+      "member_count": 10,
+      "source_groups_present": [
+        "pets"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "bird_feathers_droppings",
+      "patient_name": "Bird Feathers and Droppings",
+      "explanation": "Feathers, dust and dried droppings from pet and farm birds can carry proteins that some people become sensitized to.",
+      "allergen_type": "animal",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_BIRD"
+      ],
+      "member_allergen_ids": [
+        "pigeon_droppings",
+        "pigeon_feathers",
+        "turkey_feathers",
+        "goose_feathers",
+        "budgerigar_dropping",
+        "budgerigar_feathers",
+        "canarian_feathers",
+        "budgerigar_serum_proteins",
+        "chicken_feathers",
+        "chicken_droppings",
+        "duck_feathers"
+      ],
+      "member_count": 11,
+      "source_groups_present": [
+        "pets"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "house_dust_mites",
+      "patient_name": "House Dust Mites",
+      "explanation": "Microscopic mites live in bedding, carpets and soft furnishings and are a common indoor trigger worldwide.",
+      "allergen_type": "environmental",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MITE"
+      ],
+      "member_allergen_ids": [
+        "euroglyphus_maynei",
+        "dermatophagoides_microceras",
+        "blomia_tropicalis",
+        "dermatophagoides_farinae",
+        "dermatophagoides_pteronyssinus"
+      ],
+      "member_count": 5,
+      "source_groups_present": [
+        "allergy_dust_mites"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "storage_mites",
+      "patient_name": "Storage Mites",
+      "explanation": "These mites live in stored grains, flour and damp food-storage areas rather than in beds.",
+      "allergen_type": "environmental",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MITE"
+      ],
+      "member_allergen_ids": [
+        "tyrophagus_putrescentiae",
+        "lepidoglyphus_destructor",
+        "acarus_siro",
+        "glycyphagus_domesticus"
+      ],
+      "member_count": 4,
+      "source_groups_present": [
+        "allergy_dust_mites"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "mixed_environmental_dusts",
+      "patient_name": "Mixed Household and Farm Dusts",
+      "explanation": "These tests use dust collected from homes, hay or old books, which contains a mix of materials.",
+      "allergen_type": "environmental",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MIXED"
+      ],
+      "member_allergen_ids": [
+        "house_dust_ifci_1",
+        "hay_dust",
+        "books_dust"
+      ],
+      "member_count": 3,
+      "source_groups_present": [
+        "allergy_dust_mites"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "plant_fibres_and_dusts",
+      "patient_name": "Plant Fibres and Dusts",
+      "explanation": "Dust and fibres from plants such as tobacco, jute and cotton can be inhaled or touched during work or hobbies.",
+      "allergen_type": "occupational",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_OCC",
+        "C_MIXED"
+      ],
+      "member_allergen_ids": [
+        "tobacco_dust",
+        "jute",
+        "cotton_linters"
+      ],
+      "member_count": 3,
+      "source_groups_present": [
+        "allergy_dust_mites",
+        "allergy_occupational"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "animal_fibres_and_silk",
+      "patient_name": "Wool and Silk",
+      "explanation": "Fibres from sheep wool and silk are used in clothing and textiles and may be handled at work.",
+      "allergen_type": "occupational",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_OCC",
+        "C_MIXED"
+      ],
+      "member_allergen_ids": [
+        "sheep_wool_treated",
+        "silk_bombyx_mori"
+      ],
+      "member_count": 2,
+      "source_groups_present": [
+        "allergy_occupational"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "natural_rubber_latex",
+      "patient_name": "Natural Rubber Latex",
+      "explanation": "Latex is a rubber material found in gloves, balloons and medical products.",
+      "allergen_type": "occupational",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_OCC"
+      ],
+      "member_allergen_ids": [
+        "latex"
+      ],
+      "member_count": 1,
+      "source_groups_present": [
+        "allergy_occupational"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "henna_cosmetic_plant",
+      "patient_name": "Henna",
+      "explanation": "Henna is a plant dye used for skin and hair decoration.",
+      "allergen_type": "occupational",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_OCC"
+      ],
+      "member_allergen_ids": [
+        "henna"
+      ],
+      "member_count": 1,
+      "source_groups_present": [
+        "allergy_occupational"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "stinging_insect_venoms",
+      "patient_name": "Bee and Wasp Venom",
+      "explanation": "Venom is injected during a sting, so this is different from everyday environmental exposure.",
+      "allergen_type": "insect",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_VENOM"
+      ],
+      "member_allergen_ids": [
+        "vespula_germanica",
+        "apis_mellifera"
+      ],
+      "member_count": 2,
+      "source_groups_present": [
+        "allergy_insects"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "cockroach",
+      "patient_name": "Cockroach",
+      "explanation": "Cockroach body parts and droppings can become part of household dust, especially in kitchens and damp areas.",
+      "allergen_type": "insect",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_INSECT_XR"
+      ],
+      "member_allergen_ids": [
+        "blatella_germanica"
+      ],
+      "member_count": 1,
+      "source_groups_present": [
+        "allergy_insects"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "other_insects",
+      "patient_name": "Other Insects",
+      "explanation": "Moths, mosquitoes and houseflies are common around homes and can sometimes trigger allergy symptoms.",
+      "allergen_type": "insect",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_INSECT_OTHER"
+      ],
+      "member_allergen_ids": [
+        "heterocera_mix",
+        "aedes_communis",
+        "housefly_musca_domestica"
+      ],
+      "member_count": 3,
+      "source_groups_present": [
+        "allergy_insects"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "grass_pollen",
+      "patient_name": "Grass Pollen",
+      "explanation": "Pollen from grasses is carried in the air in certain seasons and is a common cause of hay fever.",
+      "allergen_type": "environmental",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "member_allergen_ids": [
+        "dactylis_glomerata",
+        "phleum_pratense",
+        "cynodon_dactylon",
+        "lolium_perenne",
+        "agrostis_stolonifera",
+        "sorghum_halepense",
+        "festuca_elatior",
+        "phragmites_communis"
+      ],
+      "member_count": 8,
+      "source_groups_present": [
+        "allergy_grass"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "weed_pollen",
+      "patient_name": "Weed Pollen",
+      "explanation": "Pollen from common weeds is released into the air in certain seasons.",
+      "allergen_type": "environmental",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "member_allergen_ids": [
+        "amaranthus_retroflexus",
+        "xanthium_commune",
+        "nart_v1_artemisia_vulgaris",
+        "chenopodium_album"
+      ],
+      "member_count": 4,
+      "source_groups_present": [
+        "allergy_weed_tree"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "tree_pollen",
+      "patient_name": "Tree Pollen",
+      "explanation": "Pollen from trees is carried by wind in certain seasons and can affect the nose, eyes and chest.",
+      "allergen_type": "environmental",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "member_allergen_ids": [
+        "eucalyptus_spp",
+        "morus_alba",
+        "prosopis_juliflora",
+        "acacia_spp",
+        "oak_wood",
+        "salix_caprea"
+      ],
+      "member_count": 6,
+      "source_groups_present": [
+        "allergy_weed_tree"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "crop_plant_pollen",
+      "patient_name": "Crop Plant Pollen",
+      "explanation": "Pollen from farm crops such as oilseed rape can be released in large amounts near fields.",
+      "allergen_type": "environmental",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "member_allergen_ids": [
+        "brassica_napus"
+      ],
+      "member_count": 1,
+      "source_groups_present": [
+        "allergy_weed_tree"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "moulds",
+      "patient_name": "Moulds",
+      "explanation": "Moulds are tiny fungi that grow in damp places and release spores into the air.",
+      "allergen_type": "environmental",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MOULD"
+      ],
+      "member_allergen_ids": [
+        "penicillium_notatum",
+        "cladosporium_herbarum",
+        "aspergillus_fumigatus",
+        "mucor_racemosus",
+        "alternaria_alternata",
+        "curvularia_lunata",
+        "trichoderma_viride",
+        "phoma_betae",
+        "rhizopus_nigricans"
+      ],
+      "member_count": 9,
+      "source_groups_present": [
+        "allergy_moulds_yeast"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "yeasts_and_candida",
+      "patient_name": "Candida Yeast",
+      "explanation": "Candida is a yeast that normally lives on human skin, in the mouth and in the gut.",
+      "allergen_type": "environmental",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_YEAST"
+      ],
+      "member_allergen_ids": [
+        "candida_albicans"
+      ],
+      "member_count": 1,
+      "source_groups_present": [
+        "allergy_moulds_yeast"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "beta_lactam_antibiotics",
+      "patient_name": "Penicillin-Type Antibiotics",
+      "explanation": "These are common antibiotics related to penicillin that doctors use for many infections.",
+      "allergen_type": "drug",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "member_allergen_ids": [
+        "penicillin_v",
+        "penicillin_g",
+        "cephalosporin",
+        "amoxicillin",
+        "oxacillin",
+        "ampicillin"
+      ],
+      "member_count": 6,
+      "source_groups_present": [
+        "allergy_drugs"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "other_antibiotics",
+      "patient_name": "Other Antibiotics",
+      "explanation": "These antibiotics belong to several different families used for a variety of infections.",
+      "allergen_type": "drug",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "member_allergen_ids": [
+        "azithromycin",
+        "sulfamethoxazole",
+        "gentamycin",
+        "metronidazole",
+        "chloramphenicol",
+        "tetracycline",
+        "ofloxacin",
+        "ciprofloxacin"
+      ],
+      "member_count": 8,
+      "source_groups_present": [
+        "allergy_drugs"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "nsaids_and_analgesics",
+      "patient_name": "Pain and Fever Medicines",
+      "explanation": "These common medicines relieve pain, inflammation and fever.",
+      "allergen_type": "drug",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "member_allergen_ids": [
+        "aspirin",
+        "ibuprofen",
+        "diclofenac",
+        "paracetamol"
+      ],
+      "member_count": 4,
+      "source_groups_present": [
+        "allergy_drugs"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "local_anaesthetics",
+      "patient_name": "Numbing Medicines",
+      "explanation": "These medicines numb the skin or mouth and are used in creams, sprays and dental or minor procedures.",
+      "allergen_type": "drug",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "member_allergen_ids": [
+        "benzocaine",
+        "prilocaine"
+      ],
+      "member_count": 2,
+      "source_groups_present": [
+        "allergy_drugs"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "vitamins_and_other_medicines",
+      "patient_name": "Vitamins and Other Medicines",
+      "explanation": "This group includes vitamins and a cough medicine that people may take as tablets, syrups or injections.",
+      "allergen_type": "drug",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "member_allergen_ids": [
+        "ascorbic_acid_vitamin_c",
+        "cobalamin_vitamin_b12",
+        "bromhexine",
+        "thiamine_vitamin_b1"
+      ],
+      "member_count": 4,
+      "source_groups_present": [
+        "allergy_drugs"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "vegetables_allium",
+      "patient_name": "Onion Family Vegetables",
+      "explanation": "Onion and garlic are strongly flavoured vegetables used in most Indian cooking.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "onion",
+        "garlic"
+      ],
+      "member_count": 2,
+      "source_groups_present": [
+        "allergy_veg"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "vegetables_brassica",
+      "patient_name": "Cabbage Family Vegetables",
+      "explanation": "Cabbage, cauliflower, broccoli and radish belong to the same plant family.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "cauliflower",
+        "red_radish",
+        "cabbage",
+        "broccoli"
+      ],
+      "member_count": 4,
+      "source_groups_present": [
+        "allergy_veg"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "vegetables_nightshade",
+      "patient_name": "Nightshade Vegetables",
+      "explanation": "Tomato, potato, brinjal and capsicum belong to the nightshade plant family.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "egg_plant_aubergine",
+        "tomato",
+        "potato",
+        "sweet_pepper"
+      ],
+      "member_count": 4,
+      "source_groups_present": [
+        "allergy_spices",
+        "allergy_veg"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "vegetables_gourd",
+      "patient_name": "Gourd Family Vegetables",
+      "explanation": "Pumpkin and cucumber belong to the gourd plant family.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "pumpkin",
+        "cucumber"
+      ],
+      "member_count": 2,
+      "source_groups_present": [
+        "allergy_veg"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "vegetables_leafy",
+      "patient_name": "Leafy Vegetables",
+      "explanation": "Spinach and lettuce are eaten for their leaves, raw or cooked.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "spinach",
+        "lettuce"
+      ],
+      "member_count": 2,
+      "source_groups_present": [
+        "allergy_veg"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "vegetables_root",
+      "patient_name": "Root Vegetables",
+      "explanation": "Carrot, beetroot and sweet potato are vegetables that grow underground.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "sweet_potato",
+        "carrot",
+        "beet"
+      ],
+      "member_count": 3,
+      "source_groups_present": [
+        "allergy_veg"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "legumes_pulses",
+      "patient_name": "Beans, Peas and Pulses",
+      "explanation": "These foods come from legume plants and include soya products such as tofu.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "french_bean",
+        "tofu_bean_curd",
+        "pea",
+        "soya_bean",
+        "lentil"
+      ],
+      "member_count": 5,
+      "source_groups_present": [
+        "allergy_dairy",
+        "allergy_seeds_nuts_legumes",
+        "allergy_veg"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "fruits_rosaceae",
+      "patient_name": "Stone and Orchard Fruits",
+      "explanation": "Apple, peach, plum, cherry, apricot and strawberry belong to the rose plant family.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "apricot",
+        "cherry",
+        "plum",
+        "strawberry",
+        "apple",
+        "peach"
+      ],
+      "member_count": 6,
+      "source_groups_present": [
+        "allergy_veg"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "fruits_citrus",
+      "patient_name": "Citrus Fruits",
+      "explanation": "Citrus fruits such as orange are juicy fruits rich in vitamin C.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "orange"
+      ],
+      "member_count": 1,
+      "source_groups_present": [
+        "allergy_veg"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "fruits_melons",
+      "patient_name": "Melons",
+      "explanation": "Watermelon and melon are juicy fruits from the gourd plant family.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "watermelon",
+        "melon"
+      ],
+      "member_count": 2,
+      "source_groups_present": [
+        "allergy_veg"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "fruits_tropical",
+      "patient_name": "Tropical Fruits",
+      "explanation": "Mango, banana, papaya, pineapple, guava, lychee and kiwi are widely eaten warm-climate fruits.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "pineapple",
+        "guava",
+        "lychee",
+        "papaya",
+        "mango",
+        "banana",
+        "kiwi"
+      ],
+      "member_count": 7,
+      "source_groups_present": [
+        "allergy_veg"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "fruits_other",
+      "patient_name": "Other Fruits",
+      "explanation": "These are fresh and dried fruits that do not fit into the other fruit groups.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "date",
+        "grape",
+        "pomegranate",
+        "cranberry",
+        "fig",
+        "olive",
+        "raisin"
+      ],
+      "member_count": 7,
+      "source_groups_present": [
+        "allergy_seeds_nuts_legumes",
+        "allergy_veg"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "cereals_grains",
+      "patient_name": "Cereals and Grains",
+      "explanation": "Rice, wheat, barley, oats and maize are grains used for staple foods.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "member_allergen_ids": [
+        "rice",
+        "wheat_flour",
+        "barley",
+        "oats",
+        "maize",
+        "semolina"
+      ],
+      "member_count": 6,
+      "source_groups_present": [
+        "allergy_seeds_nuts_legumes",
+        "allergy_veg"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "fish",
+      "patient_name": "Fish",
+      "explanation": "These are finfish commonly eaten fresh, dried or tinned.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "mackerel",
+        "sardine",
+        "carp_fish",
+        "salmon",
+        "fish_cod"
+      ],
+      "member_count": 5,
+      "source_groups_present": [
+        "allergy_non_veg"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "shellfish_crustaceans",
+      "patient_name": "Shellfish and Crustaceans",
+      "explanation": "Prawns, crab and lobster are shellfish with a hard outer shell.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "crab",
+        "shrimp",
+        "lobster"
+      ],
+      "member_count": 3,
+      "source_groups_present": [
+        "allergy_non_veg"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "red_meat_and_pork",
+      "patient_name": "Red Meat and Pork",
+      "explanation": "Mutton, beef and pork are meats from mammals.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "mutton",
+        "beef",
+        "pork"
+      ],
+      "member_count": 3,
+      "source_groups_present": [
+        "allergy_non_veg"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "poultry_meat",
+      "patient_name": "Poultry Meat",
+      "explanation": "Chicken, turkey and duck are meats from farmed birds.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "chicken_meat",
+        "turkey",
+        "duck_meat"
+      ],
+      "member_count": 3,
+      "source_groups_present": [
+        "allergy_non_veg"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "hen_egg",
+      "patient_name": "Hen's Egg",
+      "explanation": "These tests look at the whole egg or at its white and yolk separately.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "whole_egg_hen",
+        "egg_yolk_elisa",
+        "egg_white_elisa"
+      ],
+      "member_count": 3,
+      "source_groups_present": [
+        "allergy_non_veg"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "milk_and_dairy",
+      "patient_name": "Milk and Dairy",
+      "explanation": "Milk, curd, yogurt, cheese and milk protein come from cow's milk.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "cheese_cheddar_type",
+        "curd",
+        "cow_milk",
+        "yogurt",
+        "casein_milk_protein"
+      ],
+      "member_count": 5,
+      "source_groups_present": [
+        "allergy_dairy"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "peanut",
+      "patient_name": "Peanut",
+      "explanation": "Peanut is a legume that is commonly eaten roasted, in chutneys, sweets and snacks.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "peanut"
+      ],
+      "member_count": 1,
+      "source_groups_present": [
+        "allergy_seeds_nuts_legumes"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "tree_nuts",
+      "patient_name": "Tree Nuts",
+      "explanation": "Almond, walnut, cashew, hazelnut and pistachio are nuts that grow on trees.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "hazelnut",
+        "walnut",
+        "almond",
+        "cashew_nut",
+        "pistachio_nut"
+      ],
+      "member_count": 5,
+      "source_groups_present": [
+        "allergy_seeds_nuts_legumes"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "coconut_products",
+      "patient_name": "Coconut",
+      "explanation": "Coconut and coconut milk are widely used in cooking in many parts of India.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "coconut_milk",
+        "coconut"
+      ],
+      "member_count": 2,
+      "source_groups_present": [
+        "allergy_dairy",
+        "allergy_seeds_nuts_legumes"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "edible_seeds",
+      "patient_name": "Edible Seeds",
+      "explanation": "Sesame, sunflower, pumpkin, poppy and flax seeds are eaten whole, ground or pressed for oil.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "member_allergen_ids": [
+        "pumpkin_seed",
+        "sunflower_seed",
+        "sesame_seed",
+        "poppy_seed",
+        "flaxseed"
+      ],
+      "member_count": 5,
+      "source_groups_present": [
+        "allergy_seeds_nuts_legumes"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "culinary_spices",
+      "patient_name": "Spices",
+      "explanation": "Spices come from seeds, bark, roots or buds of plants and are used to flavour food.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "member_allergen_ids": [
+        "cinnamon",
+        "mustard",
+        "vanilla",
+        "coriander",
+        "ginger",
+        "anise",
+        "cardamon",
+        "saffron",
+        "fennel",
+        "cloves",
+        "black_pepper",
+        "nutmeg",
+        "curcuma"
+      ],
+      "member_count": 13,
+      "source_groups_present": [
+        "allergy_spices"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "culinary_herbs",
+      "patient_name": "Culinary Herbs",
+      "explanation": "Herbs such as mint, basil, thyme and oregano are leafy plants used to flavour food.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "member_allergen_ids": [
+        "mint",
+        "thyme",
+        "basil",
+        "oregano"
+      ],
+      "member_count": 4,
+      "source_groups_present": [
+        "allergy_spices"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "spice_mixtures",
+      "patient_name": "Spice Mixtures",
+      "explanation": "Curry powder is a blend of several spices that varies between brands and recipes.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_MIXED"
+      ],
+      "member_allergen_ids": [
+        "curry"
+      ],
+      "member_count": 1,
+      "source_groups_present": [
+        "allergy_spices"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "coffee_tea_cocoa",
+      "patient_name": "Coffee, Tea and Chocolate",
+      "explanation": "These plant-based drinks and treats are enjoyed daily by many people.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "member_allergen_ids": [
+        "chocolate",
+        "coffee",
+        "tea"
+      ],
+      "member_count": 3,
+      "source_groups_present": [
+        "allergy_dairy"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "edible_fungi_and_yeast_foods",
+      "patient_name": "Mushrooms and Yeast",
+      "explanation": "Mushrooms are edible fungi, and yeast is used in baking and brewing.",
+      "allergen_type": "food",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "member_allergen_ids": [
+        "yeast",
+        "mushrooms"
+      ],
+      "member_count": 2,
+      "source_groups_present": [
+        "allergy_dairy"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "parasitic_worms",
+      "patient_name": "Intestinal Worms",
+      "explanation": "Roundworms such as Ascaris and the dog roundworm Toxocara can infect people through soil, dirty hands or contaminated food.",
+      "allergen_type": "parasite",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_PARASITE"
+      ],
+      "member_allergen_ids": [
+        "ascaris",
+        "toxocara_canis"
+      ],
+      "member_count": 2,
+      "source_groups_present": [
+        "allergy_parasites"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "fish_parasite_anisakis",
+      "patient_name": "Fish Worm (Anisakis)",
+      "explanation": "Anisakis is a worm that can live in sea fish and cause illness or allergy when infected fish is eaten.",
+      "allergen_type": "parasite",
+      "caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_PARASITE",
+        "C_ANISAKIS"
+      ],
+      "member_allergen_ids": [
+        "anisakis"
+      ],
+      "member_count": 1,
+      "source_groups_present": [
+        "allergy_parasites"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    },
+    {
+      "category_id": "total_ige",
+      "patient_name": "Total IgE",
+      "explanation": "Total IgE counts all IgE antibodies in your blood. It is a general marker and not a test for one allergen.",
+      "allergen_type": "total_ige",
+      "caution_rule_ids": [
+        "C_TOTAL"
+      ],
+      "member_allergen_ids": [
+        "ige_total"
+      ],
+      "member_count": 1,
+      "source_groups_present": [
+        "ige"
+      ],
+      "status_words": {
+        "sensitization_detected": "Sensitization detected",
+        "no_sensitization_detected": "No sensitization detected",
+        "incomplete": "Results incomplete",
+        "not_tested": "Not tested"
+      },
+      "clinical_review_status": "pending"
+    }
+  ],
+  "caution_library": {
+    "C_SENS": {
+      "patient_text": "A positive blood test shows your immune system has made IgE to this substance. This is called sensitization. It does not prove that the substance is causing your symptoms.",
+      "evidence_refs": [],
+      "global_rule": "R_SIGE_SENSITIZATION"
+    },
+    "C_CLASS": {
+      "patient_text": "The class or value on your report shows how much IgE was found. It does not show how severe a reaction could be, and a higher value does not mean a worse reaction.",
+      "evidence_refs": [],
+      "global_rule": "R_CLASS_NOT_SEVERITY"
+    },
+    "C_NEG": {
+      "patient_text": "A negative or low result does not rule out an allergy, and it does not make something safe. Your history and your doctor's advice matter more than this test alone.",
+      "evidence_refs": [],
+      "global_rule": "R_NEG_NOT_SAFE"
+    },
+    "C_TOTAL": {
+      "patient_text": "Total IgE is a general marker. It cannot confirm allergy, cannot show which substance you react to, and cannot show how severe any allergy might be.",
+      "evidence_refs": [
+        "E01"
+      ],
+      "global_rule": "R_TOTAL_NOT_DIAGNOSTIC"
+    },
+    "C_ANIMAL": {
+      "patient_text": "A positive result may involve proteins that several animals share. It does not show that your own pet is the cause, so speak to an allergist before any decision about a pet.",
+      "evidence_refs": [],
+      "global_rule": "R_SIGE_SENSITIZATION"
+    },
+    "C_BIRD": {
+      "patient_text": "Feathers, droppings and bird products can contain different proteins. A positive result for one bird part does not show which bird or which part matters for you.",
+      "evidence_refs": [
+        "E11"
+      ],
+      "global_rule": "R_SIGE_SENSITIZATION"
+    },
+    "C_MITE": {
+      "patient_text": "Dust mite, storage mite and cockroach results often appear together, and they share a protein with shellfish. A positive result does not show which source is responsible.",
+      "evidence_refs": [
+        "E09",
+        "E10"
+      ],
+      "global_rule": "R_SIGE_SENSITIZATION"
+    },
+    "C_MIXED": {
+      "patient_text": "This test uses a mixture of materials. The result cannot say which part you react to, so it is less specific than a test for a single source.",
+      "evidence_refs": [],
+      "global_rule": "R_SIGE_SENSITIZATION"
+    },
+    "C_OCC": {
+      "patient_text": "These materials matter most if you touch or breathe them at work or during a hobby. A blood test alone cannot show whether your work is causing symptoms.",
+      "evidence_refs": [
+        "E16",
+        "E24"
+      ],
+      "global_rule": "R_OCCUPATIONAL"
+    },
+    "C_VENOM": {
+      "patient_text": "A positive venom result shows sensitization and does not prove you will react to the next sting. Anyone with a body wide reaction to a sting should see an allergist.",
+      "evidence_refs": [
+        "E08"
+      ],
+      "global_rule": "R_INSECT"
+    },
+    "C_INSECT_XR": {
+      "patient_text": "Cockroach results often appear together with dust mite results, so the true source can be hard to tell apart without your doctor's review.",
+      "evidence_refs": [
+        "E10"
+      ],
+      "global_rule": "R_INSECT"
+    },
+    "C_INSECT_OTHER": {
+      "patient_text": "Blood tests for mosquito, housefly and moth have limited published support. A positive result alone does not explain your symptoms, so discuss it with your doctor.",
+      "evidence_refs": [],
+      "global_rule": "R_INSECT"
+    },
+    "C_POLLEN": {
+      "patient_text": "Pollen results show sensitization. They matter most if nose, eye or chest symptoms follow the local pollen season. Pollen results can overlap with each other.",
+      "evidence_refs": [],
+      "global_rule": "R_SIGE_SENSITIZATION"
+    },
+    "C_MOULD": {
+      "patient_text": "Mould results show sensitization. Several moulds can share proteins, so one positive result may reflect another mould. Symptoms in damp seasons or damp rooms are useful clues.",
+      "evidence_refs": [
+        "E21"
+      ],
+      "global_rule": "R_SIGE_SENSITIZATION"
+    },
+    "C_YEAST": {
+      "patient_text": "Candida lives on normal skin and in the gut, so a positive result often does not mean an infection or a current problem. Your doctor will read it with your symptoms.",
+      "evidence_refs": [],
+      "global_rule": "R_SIGE_SENSITIZATION"
+    },
+    "C_DRUG": {
+      "patient_text": "Blood IgE tests are not validated for most medicines, and a negative result never means a medicine is safe. Never start, stop or retry a medicine because of this report.",
+      "evidence_refs": [
+        "E06",
+        "E23"
+      ],
+      "global_rule": "R_DRUG_STRICT"
+    },
+    "C_DRUG_ROUTE": {
+      "patient_text": "Many medicine reactions do not involve IgE, and some appear days later. A drug allergy specialist decides what testing or supervised steps are right for you.",
+      "evidence_refs": [
+        "E06",
+        "E07"
+      ],
+      "global_rule": "R_DRUG_STRICT"
+    },
+    "C_FOOD": {
+      "patient_text": "A positive food result does not mean you must avoid that food. Do not remove foods you eat without symptoms because of this test alone. Your doctor decides with your history.",
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "global_rule": "R_NO_ELIMINATE_TOLERATED"
+    },
+    "C_FOOD_LOWER_PERF": {
+      "patient_text": "Blood tests for this food type are less reliable and are often positive in people who eat these foods without trouble. Your history matters far more than this result.",
+      "evidence_refs": [
+        "E01"
+      ],
+      "global_rule": "R_NO_ELIMINATE_TOLERATED"
+    },
+    "C_PARASITE": {
+      "patient_text": "IgE to worm proteins may reflect past or present exposure and cannot tell which. Never take worm medicines because of this report, and let your doctor decide on further tests.",
+      "evidence_refs": [
+        "E14",
+        "E15"
+      ],
+      "global_rule": "R_PARASITE"
+    },
+    "C_ANISAKIS": {
+      "patient_text": "Anisakis can cause both infection and allergy after eating infected fish. Tell your doctor about hives, swelling or stomach pain after fish meals, especially raw or lightly cooked fish.",
+      "evidence_refs": [
+        "E14",
+        "E15"
+      ],
+      "global_rule": "R_PARASITE"
+    }
+  }
+}

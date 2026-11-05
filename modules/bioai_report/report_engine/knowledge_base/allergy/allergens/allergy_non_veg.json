@@ -1,0 +1,993 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "source_group": "allergy_non_veg",
+  "source_group_display_order": 9,
+  "patient_group_name": "Meat, Fish and Eggs",
+  "patient_group_explanation": "Fish, meats, shellfish and egg parts.",
+  "group_caution_rule_ids": [
+    "C_SENS",
+    "C_CLASS",
+    "C_FOOD"
+  ],
+  "test_count": 17,
+  "clinical_review_status": "pending",
+  "allergens": [
+    {
+      "allergen_id": "mackerel",
+      "lab_test_name": "Mackerel",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 1,
+      "aliases": [
+        "Bangda",
+        "Mackerel (Bangda)"
+      ],
+      "common_name": "Mackerel (Bangda)",
+      "scientific_name": null,
+      "canonical_category": "fish",
+      "allergen_type": "food",
+      "definition": "Mackerel is an oily sea fish widely eaten fried, curried or grilled, especially in coastal regions such as Maharashtra, Goa and Kerala. The test does not state the exact species.",
+      "exposure_sources": [
+        "Fried and curried fish",
+        "Grilled or smoked fish",
+        "Coastal fish markets",
+        "Canned fish"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "A positive result shows IgE to mackerel. This does not prove fish allergy. If fish has ever caused hives, swelling or vomiting soon after eating, tell your doctor and avoid fish until you have been assessed. Do not test fish at home after a serious reaction.",
+      "card_summary": "An oily sea fish eaten fried, curried or grilled, especially in coastal regions.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "The exact fish species used in this test is not stated. A positive result does not tell you which other fish you can or cannot eat.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "species_unspecified"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "sardine",
+      "lab_test_name": "Sardine",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 2,
+      "aliases": [],
+      "common_name": "Sardine",
+      "scientific_name": null,
+      "canonical_category": "fish",
+      "allergen_type": "food",
+      "definition": "Sardines are small oily sea fish eaten fresh, fried, curried, dried or tinned. They are common in coastal diets, especially in Kerala, Goa and Maharashtra.",
+      "exposure_sources": [
+        "Fried and curried sardines",
+        "Dried fish",
+        "Tinned sardines",
+        "Coastal markets"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to sardine. It does not prove allergy. If you have had symptoms after fish, talk to your doctor and do not test fish at home. If you eat sardines without problems, do not stop on this result alone.",
+      "card_summary": "Small oily sea fish eaten fresh, dried, fried, curried or tinned in coastal homes.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "The exact sardine species is not stated. A positive result alone does not tell you which other fish are safe.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "species_unspecified"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "carp_fish",
+      "lab_test_name": "Carp Fish",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 3,
+      "aliases": [
+        "Carp (Rohu, Catla and Related Fish)"
+      ],
+      "common_name": "Carp (Rohu, Catla and Related Fish)",
+      "scientific_name": "Cyprinus carpio (and related carps)",
+      "canonical_category": "fish",
+      "allergen_type": "food",
+      "definition": "Carp are freshwater fish that include common farmed fish such as rohu and catla in India. They are cooked as curries, fries and Bengali-style dishes.",
+      "exposure_sources": [
+        "Fish curries and fries",
+        "Freshwater fish markets",
+        "Fish cooked in mustard gravy",
+        "Pond-farmed fish"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "A positive result shows IgE to carp. It does not confirm fish allergy. If fish has ever caused hives, swelling or vomiting soon after eating, see an allergist. A positive result alone is not a reason to stop eating fish you tolerate.",
+      "card_summary": "A group of freshwater fish, including rohu and catla, eaten as curries and fries.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "The exact carp species is not stated. This result does not show which other fish are safe.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "species_unspecified"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "salmon",
+      "lab_test_name": "Salmon",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 4,
+      "aliases": [],
+      "common_name": "Salmon",
+      "scientific_name": "Salmo salar",
+      "canonical_category": "fish",
+      "allergen_type": "food",
+      "definition": "Salmon is a pink-fleshed oily fish eaten grilled, baked, smoked or in sushi. It is mostly imported or farmed, and served in many city restaurants.",
+      "exposure_sources": [
+        "Grilled and baked fish",
+        "Smoked salmon",
+        "Sushi and sashimi",
+        "Fish oil products"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to salmon. It does not prove allergy. If you have had a reaction after any fish, tell your doctor. Do not eat fish you are worried about without medical advice, and do not stop others on this result alone.",
+      "card_summary": "A pink-fleshed oily fish eaten grilled, baked, smoked or in sushi rolls.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "Salmon results do not show which other fish you can eat. Your doctor will guide this using your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "fish_cod",
+      "lab_test_name": "Fish (Cod)",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 5,
+      "aliases": [
+        "Cod"
+      ],
+      "common_name": "Cod",
+      "scientific_name": "Gadus morhua",
+      "canonical_category": "fish",
+      "allergen_type": "food",
+      "definition": "Cod is a white-fleshed sea fish, often sold frozen or in fish fingers, fillets and fish oil products. It is common in restaurants and packaged foods.",
+      "exposure_sources": [
+        "Fish fingers and fillets",
+        "Frozen fish",
+        "Fish and chips",
+        "Cod liver oil"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "A positive result shows IgE to cod. It does not confirm fish allergy, and it may not cover every kind of fish you eat. If fish has ever caused symptoms, tell your doctor which fish and how it was cooked.",
+      "card_summary": "A white sea fish used as a standard test fish and in frozen fish products.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "Cod is a test fish, so a positive result does not show which fish you react to. It does not replace a doctor's assessment.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "mutton",
+      "lab_test_name": "Mutton",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 6,
+      "aliases": [
+        "Mutton (Goat or Sheep Meat)"
+      ],
+      "common_name": "Mutton (Goat or Sheep Meat)",
+      "scientific_name": "Capra hircus or Ovis aries",
+      "canonical_category": "red_meat_and_pork",
+      "allergen_type": "food",
+      "definition": "Mutton is meat from goat or sheep. In India the word is often used for goat meat, though the test does not say which animal was used.",
+      "exposure_sources": [
+        "Curries and biryani",
+        "Kebabs and keema",
+        "Bone broths and soups",
+        "Barbecued meat"
+      ],
+      "typical_symptoms": [
+        "Hives",
+        "Stomach pain or vomiting",
+        "Swelling of lips or face",
+        "Diarrhoea",
+        "Itching"
+      ],
+      "interpretation_insight": "A positive result shows IgE to mutton. Some meat allergies cause symptoms several hours after eating and are linked to tick bites, so tell your doctor if this pattern fits. This result does not show whether it is safe to eat meat.",
+      "card_summary": "Goat or sheep meat, widely eaten in curries, biryani, kebabs and festive dishes.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "meat_delayed_reaction_review",
+        "food_no_home_challenge"
+      ],
+      "caution": "The test does not state whether goat or sheep was used. A positive result alone does not confirm a meat allergy.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "name_ambiguous",
+        "species_unspecified"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E17"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "chicken_meat",
+      "lab_test_name": "Chicken Meat",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 7,
+      "aliases": [],
+      "common_name": "Chicken Meat",
+      "scientific_name": "Gallus gallus domesticus",
+      "canonical_category": "poultry_meat",
+      "allergen_type": "food",
+      "definition": "Chicken meat is the commonest poultry meat in India, eaten in curries, tikka, biryani, grills and fast foods. It is often cooked at home and eaten out.",
+      "exposure_sources": [
+        "Curries and biryani",
+        "Grills and tikka",
+        "Fried chicken and snacks",
+        "Soups and stocks"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to chicken meat. It does not prove allergy. If chicken has caused hives, swelling or vomiting soon after eating, tell your doctor. Do not stop eating chicken that you tolerate on this result alone.",
+      "card_summary": "The most commonly eaten poultry meat, used in curries, grills and snacks.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs"
+      ],
+      "caution": "A positive chicken result may be linked to other poultry or bird proteins. It does not confirm allergy.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "egg_yolk_elisa",
+          "whole_egg_hen"
+        ],
+        "patient_note": "Some people who react to bird feathers or droppings also react to egg yolk. Tell your doctor if eggs have ever bothered you.",
+        "held_note_for_review": null,
+        "evidence_status": "bird_egg_syndrome_described_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "turkey",
+      "lab_test_name": "Turkey",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 8,
+      "aliases": [
+        "Turkey Meat"
+      ],
+      "common_name": "Turkey Meat",
+      "scientific_name": "Meleagris gallopavo",
+      "canonical_category": "poultry_meat",
+      "allergen_type": "food",
+      "definition": "Turkey meat comes from farmed turkeys and is eaten roasted, grilled or sliced as cold cuts. It is less common in Indian homes than chicken.",
+      "exposure_sources": [
+        "Roasts and grills",
+        "Cold cuts and sandwiches",
+        "Sausages",
+        "Festive meals"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "A positive result shows IgE to turkey meat. This does not prove allergy. If you have reacted to poultry in the past, tell your doctor. Do not change your diet based on this result alone.",
+      "card_summary": "Meat from farmed turkeys, eaten roasted, as cold cuts or in sandwiches.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs"
+      ],
+      "caution": "Turkey meat and turkey feathers are tested separately. One result does not predict the other.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "duck_meat",
+      "lab_test_name": "Duck Meat",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 9,
+      "aliases": [],
+      "common_name": "Duck Meat",
+      "scientific_name": "Anas platyrhynchos domesticus",
+      "canonical_category": "poultry_meat",
+      "allergen_type": "food",
+      "definition": "Duck meat comes from farmed ducks and is eaten roasted, curried or grilled. It is more common in some regions, such as parts of Kerala and the North-East.",
+      "exposure_sources": [
+        "Roast and curried duck",
+        "Festive dishes",
+        "Restaurant dishes",
+        "Regional cooking"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to duck meat. It does not prove allergy. If duck or other poultry has caused symptoms after eating, tell your doctor. Duck feathers and duck meat are tested separately from each other.",
+      "card_summary": "Meat from farmed ducks, eaten roasted or curried in some regions of India.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs"
+      ],
+      "caution": "A positive result for duck meat does not show whether other poultry meats are safe or unsafe. Your doctor can guide this.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "beef",
+      "lab_test_name": "Beef",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 10,
+      "aliases": [],
+      "common_name": "Beef",
+      "scientific_name": "Bos taurus",
+      "canonical_category": "red_meat_and_pork",
+      "allergen_type": "food",
+      "definition": "Beef is meat from cattle. It is eaten in different forms across communities in India and internationally, including steaks, curries, kebabs, burgers and minced dishes.",
+      "exposure_sources": [
+        "Curries and stews",
+        "Minced meat dishes",
+        "Burgers and sausages",
+        "Gelatin-containing products"
+      ],
+      "typical_symptoms": [
+        "Hives",
+        "Stomach pain or vomiting",
+        "Swelling of lips or face",
+        "Diarrhoea",
+        "Itching"
+      ],
+      "interpretation_insight": "A positive result shows IgE to beef. Some meat allergies cause symptoms several hours after eating, and a tick-bite-related allergy called alpha-gal has been reported in India. Tell your doctor if this timing fits you. This result alone does not confirm it.",
+      "card_summary": "Meat from cattle, eaten as curries, minced dishes, kebabs, burgers and grills.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "meat_delayed_reaction_review",
+        "food_no_home_challenge"
+      ],
+      "caution": "A positive beef result does not confirm meat allergy. If delayed reactions after red meat occur, an alpha-gal test may be considered by your doctor.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E17"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "pork",
+      "lab_test_name": "Pork",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 11,
+      "aliases": [],
+      "common_name": "Pork",
+      "scientific_name": "Sus scrofa domesticus",
+      "canonical_category": "red_meat_and_pork",
+      "allergen_type": "food",
+      "definition": "Pork is meat from pigs. It is eaten as chops, curries, sausages, bacon and ham in many communities, including in Goa, the North East and Kerala.",
+      "exposure_sources": [
+        "Curries and roasts",
+        "Sausages and bacon",
+        "Ham and cold cuts",
+        "Cured meats"
+      ],
+      "typical_symptoms": [
+        "Hives",
+        "Stomach pain or vomiting",
+        "Swelling of lips or face",
+        "Diarrhoea",
+        "Itching"
+      ],
+      "interpretation_insight": "This result shows IgE to pork. A small group of cat-allergic people also react to pork, and some meat allergies cause delayed symptoms hours after eating. If either fits, tell your doctor. A blood result alone does not confirm allergy.",
+      "card_summary": "Meat from pigs, eaten in curries, sausages, bacon, ham and festive roasts.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "meat_delayed_reaction_review",
+        "food_no_home_challenge"
+      ],
+      "caution": "A positive pork result may be linked to cat sensitization in some people. It does not confirm allergy to pork meat.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "cat_epithelium",
+          "cat_dander"
+        ],
+        "patient_note": "A small group of people sensitized to cats also react to pork. Tell your doctor if you have a cat allergy and pork has ever caused symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "cat_pork_syndrome_described_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E17",
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "crab",
+      "lab_test_name": "Crab",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 12,
+      "aliases": [],
+      "common_name": "Crab",
+      "scientific_name": null,
+      "canonical_category": "shellfish_crustaceans",
+      "allergen_type": "food",
+      "definition": "Crab is a hard-shelled shellfish eaten in curries, stir-fries and soups, especially in coastal areas. The test does not state which crab species was used.",
+      "exposure_sources": [
+        "Crab curry and masala",
+        "Soups and stir-fries",
+        "Seafood platters",
+        "Coastal markets"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "A positive result shows IgE to crab. Shellfish allergy can cause quick reactions, so if crab has ever caused hives, swelling or breathing trouble, avoid it until assessed and tell your doctor. Do not test crab at home.",
+      "card_summary": "A hard-shelled shellfish eaten in curries, soups, fries and many coastal dishes.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "shellfish_mite_link_note",
+        "gen_emergency_signs"
+      ],
+      "caution": "A positive crab result may reflect dust mite sensitization rather than shellfish allergy. A doctor needs to interpret it with your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "dermatophagoides_pteronyssinus",
+          "dermatophagoides_farinae",
+          "blatella_germanica"
+        ],
+        "patient_note": "Shellfish share a protein with dust mites and cockroach, so a positive shellfish result may sometimes reflect mite sensitization. Your doctor can help sort this out.",
+        "held_note_for_review": null,
+        "evidence_status": "tropomyosin_link_E09",
+        "shown_to_patient": true
+      },
+      "review_flags": [
+        "species_unspecified"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E09"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "shrimp",
+      "lab_test_name": "Shrimp",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 13,
+      "aliases": [
+        "Prawn",
+        "Shrimp (Prawn)"
+      ],
+      "common_name": "Shrimp (Prawn)",
+      "scientific_name": null,
+      "canonical_category": "shellfish_crustaceans",
+      "allergen_type": "food",
+      "definition": "Shrimp, also called prawn, is a popular shellfish eaten in curries, fries and rice dishes, especially in coastal regions. The test does not state the species.",
+      "exposure_sources": [
+        "Prawn curry and fry",
+        "Biryani and pulao",
+        "Seafood platters",
+        "Dried shrimp and pastes"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to shrimp. If shrimp ever caused hives, swelling or breathing difficulty soon after eating, avoid it until an allergist has assessed you. A positive result can also reflect dust mite sensitization, so it needs your doctor's review.",
+      "card_summary": "A popular shellfish, also called prawn, eaten in curries, fries and rice dishes.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "shellfish_mite_link_note",
+        "gen_emergency_signs"
+      ],
+      "caution": "A positive shrimp result can reflect dust mite sensitization and not shrimp allergy. Your doctor needs to look at both.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "dermatophagoides_pteronyssinus",
+          "dermatophagoides_farinae",
+          "blatella_germanica"
+        ],
+        "patient_note": "Shellfish share a protein with dust mites and cockroach, so a positive shellfish result may sometimes reflect mite sensitization. Your doctor can help sort this out.",
+        "held_note_for_review": null,
+        "evidence_status": "tropomyosin_link_E09",
+        "shown_to_patient": true
+      },
+      "review_flags": [
+        "species_unspecified"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E09"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "lobster",
+      "lab_test_name": "Lobster",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 14,
+      "aliases": [],
+      "common_name": "Lobster",
+      "scientific_name": null,
+      "canonical_category": "shellfish_crustaceans",
+      "allergen_type": "food",
+      "definition": "Lobster is a large shellfish with a hard shell, eaten grilled, boiled or in curries. It is a premium seafood item in many places and restaurants.",
+      "exposure_sources": [
+        "Grilled or boiled lobster",
+        "Seafood platters",
+        "Restaurant dishes",
+        "Soups and bisques"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "A positive result shows IgE to lobster. Lobster is not eaten daily by most people, so the result may reflect sensitization to related shellfish or to dust mites. If you have ever reacted to shellfish, tell your doctor.",
+      "card_summary": "A large hard-shelled shellfish served grilled, boiled, buttered or in rich curries.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "shellfish_mite_link_note",
+        "gen_emergency_signs"
+      ],
+      "caution": "A positive lobster result may reflect sensitization to other shellfish or mites. Your doctor can interpret it with your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "dermatophagoides_pteronyssinus",
+          "dermatophagoides_farinae",
+          "blatella_germanica"
+        ],
+        "patient_note": "Shellfish share a protein with dust mites and cockroach, so a positive shellfish result may sometimes reflect mite sensitization. Your doctor can help sort this out.",
+        "held_note_for_review": null,
+        "evidence_status": "tropomyosin_link_E09",
+        "shown_to_patient": true
+      },
+      "review_flags": [
+        "species_unspecified"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E09"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "whole_egg_hen",
+      "lab_test_name": "Whole Egg (Hen)",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 15,
+      "aliases": [
+        "Whole Hen's Egg"
+      ],
+      "common_name": "Whole Hen's Egg",
+      "scientific_name": "Gallus gallus domesticus",
+      "canonical_category": "hen_egg",
+      "allergen_type": "food",
+      "definition": "Whole egg means both egg white and yolk from a hen. Eggs are eaten boiled, fried, in omelettes, baked goods and many other prepared foods.",
+      "exposure_sources": [
+        "Boiled, fried and omelettes",
+        "Cakes and baked goods",
+        "Mayonnaise and sauces",
+        "Biryani and curries"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "A positive result shows IgE to hen's egg. This does not prove egg allergy, and many people who test positive eat eggs without symptoms. If eggs have caused hives, swelling or vomiting, tell your doctor. Do not test egg at home after a serious reaction.",
+      "card_summary": "The white and yolk of a hen's egg, used in many foods.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "The egg white and yolk tests below can behave differently from the whole egg test. Together they help your doctor, not you alone.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "egg_yolk_elisa",
+          "whole_egg_hen"
+        ],
+        "patient_note": "Some people who react to bird feathers or droppings also react to egg yolk. Tell your doctor if eggs have ever bothered you.",
+        "held_note_for_review": null,
+        "evidence_status": "bird_egg_syndrome_described_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "egg_yolk_elisa",
+      "lab_test_name": "Egg Yolk Elisa",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 16,
+      "aliases": [
+        "Egg Yolk"
+      ],
+      "common_name": "Egg Yolk",
+      "scientific_name": "Gallus gallus domesticus",
+      "canonical_category": "hen_egg",
+      "allergen_type": "food",
+      "definition": "Egg yolk is the yellow part of a hen's egg. The test name includes the word ELISA, which names a laboratory method rather than the food.",
+      "exposure_sources": [
+        "Boiled and fried eggs",
+        "Custards and sauces",
+        "Baked goods",
+        "Mayonnaise"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to egg yolk. Some people sensitized to bird feathers or bird proteins also react to egg yolk. If eggs have caused symptoms, tell your doctor. Do not test eggs at home after a serious reaction.",
+      "card_summary": "The yellow part of a hen's egg, tested using an ELISA method.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "The test name mentions a laboratory method, so confirm what was measured. A positive result does not confirm egg allergy.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "egg_yolk_elisa",
+          "whole_egg_hen"
+        ],
+        "patient_note": "Some people who react to bird feathers or droppings also react to egg yolk. Tell your doctor if eggs have ever bothered you.",
+        "held_note_for_review": null,
+        "evidence_status": "bird_egg_syndrome_described_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [
+        "method_in_name"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "egg_white_elisa",
+      "lab_test_name": "Egg White Elisa",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 17,
+      "aliases": [
+        "Egg White"
+      ],
+      "common_name": "Egg White",
+      "scientific_name": "Gallus gallus domesticus",
+      "canonical_category": "hen_egg",
+      "allergen_type": "food",
+      "definition": "Egg white is the clear part of a hen's egg. The test name includes the word ELISA, which names a laboratory method rather than the food.",
+      "exposure_sources": [
+        "Boiled and fried eggs",
+        "Cakes and meringues",
+        "Sauces and foams",
+        "Binding in cooking"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "A positive result shows IgE to egg white. This does not confirm egg allergy. Many people with this result eat egg without trouble. Your doctor will use your own history of reactions to decide what is safe.",
+      "card_summary": "The clear part of a hen's egg, tested using an ELISA method.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "The test name mentions a laboratory method, so confirm what was measured. Egg white and yolk results can differ.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "method_in_name"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    }
+  ]
+}

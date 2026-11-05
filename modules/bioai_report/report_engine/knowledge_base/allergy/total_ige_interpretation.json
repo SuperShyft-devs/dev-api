@@ -1,0 +1,119 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "source_group": "ige",
+  "interpretation_principles": [
+    "Never present total IgE as proof of allergy, as a severity marker, or as a way to find the trigger. Interpret only against the reference interval printed by the laboratory."
+  ],
+  "record": {
+    "allergen_id": "ige_total",
+    "lab_test_name": "IGE total",
+    "source_group": "ige",
+    "source_group_display_order": 15,
+    "position_in_source_group": 1,
+    "aliases": [
+      "Total IgE",
+      "Serum total IgE",
+      "IgE"
+    ],
+    "common_name": "Total IgE",
+    "scientific_name": null,
+    "canonical_category": "total_ige",
+    "allergen_type": "total_ige",
+    "definition": "Total IgE measures all the IgE antibodies in your blood, whatever they react to. It gives a general picture of IgE activity and is not a test for any one allergen.",
+    "exposure_sources": null,
+    "typical_symptoms": null,
+    "status_content": {
+      "within_reference": {
+        "label": "Within the reference range",
+        "interpretation_insight": "Your total IgE is within the reference range printed on your report. This does not rule out allergy, because specific IgE tests and your symptoms matter more. Please read it together with the other results in this report.",
+        "card_summary": "Your total IgE is within the laboratory reference range printed on your report.",
+        "recommendation_ids": [
+          "ige_interpret_with_doctor"
+        ]
+      },
+      "above_reference": {
+        "label": "Above the reference range",
+        "interpretation_insight": "Your total IgE is above the reference range on your report. Many conditions can raise it, so it cannot confirm allergy and does not show how severe any allergy might be. Your doctor will read it with your symptoms and specific tests.",
+        "card_summary": "Your total IgE is above the laboratory reference range, which needs your doctor's interpretation.",
+        "recommendation_ids": [
+          "ige_interpret_with_doctor",
+          "gen_see_allergist"
+        ]
+      },
+      "below_reference": {
+        "label": "Below the reference range",
+        "interpretation_insight": "Your total IgE is below the reference range on your report. This does not rule out allergy, and it does not by itself tell you anything about specific triggers. Your doctor will read it with your symptoms and specific results.",
+        "card_summary": "Your total IgE is below the laboratory reference range printed on your report.",
+        "recommendation_ids": [
+          "ige_interpret_with_doctor"
+        ]
+      },
+      "missing": {
+        "label": "Result not available",
+        "interpretation_insight": "A total IgE result was not available for this report. Without it, no comment can be made, and this should not be read as a normal result. Please check with the laboratory if you expected it to be included.",
+        "card_summary": "No total IgE result was available, so no comment is made on this test.",
+        "recommendation_ids": [
+          "ige_interpret_with_doctor"
+        ]
+      },
+      "invalid": {
+        "label": "Result could not be read",
+        "interpretation_insight": "The total IgE value could not be read as a valid result, so it has not been treated as normal or abnormal. Please check with the laboratory or your doctor to confirm the correct result before relying on this report.",
+        "card_summary": "The total IgE value could not be read, so it is not marked normal or abnormal.",
+        "recommendation_ids": [
+          "ige_interpret_with_doctor"
+        ]
+      }
+    },
+    "card_summary": "Total IgE counts all IgE antibodies in your blood and is only a general marker.",
+    "caution": "Total IgE is not a diagnosis. It cannot show which substance you react to or how severe a reaction could be. Do not change food, medicines or pets because of this value alone.",
+    "category_caution_rule_ids": [
+      "C_TOTAL"
+    ],
+    "reference_interval_source": "laboratory_report",
+    "hardcoded_thresholds": null,
+    "result_state_mapping": {
+      "within_reference": "value inside the interval printed by the laboratory",
+      "above_reference": "value above the interval printed by the laboratory",
+      "below_reference": "value below the interval printed by the laboratory",
+      "missing": "no result present",
+      "invalid": "value could not be parsed"
+    },
+    "review_flags": [
+      "reference_interval_from_lab",
+      "below_reference_wording_for_review"
+    ],
+    "evidence_refs": [
+      "E01"
+    ],
+    "evidence_status": "supported_by_retrieved_sources",
+    "cross_reactivity": null,
+    "clinical_review_status": "pending",
+    "content_version": "1.0.0-draft"
+  },
+  "recommendations": [
+    {
+      "recommendation_id": "ige_interpret_with_doctor",
+      "title": "Read Total IgE With Your Doctor",
+      "description": "Total IgE alone cannot explain symptoms. Share your report with your doctor, who can read it with your history and the specific IgE results.",
+      "applicable_categories": [
+        "total_ige"
+      ],
+      "applicable_allergen_ids": [
+        "ige_total"
+      ],
+      "required_context": [],
+      "exclusions": [],
+      "clinical_priority": "important",
+      "display_priority": 1,
+      "theme": "clinical_review",
+      "evidence_refs": [
+        "E01"
+      ],
+      "clinical_review_status": "pending",
+      "review_note": "Statement that total IgE alone cannot confirm or exclude allergy is tied to E01 (diagnosis rests on history plus specific IgE or skin test). Reviewer to confirm."
+    }
+  ],
+  "clinical_review_status": "pending"
+}

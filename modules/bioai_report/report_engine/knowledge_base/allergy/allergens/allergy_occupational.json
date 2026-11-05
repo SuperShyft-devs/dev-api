@@ -1,0 +1,357 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "source_group": "allergy_occupational",
+  "source_group_display_order": 13,
+  "patient_group_name": "Work and Contact Materials",
+  "patient_group_explanation": "Latex, fibres, silk, wool and henna that people touch or handle.",
+  "group_caution_rule_ids": [
+    "C_SENS",
+    "C_CLASS",
+    "C_OCC"
+  ],
+  "test_count": 6,
+  "clinical_review_status": "pending",
+  "allergens": [
+    {
+      "allergen_id": "jute",
+      "lab_test_name": "Jute",
+      "source_group": "allergy_occupational",
+      "source_group_display_order": 13,
+      "position_in_source_group": 1,
+      "aliases": [
+        "Jute (Pat)"
+      ],
+      "common_name": "Jute (Pat)",
+      "scientific_name": "Corchorus species",
+      "canonical_category": "plant_fibres_and_dusts",
+      "allergen_type": "occupational",
+      "definition": "Jute is a natural plant fibre used to make sacks, ropes, mats, carpets and bags. Dust is released when jute is processed, packed or handled.",
+      "exposure_sources": [
+        "Jute mills and sack factories",
+        "Rope and mat making",
+        "Grain and vegetable storage sacks",
+        "Handicrafts and carpet work"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Skin itching or rash"
+      ],
+      "interpretation_insight": "This result shows IgE to jute. It matters mainly if you work with jute or sacks and your symptoms improve away from them. A positive result alone does not prove allergy or occupational disease. Your doctor can advise.",
+      "card_summary": "A plant fibre used for sacks, ropes, mats and carpets at work.",
+      "recommendation_ids": [
+        "occ_review_exposure",
+        "occ_health_review",
+        "fibre_dust_control",
+        "gen_note_symptoms",
+        "gen_see_allergist"
+      ],
+      "caution": "Dust from fibres can irritate the nose and chest without allergy. A blood test cannot decide this, so your work history matters.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_OCC",
+        "C_MIXED"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence",
+        "occupational_context"
+      ],
+      "evidence_refs": [
+        "E16",
+        "E24"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "sheep_wool_treated",
+      "lab_test_name": "Sheep Wool (Treated)",
+      "source_group": "allergy_occupational",
+      "source_group_display_order": 13,
+      "position_in_source_group": 2,
+      "aliases": [],
+      "common_name": "Sheep Wool (Treated)",
+      "scientific_name": "Ovis aries",
+      "canonical_category": "animal_fibres_and_silk",
+      "allergen_type": "occupational",
+      "definition": "Treated sheep wool is wool that has been cleaned or processed for making yarn, blankets, carpets and clothing. It may still carry traces of animal proteins.",
+      "exposure_sources": [
+        "Woollen blankets and carpets",
+        "Shawls and sweaters",
+        "Textile and spinning units",
+        "Handloom and weaving work"
+      ],
+      "typical_symptoms": [
+        "Itching",
+        "Skin rash",
+        "Sneezing",
+        "Runny nose",
+        "Cough"
+      ],
+      "interpretation_insight": "This result shows IgE to treated wool. Wool often irritates skin without being an allergy. A positive result alone does not prove allergy to wool. It matters more if you handle wool at work. Tell your doctor about any rash.",
+      "card_summary": "Cleaned wool used for blankets, shawls, carpets and winter clothing at work.",
+      "recommendation_ids": [
+        "occ_review_exposure",
+        "occ_health_review",
+        "fibre_dust_control",
+        "gen_note_symptoms",
+        "gen_see_allergist"
+      ],
+      "caution": "Itching from wool is usually irritation and not allergy. This test does not prove either, so discuss skin symptoms with a doctor.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_OCC",
+        "C_MIXED"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence",
+        "occupational_context",
+        "overlaps_sheep_epithelium"
+      ],
+      "evidence_refs": [
+        "E16",
+        "E24"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "silk_bombyx_mori",
+      "lab_test_name": "Silk (Bombyx Mori)",
+      "source_group": "allergy_occupational",
+      "source_group_display_order": 13,
+      "position_in_source_group": 3,
+      "aliases": [],
+      "common_name": "Silk (Bombyx Mori)",
+      "scientific_name": "Bombyx mori",
+      "canonical_category": "animal_fibres_and_silk",
+      "allergen_type": "occupational",
+      "definition": "Silk is a fine fibre made by silkworms. It is used for sarees, scarves, bedding and fabrics, and is handled in silk reeling and weaving units.",
+      "exposure_sources": [
+        "Silk sarees and fabrics",
+        "Silk reeling and weaving units",
+        "Silk bedding",
+        "Sericulture farms"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Skin itching or rash"
+      ],
+      "interpretation_insight": "This result shows IgE to silk. It matters mainly if you work with silk or silkworms and your symptoms improve away from work. A positive result alone does not prove allergy. Your doctor can advise you.",
+      "card_summary": "A fine fibre from silkworms used in sarees, scarves, bedding and fabrics.",
+      "recommendation_ids": [
+        "occ_review_exposure",
+        "occ_health_review",
+        "fibre_dust_control",
+        "gen_note_symptoms",
+        "gen_see_allergist"
+      ],
+      "caution": "Silkworm and silk exposure at work differs from wearing silk. A positive result needs your work history and a doctor's review.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_OCC",
+        "C_MIXED"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence",
+        "occupational_context"
+      ],
+      "evidence_refs": [
+        "E16",
+        "E24"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "latex",
+      "lab_test_name": "Latex",
+      "source_group": "allergy_occupational",
+      "source_group_display_order": 13,
+      "position_in_source_group": 4,
+      "aliases": [
+        "Natural Rubber Latex"
+      ],
+      "common_name": "Natural Rubber Latex",
+      "scientific_name": "Hevea brasiliensis",
+      "canonical_category": "natural_rubber_latex",
+      "allergen_type": "occupational",
+      "definition": "Latex is a natural rubber from the rubber tree. It is found in gloves, balloons, condoms, rubber bands, catheters and many medical and household products.",
+      "exposure_sources": [
+        "Medical and household gloves",
+        "Balloons and condoms",
+        "Rubber bands and elastic",
+        "Dental and hospital supplies"
+      ],
+      "typical_symptoms": [
+        "Itching",
+        "Hives",
+        "Skin rash",
+        "Sneezing",
+        "Wheezing"
+      ],
+      "interpretation_insight": "This result shows IgE to latex. A positive result alone does not prove latex allergy. Latex can cause serious reactions in some people, so tell your doctor and dentist about any past reactions to gloves or balloons.",
+      "card_summary": "Natural rubber found in gloves, balloons, condoms and many medical and household products.",
+      "recommendation_ids": [
+        "latex_free_choices",
+        "latex_fruit_note",
+        "occ_health_review",
+        "gen_see_allergist",
+        "gen_emergency_signs"
+      ],
+      "caution": "If gloves or balloons have caused swelling, wheezing or collapse, seek medical advice before any procedure that uses latex products.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_OCC"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "banana",
+          "kiwi",
+          "papaya"
+        ],
+        "patient_note": "Some people with latex reactions also react to certain fruits. Tell your doctor if these fruits have ever caused symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "latex_fruit_syndrome_E13",
+        "shown_to_patient": true
+      },
+      "review_flags": [
+        "occupational_context",
+        "serious_reaction_possible"
+      ],
+      "evidence_refs": [
+        "E12",
+        "E13",
+        "E16"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "henna",
+      "lab_test_name": "Henna",
+      "source_group": "allergy_occupational",
+      "source_group_display_order": 13,
+      "position_in_source_group": 5,
+      "aliases": [
+        "Henna (Mehndi)"
+      ],
+      "common_name": "Henna (Mehndi)",
+      "scientific_name": "Lawsonia inermis",
+      "canonical_category": "henna_cosmetic_plant",
+      "allergen_type": "occupational",
+      "definition": "Henna is a plant dye used as mehndi paste on skin and hair. It is applied for weddings, festivals, hair colouring and conditioning treatments at salons.",
+      "exposure_sources": [
+        "Mehndi for weddings and festivals",
+        "Hair colour and conditioning",
+        "Professional mehndi artists",
+        "Ready-made henna cones"
+      ],
+      "typical_symptoms": [
+        "Skin redness",
+        "Itching",
+        "Rash",
+        "Swelling",
+        "Sneezing"
+      ],
+      "interpretation_insight": "This result shows IgE to henna. Skin reactions to henna products are often caused by additives and not by henna itself. A blood test cannot decide this. Ask a dermatologist about any skin symptoms after using henna.",
+      "card_summary": "A plant dye used as mehndi paste on skin, nails and hair.",
+      "recommendation_ids": [
+        "henna_patch_testing",
+        "occ_review_exposure",
+        "gen_note_symptoms",
+        "gen_see_allergist"
+      ],
+      "caution": "Rashes from mehndi and hair dyes are often skin contact reactions, which a blood IgE test does not measure.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_OCC"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "contact_dermatitis_not_ige",
+        "limited_published_evidence",
+        "occupational_context"
+      ],
+      "evidence_refs": [
+        "E16",
+        "E20"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "cotton_linters",
+      "lab_test_name": "Cotton Linters",
+      "source_group": "allergy_occupational",
+      "source_group_display_order": 13,
+      "position_in_source_group": 6,
+      "aliases": [],
+      "common_name": "Cotton Linters",
+      "scientific_name": "Gossypium species",
+      "canonical_category": "plant_fibres_and_dusts",
+      "allergen_type": "occupational",
+      "definition": "Cotton linters are the short fibres left on cotton seeds after the main cotton is removed. They are used in stuffing, paper and cellulose products.",
+      "exposure_sources": [
+        "Cotton ginning and mills",
+        "Mattress and quilt stuffing",
+        "Paper and cellulose products",
+        "Cotton seed processing"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Skin itching or rash"
+      ],
+      "interpretation_insight": "This result shows IgE to cotton linters. It matters mainly if you work in cotton processing and your symptoms improve away from work. A positive result alone does not prove allergy or occupational disease. Your doctor can advise.",
+      "card_summary": "Short cotton fibres used in stuffing, paper and cellulose products at work.",
+      "recommendation_ids": [
+        "occ_review_exposure",
+        "occ_health_review",
+        "fibre_dust_control",
+        "gen_note_symptoms",
+        "gen_see_allergist"
+      ],
+      "caution": "Cotton dust can irritate the nose and chest without allergy. Wearing cotton clothes is not the same as this exposure.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_OCC",
+        "C_MIXED"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence",
+        "occupational_context"
+      ],
+      "evidence_refs": [
+        "E16",
+        "E24"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    }
+  ]
+}

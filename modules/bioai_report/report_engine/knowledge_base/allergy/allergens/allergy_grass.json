@@ -1,0 +1,490 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "source_group": "allergy_grass",
+  "source_group_display_order": 5,
+  "patient_group_name": "Grass Pollen",
+  "patient_group_explanation": "Pollen from different grasses.",
+  "group_caution_rule_ids": [
+    "C_SENS",
+    "C_CLASS",
+    "C_POLLEN"
+  ],
+  "test_count": 8,
+  "clinical_review_status": "pending",
+  "allergens": [
+    {
+      "allergen_id": "dactylis_glomerata",
+      "lab_test_name": "Dactylis Glomerata",
+      "source_group": "allergy_grass",
+      "source_group_display_order": 5,
+      "position_in_source_group": 1,
+      "aliases": [
+        "Cocksfoot (Orchard Grass)"
+      ],
+      "common_name": "Cocksfoot (Orchard Grass)",
+      "scientific_name": "Dactylis glomerata",
+      "canonical_category": "grass_pollen",
+      "allergen_type": "environmental",
+      "definition": "Dactylis glomerata, known as cocksfoot or orchard grass, is a tall grass that grows in meadows, pastures and cooler hill areas. Its pollen is carried by wind.",
+      "exposure_sources": [
+        "Meadows and pastures",
+        "Roadsides and verges",
+        "Parks and lawns",
+        "Hill-region grasslands"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy, watery eyes",
+        "Itchy throat",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to cocksfoot grass pollen. It is more meaningful if your symptoms rise and fall with the seasons or after time in grassy areas. Many grasses share similar pollen proteins, so this may reflect sensitization to grasses in general.",
+      "card_summary": "Pollen from a tall pasture grass that is spread widely by wind.",
+      "recommendation_ids": [
+        "pollen_check_forecast",
+        "pollen_clean_up",
+        "pollen_indoor_air",
+        "grass_cutting_care"
+      ],
+      "caution": "Sensitization to grass pollen is common and does not always cause symptoms. The class does not show how severe symptoms will be.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "phleum_pratense",
+          "cynodon_dactylon",
+          "lolium_perenne"
+        ],
+        "patient_note": null,
+        "held_note_for_review": "Grass pollens are closely related, so positives to several grasses may reflect one underlying sensitization.",
+        "evidence_status": "grass_group_relatedness_pending",
+        "shown_to_patient": false
+      },
+      "review_flags": [],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "phleum_pratense",
+      "lab_test_name": "Phleum Pratense",
+      "source_group": "allergy_grass",
+      "source_group_display_order": 5,
+      "position_in_source_group": 2,
+      "aliases": [
+        "Timothy Grass"
+      ],
+      "common_name": "Timothy Grass",
+      "scientific_name": "Phleum pratense",
+      "canonical_category": "grass_pollen",
+      "allergen_type": "environmental",
+      "definition": "Phleum pratense, or timothy grass, is a pasture and hay grass of cooler climates. It is one of the most studied grass pollens in allergy research.",
+      "exposure_sources": [
+        "Pastures and hay fields",
+        "Meadows",
+        "Roadside grass",
+        "Grass seed mixes"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy, watery eyes",
+        "Itchy throat",
+        "Wheezing"
+      ],
+      "interpretation_insight": "This result shows IgE to timothy grass pollen. Timothy is often used as a reference grass in testing, so a positive result may point to general grass sensitization. If you live in a hot lowland area, other local grasses may matter more.",
+      "card_summary": "Pollen from timothy grass, a widely studied pasture and hay grass. Often tested.",
+      "recommendation_ids": [
+        "pollen_check_forecast",
+        "pollen_clean_up",
+        "pollen_indoor_air",
+        "grass_cutting_care"
+      ],
+      "caution": "Timothy grass is more common in cooler regions. A positive result may reflect sensitization to similar grasses found locally.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "phleum_pratense",
+          "cynodon_dactylon",
+          "lolium_perenne"
+        ],
+        "patient_note": null,
+        "held_note_for_review": "Grass pollens are closely related, so positives to several grasses may reflect one underlying sensitization.",
+        "evidence_status": "grass_group_relatedness_pending",
+        "shown_to_patient": false
+      },
+      "review_flags": [],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "cynodon_dactylon",
+      "lab_test_name": "Cynodon Dactylon",
+      "source_group": "allergy_grass",
+      "source_group_display_order": 5,
+      "position_in_source_group": 3,
+      "aliases": [
+        "Bermuda Grass (Doob)",
+        "Bermuda grass",
+        "Doob grass"
+      ],
+      "common_name": "Bermuda Grass (Doob)",
+      "scientific_name": "Cynodon dactylon",
+      "canonical_category": "grass_pollen",
+      "allergen_type": "environmental",
+      "definition": "Cynodon dactylon, known as Bermuda grass or doob, is a low, spreading grass common in lawns, playgrounds and roadsides across warm regions, including many parts of India.",
+      "exposure_sources": [
+        "Lawns and playgrounds",
+        "Roadsides and open grounds",
+        "Parks and gardens",
+        "Sports fields"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy, watery eyes",
+        "Itchy throat",
+        "Wheezing"
+      ],
+      "interpretation_insight": "Your blood shows IgE to Bermuda grass pollen. This grass is very common in warm places, so exposure is hard to avoid. A positive result is most meaningful if symptoms follow lawn work, outdoor play or particular seasons.",
+      "card_summary": "Pollen from Bermuda grass, a very common lawn and roadside grass in warm regions.",
+      "recommendation_ids": [
+        "pollen_check_forecast",
+        "pollen_clean_up",
+        "pollen_indoor_air",
+        "grass_cutting_care"
+      ],
+      "caution": "Bermuda grass sensitization is common and often present without symptoms. The result alone does not show how you will react.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "phleum_pratense",
+          "cynodon_dactylon",
+          "lolium_perenne"
+        ],
+        "patient_note": null,
+        "held_note_for_review": "Grass pollens are closely related, so positives to several grasses may reflect one underlying sensitization.",
+        "evidence_status": "grass_group_relatedness_pending",
+        "shown_to_patient": false
+      },
+      "review_flags": [],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "lolium_perenne",
+      "lab_test_name": "Lolium Perenne",
+      "source_group": "allergy_grass",
+      "source_group_display_order": 5,
+      "position_in_source_group": 4,
+      "aliases": [
+        "Perennial Ryegrass"
+      ],
+      "common_name": "Perennial Ryegrass",
+      "scientific_name": "Lolium perenne",
+      "canonical_category": "grass_pollen",
+      "allergen_type": "environmental",
+      "definition": "Lolium perenne is perennial ryegrass, widely used in lawns, pastures and sports fields. It releases large amounts of wind-blown pollen in its flowering season each year.",
+      "exposure_sources": [
+        "Lawns and sports fields",
+        "Pastures",
+        "Golf courses",
+        "Roadside grass"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy, watery eyes",
+        "Itchy throat",
+        "Wheezing"
+      ],
+      "interpretation_insight": "This result shows IgE to ryegrass pollen. Ryegrass is closely related to many other grasses, so the result may reflect general grass sensitization. Notice whether symptoms rise on days when grass is cut or in open fields.",
+      "card_summary": "Pollen from ryegrass, a common lawn, sports field, pasture and roadside grass.",
+      "recommendation_ids": [
+        "pollen_check_forecast",
+        "pollen_clean_up",
+        "pollen_indoor_air",
+        "grass_cutting_care"
+      ],
+      "caution": "A positive result for one grass often appears with others. Treat it as a marker of grass sensitization, not proof of a specific cause.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "phleum_pratense",
+          "cynodon_dactylon",
+          "lolium_perenne"
+        ],
+        "patient_note": null,
+        "held_note_for_review": "Grass pollens are closely related, so positives to several grasses may reflect one underlying sensitization.",
+        "evidence_status": "grass_group_relatedness_pending",
+        "shown_to_patient": false
+      },
+      "review_flags": [],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "agrostis_stolonifera",
+      "lab_test_name": "Agrostis Stolonifera",
+      "source_group": "allergy_grass",
+      "source_group_display_order": 5,
+      "position_in_source_group": 5,
+      "aliases": [
+        "Creeping Bentgrass"
+      ],
+      "common_name": "Creeping Bentgrass",
+      "scientific_name": "Agrostis stolonifera",
+      "canonical_category": "grass_pollen",
+      "allergen_type": "environmental",
+      "definition": "Agrostis stolonifera, or creeping bentgrass, is a fine-leaved grass used in lawns and golf courses. It also grows wild in damp meadows and river edges.",
+      "exposure_sources": [
+        "Lawns and golf courses",
+        "Damp meadows",
+        "Parks",
+        "Garden turf"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy, watery eyes",
+        "Itchy throat",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result suggests IgE to creeping bentgrass pollen. This grass is related to other lawn grasses, so you may be sensitized to several. If you work on lawns or golf courses, tell your doctor.",
+      "card_summary": "Pollen from a fine-leaved grass used in lawns, golf courses and damp meadows.",
+      "recommendation_ids": [
+        "pollen_check_forecast",
+        "pollen_clean_up",
+        "pollen_indoor_air",
+        "grass_cutting_care"
+      ],
+      "caution": "This grass is less commonly tested. Interpret the result alongside the more common grass results.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "phleum_pratense",
+          "cynodon_dactylon",
+          "lolium_perenne"
+        ],
+        "patient_note": null,
+        "held_note_for_review": "Grass pollens are closely related, so positives to several grasses may reflect one underlying sensitization.",
+        "evidence_status": "grass_group_relatedness_pending",
+        "shown_to_patient": false
+      },
+      "review_flags": [
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "sorghum_halepense",
+      "lab_test_name": "Sorghum Halepense",
+      "source_group": "allergy_grass",
+      "source_group_display_order": 5,
+      "position_in_source_group": 6,
+      "aliases": [
+        "Johnson Grass"
+      ],
+      "common_name": "Johnson Grass",
+      "scientific_name": "Sorghum halepense",
+      "canonical_category": "grass_pollen",
+      "allergen_type": "environmental",
+      "definition": "Sorghum halepense, known as Johnson grass, is a tall weedy grass that grows along roadsides, field edges and wasteland. It spreads quickly in warm climates.",
+      "exposure_sources": [
+        "Field edges and wasteland",
+        "Roadsides and canals",
+        "Fallow farmland",
+        "Open grassy areas"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy, watery eyes",
+        "Itchy throat",
+        "Wheezing"
+      ],
+      "interpretation_insight": "Your blood shows IgE to Johnson grass pollen. This grass grows widely in warm climates, so exposure may be seasonal. If symptoms appear near fields, canals or roadsides, mention this pattern to your doctor. It is a clue, not a diagnosis.",
+      "card_summary": "Pollen from a tall weedy grass found on roadsides and field edges.",
+      "recommendation_ids": [
+        "pollen_check_forecast",
+        "pollen_clean_up",
+        "pollen_indoor_air",
+        "grass_cutting_care"
+      ],
+      "caution": "Johnson grass sensitization often occurs with other grasses. The result does not show which grass is the main trigger.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "phleum_pratense",
+          "cynodon_dactylon",
+          "lolium_perenne"
+        ],
+        "patient_note": null,
+        "held_note_for_review": "Grass pollens are closely related, so positives to several grasses may reflect one underlying sensitization.",
+        "evidence_status": "grass_group_relatedness_pending",
+        "shown_to_patient": false
+      },
+      "review_flags": [],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "festuca_elatior",
+      "lab_test_name": "Festuca Elatior",
+      "source_group": "allergy_grass",
+      "source_group_display_order": 5,
+      "position_in_source_group": 7,
+      "aliases": [
+        "Meadow Fescue"
+      ],
+      "common_name": "Meadow Fescue",
+      "scientific_name": "Festuca elatior",
+      "canonical_category": "grass_pollen",
+      "allergen_type": "environmental",
+      "definition": "Festuca elatior, known as meadow fescue, is a pasture and lawn grass. It is more common in cooler, moist climates than in most parts of India.",
+      "exposure_sources": [
+        "Pastures and meadows",
+        "Lawns",
+        "Grass seed mixes",
+        "Roadside grass"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy, watery eyes",
+        "Itchy throat",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to meadow fescue pollen. This grass mostly grows in cooler climates, so the result may reflect sensitization to grasses in general. Local grasses may matter more for you than this one.",
+      "card_summary": "Pollen from a pasture and lawn grass of cooler, moist hill climates.",
+      "recommendation_ids": [
+        "pollen_check_forecast",
+        "pollen_clean_up",
+        "pollen_indoor_air",
+        "grass_cutting_care"
+      ],
+      "caution": "Grass pollens share similar proteins. A positive result here does not prove this particular grass is the cause.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "phleum_pratense",
+          "cynodon_dactylon",
+          "lolium_perenne"
+        ],
+        "patient_note": null,
+        "held_note_for_review": "Grass pollens are closely related, so positives to several grasses may reflect one underlying sensitization.",
+        "evidence_status": "grass_group_relatedness_pending",
+        "shown_to_patient": false
+      },
+      "review_flags": [
+        "taxonomy_check"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "phragmites_communis",
+      "lab_test_name": "Phragmites Communis",
+      "source_group": "allergy_grass",
+      "source_group_display_order": 5,
+      "position_in_source_group": 8,
+      "aliases": [
+        "Common Reed"
+      ],
+      "common_name": "Common Reed",
+      "scientific_name": "Phragmites communis",
+      "canonical_category": "grass_pollen",
+      "allergen_type": "environmental",
+      "definition": "Phragmites communis, the common reed, is a tall grass growing along lakes, rivers, ponds and wetlands. It also grows in drains, canals and marshy land.",
+      "exposure_sources": [
+        "Wetlands and riverbanks",
+        "Ponds and lakes",
+        "Drains and canals",
+        "Marshy land"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy, watery eyes",
+        "Itchy throat",
+        "Wheezing"
+      ],
+      "interpretation_insight": "This result shows IgE to common reed pollen. Exposure is mainly near wetlands and water edges. If your symptoms appear near riverbanks or marshy places, share that with your doctor. Other grass results may help explain it.",
+      "card_summary": "Pollen from a tall grass of wetlands, riverbanks, canals, drains and marshes.",
+      "recommendation_ids": [
+        "pollen_check_forecast",
+        "pollen_clean_up",
+        "pollen_indoor_air",
+        "grass_cutting_care"
+      ],
+      "caution": "This grass is tested less often than others. A positive result may reflect sensitization to similar grasses.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_POLLEN"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "phleum_pratense",
+          "cynodon_dactylon",
+          "lolium_perenne"
+        ],
+        "patient_note": null,
+        "held_note_for_review": "Grass pollens are closely related, so positives to several grasses may reflect one underlying sensitization.",
+        "evidence_status": "grass_group_relatedness_pending",
+        "shown_to_patient": false
+      },
+      "review_flags": [
+        "limited_published_evidence",
+        "taxonomy_check"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    }
+  ]
+}

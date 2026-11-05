@@ -1,0 +1,268 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "generated_by": "build.py and validate.py",
+  "overall": "PASS",
+  "checks_total": 40,
+  "checks_failed": 0,
+  "statistics": {
+    "allergens": 211,
+    "recommendations": 70,
+    "canonical_categories": 54,
+    "evidence_items": 25,
+    "review_queue_items": 239,
+    "cross_reactivity_notes_shown": 47,
+    "cross_reactivity_notes_held": 12,
+    "allergens_with_limited_evidence_flag": 48,
+    "recommendations_without_citation": 42
+  },
+  "disclaimer": "Passing automated validation does not mean medical approval. All clinical content is pending review by a qualified clinician.",
+  "checks": [
+    {
+      "check": "catalogue_stated_counts_match_audit",
+      "passed": true,
+      "detail": {
+        "pets": 21,
+        "allergy_drugs": 24,
+        "allergy_dust_mites": 13,
+        "allergy_insects": 6,
+        "allergy_grass": 8,
+        "allergy_moulds_yeast": 10,
+        "allergy_weed_tree": 11,
+        "allergy_veg": 40,
+        "allergy_non_veg": 17,
+        "allergy_dairy": 12,
+        "allergy_seeds_nuts_legumes": 21,
+        "allergy_spices": 19,
+        "allergy_occupational": 6,
+        "allergy_parasites": 3,
+        "ige": 1
+      }
+    },
+    {
+      "check": "total_tests_212",
+      "passed": true,
+      "detail": 212
+    },
+    {
+      "check": "specific_tests_211",
+      "passed": true,
+      "detail": 211
+    },
+    {
+      "check": "fourteen_group_files",
+      "passed": true,
+      "detail": [
+        "allergy_dairy",
+        "allergy_drugs",
+        "allergy_dust_mites",
+        "allergy_grass",
+        "allergy_insects",
+        "allergy_moulds_yeast",
+        "allergy_non_veg",
+        "allergy_occupational",
+        "allergy_parasites",
+        "allergy_seeds_nuts_legumes",
+        "allergy_spices",
+        "allergy_veg",
+        "allergy_weed_tree",
+        "pets"
+      ]
+    },
+    {
+      "check": "exact_lab_names_and_groups_preserved",
+      "passed": true,
+      "detail": {
+        "missing": [],
+        "extra": []
+      }
+    },
+    {
+      "check": "group_order_preserved",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "ige_total_present",
+      "passed": true,
+      "detail": "IGE total"
+    },
+    {
+      "check": "allergen_ids_unique",
+      "passed": true,
+      "detail": 212
+    },
+    {
+      "check": "allergen_id_pattern",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "registry_matches_group_files",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "allergen_text_length_ranges",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "check": "total_ige_text_length_ranges",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "check": "recommendation_length_12_25",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "check": "caution_library_length_15_35",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "check": "allergen_recommendation_ids_resolve",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "check": "allergen_categories_resolve",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "recommendation_categories_resolve",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "check": "recommendations_applicable_to_allergen_category",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "check": "evidence_refs_resolve",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "check": "cross_reactivity_resolves_and_unverified_held",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "check": "no_empty_canonical_category",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "check": "every_test_in_exactly_one_canonical_category",
+      "passed": true,
+      "detail": 212
+    },
+    {
+      "check": "caution_rule_ids_resolve",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "check": "no_dashes_in_patient_text",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "check": "no_dash_characters_outside_exact_lab_names_and_registry_duplicates",
+      "passed": true,
+      "detail": 0
+    },
+    {
+      "check": "banned_phrases_absent",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "check": "severity_words_only_in_negation",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "check": "no_unconditional_avoid_advice",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "check": "emergency_recs_gated_by_serious_history",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "check": "supervised_challenge_excluded_after_serious_history",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "drug_recommendations_not_directive",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "check": "all_drug_records_carry_strict_cautions",
+      "passed": true,
+      "detail": 24
+    },
+    {
+      "check": "no_numeric_thresholds_in_ige_record",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "all_content_pending_clinical_review",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "evidence_titles_retrieved_levels_valid",
+      "passed": true,
+      "detail": {
+        "abstract_reviewed": 23,
+        "title_metadata_only": 2
+      }
+    },
+    {
+      "check": "title_only_evidence_has_no_numeric_claims",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "check": "review_queue_nonempty_and_open",
+      "passed": true,
+      "detail": {
+        "group_signoff": 15,
+        "allergen_flag": 160,
+        "cross_reactivity_held": 12,
+        "recommendation_citation": 42,
+        "recommendation_note": 1,
+        "evidence_gap": 7,
+        "regional_gap": 1,
+        "policy": 1
+      }
+    },
+    {
+      "check": "no_duplicate_insight_text",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "check": "no_duplicate_card_summary",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "check": "json_schema_validation",
+      "passed": true,
+      "detail": []
+    }
+  ]
+}

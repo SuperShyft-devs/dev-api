@@ -1,0 +1,1241 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "source_group": "allergy_drugs",
+  "source_group_display_order": 2,
+  "patient_group_name": "Medicines",
+  "patient_group_explanation": "Antibiotics, pain relievers, numbing medicines and vitamins.",
+  "group_caution_rule_ids": [
+    "C_SENS",
+    "C_CLASS",
+    "C_DRUG",
+    "C_DRUG_ROUTE"
+  ],
+  "test_count": 24,
+  "clinical_review_status": "pending",
+  "allergens": [
+    {
+      "allergen_id": "penicillin_v",
+      "lab_test_name": "Penicillin V",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 1,
+      "aliases": [],
+      "common_name": "Penicillin V",
+      "scientific_name": "Phenoxymethylpenicillin",
+      "canonical_category": "beta_lactam_antibiotics",
+      "allergen_type": "drug",
+      "definition": "Penicillin V is a penicillin-type antibiotic taken by mouth as tablets or liquid. Doctors prescribe it for certain bacterial infections, including some throat and skin infections.",
+      "exposure_sources": [
+        "Tablets",
+        "Oral liquids",
+        "Prescribed antibiotic courses"
+      ],
+      "typical_symptoms": [
+        "Skin rash",
+        "Hives",
+        "Itching",
+        "Swelling of lips or face",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "A positive result means IgE to penicillin V was detected. Blood tests for penicillin allergy have limits, so a negative result does not make penicillins safe and a positive one does not prove allergy. Only an allergist can judge this using your history.",
+      "card_summary": "A penicillin-type antibiotic taken by mouth for certain bacterial infections. Ask your doctor.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_formal_review",
+        "drug_record_reactions",
+        "drug_betalactam_review",
+        "gen_emergency_signs"
+      ],
+      "caution": "Penicillin allergy is often assessed with skin tests and supervised challenges. A blood test result alone should not be used to label or clear a penicillin allergy.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E07",
+        "E23"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "penicillin_g",
+      "lab_test_name": "Penicillin G",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 2,
+      "aliases": [
+        "Penicillin G (Benzylpenicillin)"
+      ],
+      "common_name": "Penicillin G (Benzylpenicillin)",
+      "scientific_name": "Benzylpenicillin",
+      "canonical_category": "beta_lactam_antibiotics",
+      "allergen_type": "drug",
+      "definition": "Penicillin G, also called benzylpenicillin, is an injectable penicillin antibiotic. It is mainly given in clinics and hospitals for certain serious bacterial infections in adults and children.",
+      "exposure_sources": [
+        "Injections in clinics",
+        "Hospital treatment",
+        "Long-acting penicillin injections"
+      ],
+      "typical_symptoms": [
+        "Skin rash",
+        "Hives",
+        "Itching",
+        "Swelling of lips or face",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "This result shows IgE to penicillin G was detected. Because it is given by injection, any reaction history matters a great deal to your doctor. Do not avoid or accept penicillin injections on the basis of this report alone.",
+      "card_summary": "An injectable penicillin antibiotic used in clinics and hospitals for serious infections.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_formal_review",
+        "drug_record_reactions",
+        "drug_betalactam_review",
+        "gen_emergency_signs"
+      ],
+      "caution": "A blood result cannot replace a specialist assessment. Reactions to injected drugs should always be reviewed by an allergist or your treating doctor.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E07",
+        "E23"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "benzocaine",
+      "lab_test_name": "Benzocaine",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 3,
+      "aliases": [],
+      "common_name": "Benzocaine",
+      "scientific_name": "Benzocaine",
+      "canonical_category": "local_anaesthetics",
+      "allergen_type": "drug",
+      "definition": "Benzocaine is a numbing medicine used in sprays, gels, lozenges and creams. People use it for sore throats, mouth ulcers, teething and minor skin pain.",
+      "exposure_sources": [
+        "Throat lozenges and sprays",
+        "Oral gels for mouth ulcers",
+        "Pain-relief creams"
+      ],
+      "typical_symptoms": [
+        "Skin redness",
+        "Itching",
+        "Rash at the application site",
+        "Swelling",
+        "Hives"
+      ],
+      "interpretation_insight": "A positive blood result for benzocaine should be read carefully. Reactions to numbing creams are often skin reactions at the spot where they were applied, which blood IgE tests do not measure well. A dermatologist or allergist can advise.",
+      "card_summary": "A numbing medicine found in throat sprays, lozenges, gels and skin creams.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_topical_patch_testing",
+        "drug_formal_review",
+        "drug_tell_providers"
+      ],
+      "caution": "Allergic skin reactions to numbing creams are usually checked by patch testing, not blood IgE. This blood result has limited ability to confirm or exclude them.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E20",
+        "E23"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "aspirin",
+      "lab_test_name": "Aspirin",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 4,
+      "aliases": [],
+      "common_name": "Aspirin",
+      "scientific_name": "Acetylsalicylic acid",
+      "canonical_category": "nsaids_and_analgesics",
+      "allergen_type": "drug",
+      "definition": "Aspirin is a pain and fever medicine that also reduces blood clotting. People take it for pain, or on medical advice for heart and stroke protection.",
+      "exposure_sources": [
+        "Pain-relief tablets",
+        "Low-dose heart-protection tablets",
+        "Cold and flu combinations"
+      ],
+      "typical_symptoms": [
+        "Hives",
+        "Facial swelling",
+        "Wheezing",
+        "Blocked nose",
+        "Stomach upset"
+      ],
+      "interpretation_insight": "A positive result means IgE to aspirin was found. Reactions to aspirin can have different causes, and blood IgE tests are not the usual way to assess them. Do not stop or restart aspirin yourself, especially if it was prescribed for your heart.",
+      "card_summary": "A pain, fever and anti-clotting medicine sold under many brand names. Ask first.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_pain_reliever_review",
+        "drug_formal_review",
+        "drug_tell_providers"
+      ],
+      "caution": "If aspirin was prescribed for a heart condition, never stop it without medical advice. A positive blood result alone is not a reason to change treatment.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E23",
+        "E25"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "ibuprofen",
+      "lab_test_name": "Ibuprofen",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 5,
+      "aliases": [],
+      "common_name": "Ibuprofen",
+      "scientific_name": "Ibuprofen",
+      "canonical_category": "nsaids_and_analgesics",
+      "allergen_type": "drug",
+      "definition": "Ibuprofen is a common anti-inflammatory medicine sold without prescription. It is used for headache, period pain, fever, muscle aches, dental pain, sprains and joint swelling.",
+      "exposure_sources": [
+        "Tablets and capsules",
+        "Liquids for children",
+        "Pain-relief gels",
+        "Cold and flu combinations"
+      ],
+      "typical_symptoms": [
+        "Hives",
+        "Facial swelling",
+        "Wheezing",
+        "Rash",
+        "Stomach upset"
+      ],
+      "interpretation_insight": "A positive result shows IgE to ibuprofen was detected. This does not prove that ibuprofen caused a past reaction. If you have had a reaction to a pain reliever, record the details and ask your doctor which medicines are safe for you.",
+      "card_summary": "A widely used anti-inflammatory medicine for pain, fever, swelling and period cramps.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_pain_reliever_review",
+        "drug_record_reactions",
+        "drug_formal_review"
+      ],
+      "caution": "Blood tests are not the standard way to diagnose reactions to this type of medicine. Your doctor decides what testing, if any, is suitable.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E23",
+        "E25"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "diclofenac",
+      "lab_test_name": "Diclofenac",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 6,
+      "aliases": [],
+      "common_name": "Diclofenac",
+      "scientific_name": "Diclofenac",
+      "canonical_category": "nsaids_and_analgesics",
+      "allergen_type": "drug",
+      "definition": "Diclofenac is an anti-inflammatory pain medicine. It is used as tablets, injections, gels and patches for joint pain, back pain, sprains, muscle strains and other injuries.",
+      "exposure_sources": [
+        "Tablets",
+        "Pain-relief injections",
+        "Gels and patches"
+      ],
+      "typical_symptoms": [
+        "Hives",
+        "Facial swelling",
+        "Wheezing",
+        "Rash",
+        "Stomach upset"
+      ],
+      "interpretation_insight": "This result shows IgE to diclofenac was detected. Many medicines of this type work in similar ways, so your doctor may want to review all of them if you have had a reaction. Do not try or stop any of them on your own.",
+      "card_summary": "An anti-inflammatory pain medicine used as tablets, injections, gels and patches daily.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_pain_reliever_review",
+        "drug_record_reactions",
+        "drug_formal_review"
+      ],
+      "caution": "A positive blood result does not show which pain relievers you can safely use. Your doctor should guide any decision about alternatives.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E23",
+        "E25"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "azithromycin",
+      "lab_test_name": "Azithromycin",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 7,
+      "aliases": [],
+      "common_name": "Azithromycin",
+      "scientific_name": "Azithromycin",
+      "canonical_category": "other_antibiotics",
+      "allergen_type": "drug",
+      "definition": "Azithromycin is a macrolide antibiotic, often taken as a short course of tablets. Doctors use it for some chest, throat, skin and other bacterial infections.",
+      "exposure_sources": [
+        "Short-course tablets",
+        "Oral liquids",
+        "Injections in hospitals"
+      ],
+      "typical_symptoms": [
+        "Skin rash",
+        "Hives",
+        "Itching",
+        "Swelling of lips or face",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "A positive result means IgE to azithromycin was detected. Blood tests for this antibiotic are not well established for diagnosing allergy. If you have had a rash or swelling after it, tell your doctor so they can plan safe choices for future infections.",
+      "card_summary": "A macrolide antibiotic often given as a short course for chest and throat infections.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_formal_review",
+        "drug_record_reactions",
+        "drug_tell_providers"
+      ],
+      "caution": "This kind of blood test is not well established for azithromycin. Do not rely on a positive or negative result to decide about future use.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E07",
+        "E23"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "sulfamethoxazole",
+      "lab_test_name": "Sulfamethoxazole",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 8,
+      "aliases": [
+        "Sulfamethoxazole (Sulfa Antibiotic)"
+      ],
+      "common_name": "Sulfamethoxazole (Sulfa Antibiotic)",
+      "scientific_name": "Sulfamethoxazole",
+      "canonical_category": "other_antibiotics",
+      "allergen_type": "drug",
+      "definition": "Sulfamethoxazole is a sulfonamide antibiotic usually combined with trimethoprim. Doctors prescribe the combination for some urinary, chest, skin and gut infections in adults and children.",
+      "exposure_sources": [
+        "Combination tablets",
+        "Oral liquids",
+        "Prescribed antibiotic courses"
+      ],
+      "typical_symptoms": [
+        "Skin rash",
+        "Hives",
+        "Itching",
+        "Fever",
+        "Swelling"
+      ],
+      "interpretation_insight": "A positive result means IgE to sulfamethoxazole was detected. Reactions to sulfa antibiotics are often skin rashes that may appear days after starting the medicine, which blood IgE tests may not capture. Share the timing of any reaction with your doctor.",
+      "card_summary": "A sulfa antibiotic usually combined with trimethoprim for certain common bacterial infections.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_formal_review",
+        "drug_record_reactions",
+        "drug_tell_providers"
+      ],
+      "caution": "Medicine rashes can appear days after starting a drug and may not involve IgE. A negative blood result does not make this medicine safe.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E07",
+        "E23"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "gentamycin",
+      "lab_test_name": "Gentamycin",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 9,
+      "aliases": [
+        "Gentamicin",
+        "Gentamicin (listed as Gentamycin)"
+      ],
+      "common_name": "Gentamicin (listed as Gentamycin)",
+      "scientific_name": "Gentamicin",
+      "canonical_category": "other_antibiotics",
+      "allergen_type": "drug",
+      "definition": "Gentamicin is an antibiotic given by injection or as eye and ear drops for certain bacterial infections. The test lists it with a different spelling.",
+      "exposure_sources": [
+        "Hospital injections",
+        "Eye drops",
+        "Ear drops",
+        "Skin creams"
+      ],
+      "typical_symptoms": [
+        "Skin rash",
+        "Itching",
+        "Redness at the application site",
+        "Hives",
+        "Swelling"
+      ],
+      "interpretation_insight": "A positive result means IgE to gentamicin was detected. Many reactions to gentamicin drops or creams are local skin reactions, which blood IgE tests do not measure well. Discuss any past reaction with your doctor.",
+      "card_summary": "An antibiotic given as injections or drops for certain serious bacterial infections.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_formal_review",
+        "drug_record_reactions"
+      ],
+      "caution": "Reactions to drops and creams are often local skin reactions, not IgE-mediated. This blood test cannot confirm or exclude them.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "name_spelling_variant"
+      ],
+      "evidence_refs": [
+        "E06",
+        "E07",
+        "E23"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "ascorbic_acid_vitamin_c",
+      "lab_test_name": "Ascorbic Acid (Vitamin C)",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 10,
+      "aliases": [
+        "Vitamin C (Ascorbic Acid)"
+      ],
+      "common_name": "Vitamin C (Ascorbic Acid)",
+      "scientific_name": "Ascorbic acid",
+      "canonical_category": "vitamins_and_other_medicines",
+      "allergen_type": "drug",
+      "definition": "Ascorbic acid is vitamin C. It is found naturally in many fruits and vegetables and is also sold as tablets, powders, fizzy drinks and injections.",
+      "exposure_sources": [
+        "Vitamin C tablets",
+        "Effervescent drinks",
+        "Injections",
+        "Multivitamin products"
+      ],
+      "typical_symptoms": [
+        "Skin rash",
+        "Hives",
+        "Itching",
+        "Swelling of lips or face",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "This result shows IgE to ascorbic acid was detected. Vitamin C is part of a normal diet, so avoiding fruits and vegetables because of this result is not advised. If a vitamin product ever caused a reaction, tell your doctor the exact product.",
+      "card_summary": "Vitamin C, naturally found in fruits and vegetables and sold as supplements.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_vitamin_ingredients",
+        "drug_formal_review"
+      ],
+      "caution": "Do not avoid vitamin C-rich foods because of this result. Reactions to supplements may be caused by other ingredients in the product.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E23"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "cobalamin_vitamin_b12",
+      "lab_test_name": "Cobalamin (Vitamin B12)",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 11,
+      "aliases": [
+        "Vitamin B12 (Cobalamin)"
+      ],
+      "common_name": "Vitamin B12 (Cobalamin)",
+      "scientific_name": "Cobalamin",
+      "canonical_category": "vitamins_and_other_medicines",
+      "allergen_type": "drug",
+      "definition": "Cobalamin is vitamin B12. It is found in animal foods and used as tablets, drops or injections to treat or prevent low vitamin B12 levels.",
+      "exposure_sources": [
+        "B12 tablets",
+        "B12 injections",
+        "Multivitamin products"
+      ],
+      "typical_symptoms": [
+        "Skin rash",
+        "Hives",
+        "Itching",
+        "Swelling of lips or face",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "A positive result means IgE to vitamin B12 was detected. If you rely on B12 injections, do not skip them because of this report. Speak with your doctor, who can review any past reaction and suggest the safest way to continue.",
+      "card_summary": "Vitamin B12 found in animal foods and used as tablets or injections.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_vitamin_ingredients",
+        "drug_formal_review"
+      ],
+      "caution": "If you need B12 treatment, stopping it can cause harm. Do not change treatment without medical advice.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E23"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "cephalosporin",
+      "lab_test_name": "Cephalosporin",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 12,
+      "aliases": [
+        "Cephalosporin Antibiotics (Group)"
+      ],
+      "common_name": "Cephalosporin Antibiotics (Group)",
+      "scientific_name": "Cephalosporins",
+      "canonical_category": "beta_lactam_antibiotics",
+      "allergen_type": "drug",
+      "definition": "Cephalosporins are a large family of antibiotics related to penicillin. This test names the family, not one specific medicine, so it covers many different drugs.",
+      "exposure_sources": [
+        "Tablets and capsules",
+        "Liquids for children",
+        "Hospital injections"
+      ],
+      "typical_symptoms": [
+        "Skin rash",
+        "Hives",
+        "Itching",
+        "Swelling of lips or face",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "A positive result suggests IgE to a cephalosporin preparation. Because this test covers a whole family, it cannot show which specific cephalosporin might be a problem. An allergist can look at your history and decide which tests, if any, are needed.",
+      "card_summary": "A family of antibiotics related to penicillin, covering many different medicines and brands.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_formal_review",
+        "drug_record_reactions",
+        "drug_betalactam_review"
+      ],
+      "caution": "This test names a drug family, so it is hard to interpret for any single medicine. Ask the laboratory which compound was used.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "class_not_single_drug",
+        "extract_unclear"
+      ],
+      "evidence_refs": [
+        "E06",
+        "E07",
+        "E23"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "metronidazole",
+      "lab_test_name": "Metronidazole",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 13,
+      "aliases": [],
+      "common_name": "Metronidazole",
+      "scientific_name": "Metronidazole",
+      "canonical_category": "other_antibiotics",
+      "allergen_type": "drug",
+      "definition": "Metronidazole is an antibiotic and antiparasitic medicine. Doctors prescribe it as tablets, syrups, gels or drips for certain gut, dental, skin and pelvic infections in adults.",
+      "exposure_sources": [
+        "Tablets",
+        "Oral liquids",
+        "Injections in hospitals",
+        "Vaginal gels"
+      ],
+      "typical_symptoms": [
+        "Skin rash",
+        "Hives",
+        "Itching",
+        "Swelling of lips or face",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "A positive result means IgE to metronidazole was detected. Blood tests for this medicine are not well established. If you noticed a rash or swelling after a course, record when it started and share it with your doctor.",
+      "card_summary": "An antibiotic and antiparasitic medicine used for gut, dental and pelvic infections.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_formal_review",
+        "drug_record_reactions",
+        "drug_tell_providers"
+      ],
+      "caution": "This blood test is not well established for metronidazole, so the result should not be used to decide whether the medicine is safe.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E07",
+        "E23"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "chloramphenicol",
+      "lab_test_name": "Chloramphenicol",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 14,
+      "aliases": [],
+      "common_name": "Chloramphenicol",
+      "scientific_name": "Chloramphenicol",
+      "canonical_category": "other_antibiotics",
+      "allergen_type": "drug",
+      "definition": "Chloramphenicol is an older antibiotic used less often today. It is still found in some eye drops, ear drops and ointments prescribed for local infections.",
+      "exposure_sources": [
+        "Eye drops",
+        "Ear drops",
+        "Skin ointments"
+      ],
+      "typical_symptoms": [
+        "Eye redness",
+        "Itching",
+        "Skin rash",
+        "Swelling of eyelids",
+        "Hives"
+      ],
+      "interpretation_insight": "This result shows IgE to chloramphenicol was detected. Reactions to eye drops and ointments are often local skin or eye reactions, which this blood test is not designed to confirm. Discuss any past reaction with your doctor.",
+      "card_summary": "An older antibiotic still found in some eye and ear drops and ointments.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_formal_review",
+        "drug_record_reactions"
+      ],
+      "caution": "Local reactions to drops and ointments often do not involve IgE, so this blood test has limited value for them.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E07",
+        "E23"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "tetracycline",
+      "lab_test_name": "Tetracycline",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 15,
+      "aliases": [],
+      "common_name": "Tetracycline",
+      "scientific_name": "Tetracycline",
+      "canonical_category": "other_antibiotics",
+      "allergen_type": "drug",
+      "definition": "Tetracycline is an antibiotic used for certain infections and for conditions such as acne. It comes as capsules, tablets, eye ointments and skin products for adults.",
+      "exposure_sources": [
+        "Capsules and tablets",
+        "Skin ointments",
+        "Acne treatments"
+      ],
+      "typical_symptoms": [
+        "Skin rash",
+        "Hives",
+        "Itching",
+        "Swelling of lips or face",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "A positive result means IgE to tetracycline was detected. Blood tests are not well established for this antibiotic, so the result does not confirm allergy. Tell your doctor about any rash or swelling you remember after taking it.",
+      "card_summary": "An antibiotic used for infections and acne, in tablets, capsules and skin products.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_formal_review",
+        "drug_record_reactions",
+        "drug_tell_providers"
+      ],
+      "caution": "This blood test is not well established for tetracycline. A positive or negative result should not decide whether you can take it.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E07",
+        "E23"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "ofloxacin",
+      "lab_test_name": "Ofloxacin",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 16,
+      "aliases": [],
+      "common_name": "Ofloxacin",
+      "scientific_name": "Ofloxacin",
+      "canonical_category": "other_antibiotics",
+      "allergen_type": "drug",
+      "definition": "Ofloxacin is a fluoroquinolone antibiotic. It is available as tablets and also as eye and ear drops for certain bacterial infections in adults and older children.",
+      "exposure_sources": [
+        "Tablets",
+        "Eye drops",
+        "Ear drops"
+      ],
+      "typical_symptoms": [
+        "Skin rash",
+        "Hives",
+        "Itching",
+        "Swelling of lips or face",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "This result shows IgE to ofloxacin was detected. Blood tests for this group of antibiotics are not well established. If you have reacted to an antibiotic of this type, your doctor can plan which options are safe.",
+      "card_summary": "A fluoroquinolone antibiotic used as tablets and as eye and ear drops.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_formal_review",
+        "drug_record_reactions",
+        "drug_tell_providers"
+      ],
+      "caution": "Blood tests for this antibiotic group are not well established. Do not use this result to decide about similar antibiotics.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E07",
+        "E23"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "bromhexine",
+      "lab_test_name": "Bromhexine",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 17,
+      "aliases": [],
+      "common_name": "Bromhexine",
+      "scientific_name": "Bromhexine",
+      "canonical_category": "vitamins_and_other_medicines",
+      "allergen_type": "drug",
+      "definition": "Bromhexine is a cough medicine that thins mucus so it is easier to cough up. It is sold as syrups and tablets for chest congestion.",
+      "exposure_sources": [
+        "Cough syrups",
+        "Tablets",
+        "Combination cold remedies"
+      ],
+      "typical_symptoms": [
+        "Skin rash",
+        "Hives",
+        "Itching",
+        "Swelling of lips or face",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "A positive result means IgE to bromhexine was detected. Allergy testing for this medicine has little published support. If a cough syrup ever caused a rash or swelling, tell your doctor the exact product, since other ingredients can also react.",
+      "card_summary": "A mucus-thinning cough medicine found in syrups, drops and tablets. Ask first.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_vitamin_ingredients",
+        "drug_formal_review",
+        "drug_tell_providers"
+      ],
+      "caution": "There is little published evidence on blood IgE testing for bromhexine. Treat this result with extra caution.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E06",
+        "E23"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "amoxicillin",
+      "lab_test_name": "Amoxicillin",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 18,
+      "aliases": [],
+      "common_name": "Amoxicillin",
+      "scientific_name": "Amoxicillin",
+      "canonical_category": "beta_lactam_antibiotics",
+      "allergen_type": "drug",
+      "definition": "Amoxicillin is a widely used penicillin-type antibiotic. Doctors prescribe it as capsules, tablets or syrup for chest, ear, throat, sinus, dental, skin and urinary infections.",
+      "exposure_sources": [
+        "Capsules and tablets",
+        "Syrups for children",
+        "Combination tablets with clavulanic acid"
+      ],
+      "typical_symptoms": [
+        "Skin rash",
+        "Hives",
+        "Itching",
+        "Swelling of lips or face",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "A positive result means IgE to amoxicillin was detected. Amoxicillin is very commonly prescribed, so a wrong label can limit future treatment choices. Ask an allergist about proper testing before assuming you are allergic or safe.",
+      "card_summary": "A very common penicillin-type antibiotic for chest, ear, throat and urinary infections.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_formal_review",
+        "drug_record_reactions",
+        "drug_betalactam_review",
+        "gen_emergency_signs"
+      ],
+      "caution": "Rashes during an infection may not be caused by the antibiotic. Proper allergist testing is more reliable than this blood result.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E07",
+        "E23"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "oxacillin",
+      "lab_test_name": "Oxacillin",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 19,
+      "aliases": [],
+      "common_name": "Oxacillin",
+      "scientific_name": "Oxacillin",
+      "canonical_category": "beta_lactam_antibiotics",
+      "allergen_type": "drug",
+      "definition": "Oxacillin is a penicillin-type antibiotic given by injection, mostly in hospitals. It is used for certain staphylococcal infections of the skin, bones, heart and blood.",
+      "exposure_sources": [
+        "Hospital injections",
+        "Intravenous drips",
+        "Intensive treatment of infections"
+      ],
+      "typical_symptoms": [
+        "Skin rash",
+        "Hives",
+        "Itching",
+        "Swelling of lips or face",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "This result shows IgE to oxacillin was detected. Most people will only meet this medicine in hospital. If you carry a penicillin allergy label, your doctors may want to review it, so tell them about this result and your history.",
+      "card_summary": "A penicillin-type antibiotic given by injection in hospitals for staphylococcal skin and blood infections.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_formal_review",
+        "drug_record_reactions",
+        "drug_betalactam_review"
+      ],
+      "caution": "A single blood result should not be used to label or clear a penicillin allergy. A specialist should review your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E07",
+        "E23"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "ampicillin",
+      "lab_test_name": "Ampicillin",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 20,
+      "aliases": [],
+      "common_name": "Ampicillin",
+      "scientific_name": "Ampicillin",
+      "canonical_category": "beta_lactam_antibiotics",
+      "allergen_type": "drug",
+      "definition": "Ampicillin is a penicillin-type antibiotic given as capsules or injections. It is used for a range of bacterial infections of the chest, gut and urine.",
+      "exposure_sources": [
+        "Capsules",
+        "Injections",
+        "Hospital treatment"
+      ],
+      "typical_symptoms": [
+        "Skin rash",
+        "Hives",
+        "Itching",
+        "Swelling of lips or face",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "A positive result means IgE to ampicillin was detected. This does not mean you are allergic to every penicillin-type antibiotic. An allergist can decide which medicines are safe for you using your history and proper testing.",
+      "card_summary": "A penicillin-type antibiotic used as capsules or injections for many common infections.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_formal_review",
+        "drug_record_reactions",
+        "drug_betalactam_review"
+      ],
+      "caution": "A positive blood result does not show which related antibiotics you can or cannot use. Specialist review is needed.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E07",
+        "E23"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "ciprofloxacin",
+      "lab_test_name": "Ciprofloxacin",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 21,
+      "aliases": [],
+      "common_name": "Ciprofloxacin",
+      "scientific_name": "Ciprofloxacin",
+      "canonical_category": "other_antibiotics",
+      "allergen_type": "drug",
+      "definition": "Ciprofloxacin is a fluoroquinolone antibiotic. Doctors prescribe it as tablets or drips for urinary, gut, skin, bone and other bacterial infections in adults and older teenagers.",
+      "exposure_sources": [
+        "Tablets",
+        "Intravenous drips",
+        "Eye and ear drops"
+      ],
+      "typical_symptoms": [
+        "Skin rash",
+        "Hives",
+        "Itching",
+        "Swelling of lips or face",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "This result shows IgE to ciprofloxacin was detected. Blood tests for this antibiotic group have limited support, so the result does not confirm allergy. Mention any past reaction to your doctor before the next antibiotic course.",
+      "card_summary": "A fluoroquinolone antibiotic used for urinary, gut, skin and other bacterial infections.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_formal_review",
+        "drug_record_reactions",
+        "drug_tell_providers"
+      ],
+      "caution": "Blood tests for this antibiotic are not well established. This result should not decide whether you can take it.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E07",
+        "E23"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "paracetamol",
+      "lab_test_name": "Paracetamol",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 22,
+      "aliases": [
+        "Paracetamol (Acetaminophen)"
+      ],
+      "common_name": "Paracetamol (Acetaminophen)",
+      "scientific_name": "Paracetamol (acetaminophen)",
+      "canonical_category": "nsaids_and_analgesics",
+      "allergen_type": "drug",
+      "definition": "Paracetamol, also called acetaminophen, is one of the most widely used medicines for fever and mild to moderate pain. It is found in many cold and flu products.",
+      "exposure_sources": [
+        "Tablets and syrups",
+        "Fever drops for children",
+        "Cold and flu combinations",
+        "Prescription pain combinations"
+      ],
+      "typical_symptoms": [
+        "Hives",
+        "Skin rash",
+        "Facial swelling",
+        "Itching",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "A positive result means IgE to paracetamol was detected. Because paracetamol is so widely used and appears in many products, do not stop or restart it based on this report. Ask your doctor, especially if you have had a reaction before.",
+      "card_summary": "A very widely used fever and pain medicine found in many combination products.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_pain_reliever_review",
+        "drug_record_reactions",
+        "drug_formal_review"
+      ],
+      "caution": "Paracetamol appears in many products. Avoiding it unnecessarily may remove a useful medicine, so seek medical advice first.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E23",
+        "E25"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "thiamine_vitamin_b1",
+      "lab_test_name": "Thiamine (Vitamin B1)",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 23,
+      "aliases": [
+        "Vitamin B1 (Thiamine)"
+      ],
+      "common_name": "Vitamin B1 (Thiamine)",
+      "scientific_name": "Thiamine",
+      "canonical_category": "vitamins_and_other_medicines",
+      "allergen_type": "drug",
+      "definition": "Thiamine is vitamin B1. It is found in whole grains, pulses and meat and is given as tablets or injections to treat or prevent low levels.",
+      "exposure_sources": [
+        "Vitamin B tablets",
+        "B-complex injections",
+        "Multivitamin products"
+      ],
+      "typical_symptoms": [
+        "Skin rash",
+        "Hives",
+        "Itching",
+        "Swelling of lips or face",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "This result shows IgE to thiamine was detected. Thiamine is part of normal food, so there is no need to avoid grains or pulses. If a B-vitamin injection once caused a reaction, tell your doctor the exact product.",
+      "card_summary": "Vitamin B1 found in whole grains and pulses and given as tablets or injections.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_vitamin_ingredients",
+        "drug_formal_review"
+      ],
+      "caution": "Do not avoid thiamine-containing foods because of this result. Reactions to vitamin products may be due to other ingredients.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E23"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "prilocaine",
+      "lab_test_name": "Prilocaine",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 24,
+      "aliases": [],
+      "common_name": "Prilocaine",
+      "scientific_name": "Prilocaine",
+      "canonical_category": "local_anaesthetics",
+      "allergen_type": "drug",
+      "definition": "Prilocaine is a numbing medicine used in dental work, minor procedures and some creams applied to the skin before injections, blood tests or small operations.",
+      "exposure_sources": [
+        "Dental numbing injections",
+        "Numbing creams before needles",
+        "Minor procedures"
+      ],
+      "typical_symptoms": [
+        "Skin redness",
+        "Itching",
+        "Rash",
+        "Swelling",
+        "Hives"
+      ],
+      "interpretation_insight": "A positive result means IgE to prilocaine was detected. Reactions to numbing medicines are often not allergic, and blood IgE tests are not well established for this drug. A specialist decides on further checks. Tell your dentist and doctor about any past reaction.",
+      "card_summary": "A numbing medicine used in dental work and in some skin creams.",
+      "recommendation_ids": [
+        "drug_no_self_change",
+        "drug_topical_patch_testing",
+        "drug_formal_review",
+        "drug_tell_providers"
+      ],
+      "caution": "If a dental or minor procedure caused a reaction, a specialist can check which numbing medicines are safe. This blood test cannot answer that.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_DRUG",
+        "C_DRUG_ROUTE"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E06",
+        "E20",
+        "E23"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    }
+  ]
+}

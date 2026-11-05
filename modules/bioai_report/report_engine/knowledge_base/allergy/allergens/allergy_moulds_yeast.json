@@ -1,0 +1,539 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "source_group": "allergy_moulds_yeast",
+  "source_group_display_order": 6,
+  "patient_group_name": "Moulds and Yeast",
+  "patient_group_explanation": "Mould spores and yeast found in damp places and on the body.",
+  "group_caution_rule_ids": [
+    "C_SENS",
+    "C_CLASS",
+    "C_MOULD"
+  ],
+  "test_count": 10,
+  "clinical_review_status": "pending",
+  "allergens": [
+    {
+      "allergen_id": "penicillium_notatum",
+      "lab_test_name": "Penicillium Notatum",
+      "source_group": "allergy_moulds_yeast",
+      "source_group_display_order": 6,
+      "position_in_source_group": 1,
+      "aliases": [
+        "Penicillium Mould (P. notatum)"
+      ],
+      "common_name": "Penicillium Mould (P. notatum)",
+      "scientific_name": "Penicillium notatum",
+      "canonical_category": "moulds",
+      "allergen_type": "environmental",
+      "definition": "Penicillium is a common blue-green mould that grows on damp walls, spoiled food and stored items. Its spores float in indoor air, especially in humid seasons.",
+      "exposure_sources": [
+        "Damp walls and ceilings",
+        "Spoiled bread and fruit",
+        "Old books and stored clothes",
+        "Damp cupboards"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to Penicillium mould. It is more meaningful if your symptoms rise in damp seasons, in musty rooms or after handling spoiled food. It does not mean you are allergic to penicillin medicines.",
+      "card_summary": "A common blue-green mould found on damp surfaces, bread and spoiled food.",
+      "recommendation_ids": [
+        "mould_fix_damp",
+        "mould_ventilate",
+        "mould_clean_small_patches",
+        "mould_avoid_decay_sites"
+      ],
+      "caution": "Mould sensitization does not predict allergy to penicillin antibiotics. Treat the two as separate questions.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MOULD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "taxonomy_check"
+      ],
+      "evidence_refs": [
+        "E21"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "cladosporium_herbarum",
+      "lab_test_name": "Cladosporium Herbarum",
+      "source_group": "allergy_moulds_yeast",
+      "source_group_display_order": 6,
+      "position_in_source_group": 2,
+      "aliases": [
+        "Cladosporium Mould"
+      ],
+      "common_name": "Cladosporium Mould",
+      "scientific_name": "Cladosporium herbarum",
+      "canonical_category": "moulds",
+      "allergen_type": "environmental",
+      "definition": "Cladosporium herbarum is a dark mould that grows on plants, decaying leaves and damp surfaces. Its spores are common in outdoor air and drift indoors.",
+      "exposure_sources": [
+        "Decaying leaves and soil",
+        "Plants and gardens",
+        "Damp bathrooms and windows",
+        "Cool damp surfaces"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "This result shows IgE to Cladosporium spores. These spores are very common outdoors, so exposure is hard to avoid. Symptoms that worsen in damp weather, near decaying leaves or in damp rooms are the most useful clue.",
+      "card_summary": "A dark mould common on plants, decaying leaves, damp walls and surfaces.",
+      "recommendation_ids": [
+        "mould_fix_damp",
+        "mould_ventilate",
+        "mould_clean_small_patches",
+        "mould_avoid_decay_sites"
+      ],
+      "caution": "Spores of this mould are very common in the air. A positive result alone does not prove it is causing your symptoms.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MOULD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E21"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "aspergillus_fumigatus",
+      "lab_test_name": "Aspergillus Fumigatus",
+      "source_group": "allergy_moulds_yeast",
+      "source_group_display_order": 6,
+      "position_in_source_group": 3,
+      "aliases": [
+        "Aspergillus Mould (A. fumigatus)"
+      ],
+      "common_name": "Aspergillus Mould (A. fumigatus)",
+      "scientific_name": "Aspergillus fumigatus",
+      "canonical_category": "moulds",
+      "allergen_type": "environmental",
+      "definition": "Aspergillus fumigatus is a mould that grows in soil, compost, damp buildings and stored grains. Its tiny spores are easily breathed in by people nearby.",
+      "exposure_sources": [
+        "Compost and soil",
+        "Damp buildings",
+        "Stored grain and spices",
+        "Decaying plant material"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to Aspergillus. For most people it only indicates sensitization. If you have long-standing asthma or lung disease, discuss this result with your doctor, who can decide whether more checks are needed.",
+      "card_summary": "A common mould in soil, compost and damp buildings with easily inhaled spores.",
+      "recommendation_ids": [
+        "mould_fix_damp",
+        "mould_ventilate",
+        "mould_clean_small_patches",
+        "mould_avoid_decay_sites",
+        "gen_see_allergist"
+      ],
+      "caution": "Mould sensitization alone is not a diagnosis of any lung condition. People with asthma or lung disease should discuss it with a doctor.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MOULD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E21"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "mucor_racemosus",
+      "lab_test_name": "Mucor Racemosus",
+      "source_group": "allergy_moulds_yeast",
+      "source_group_display_order": 6,
+      "position_in_source_group": 4,
+      "aliases": [
+        "Mucor Mould"
+      ],
+      "common_name": "Mucor Mould",
+      "scientific_name": "Mucor racemosus",
+      "canonical_category": "moulds",
+      "allergen_type": "environmental",
+      "definition": "Mucor racemosus is a fast-growing mould found in soil, decaying plants and spoiled food. It forms fluffy grey growth on bread, fruit and damp organic material.",
+      "exposure_sources": [
+        "Spoiled bread and fruit",
+        "Soil and decaying plants",
+        "Damp stored grains",
+        "Compost"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "This result shows IgE to Mucor mould. It is more meaningful if your symptoms are worse around spoiled food, compost or damp stores. A positive result alone does not confirm an allergy to this mould.",
+      "card_summary": "A fast-growing mould on spoiled bread, fruit, stored food and decaying plant material.",
+      "recommendation_ids": [
+        "mould_fix_damp",
+        "mould_ventilate",
+        "mould_clean_small_patches",
+        "mould_avoid_decay_sites"
+      ],
+      "caution": "Different moulds can share similar proteins, so a positive result may reflect another mould. Your doctor will interpret it with your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MOULD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E21"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "candida_albicans",
+      "lab_test_name": "Candida Albicans",
+      "source_group": "allergy_moulds_yeast",
+      "source_group_display_order": 6,
+      "position_in_source_group": 5,
+      "aliases": [
+        "Candida (Yeast)"
+      ],
+      "common_name": "Candida (Yeast)",
+      "scientific_name": "Candida albicans",
+      "canonical_category": "yeasts_and_candida",
+      "allergen_type": "environmental",
+      "definition": "Candida albicans is a yeast that normally lives on the skin, in the mouth and in the gut. It can sometimes overgrow and cause infections such as thrush.",
+      "exposure_sources": [
+        "Normal skin and mouth",
+        "Gut and mucosal surfaces",
+        "Moist skin folds",
+        "Some damp indoor surfaces"
+      ],
+      "typical_symptoms": [
+        "Skin itching",
+        "Rash",
+        "Sneezing",
+        "Runny nose",
+        "Cough"
+      ],
+      "interpretation_insight": "A positive result shows IgE to Candida. Because Candida lives on our bodies, many people are exposed all the time. A positive result does not show that you have an infection or an allergy, so discuss it with your doctor.",
+      "card_summary": "A yeast that normally lives on the human body, which can cause thrush.",
+      "recommendation_ids": [
+        "candida_doctor_review",
+        "gen_see_allergist"
+      ],
+      "caution": "This result does not diagnose a Candida infection. Evidence for the usefulness of Candida-specific IgE is limited, so interpret it with caution.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_YEAST"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "alternaria_alternata",
+      "lab_test_name": "Alternaria Alternata",
+      "source_group": "allergy_moulds_yeast",
+      "source_group_display_order": 6,
+      "position_in_source_group": 6,
+      "aliases": [
+        "Alternaria Mould"
+      ],
+      "common_name": "Alternaria Mould",
+      "scientific_name": "Alternaria alternata",
+      "canonical_category": "moulds",
+      "allergen_type": "environmental",
+      "definition": "Alternaria alternata is a dark outdoor mould that grows on plants, soil and decaying leaves. Its spores are common in outdoor air during warm, dry and windy weather.",
+      "exposure_sources": [
+        "Plants and crops",
+        "Decaying leaves and soil",
+        "Outdoor air in warm weather",
+        "Damp indoor surfaces"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to Alternaria spores. This mould is a well-known outdoor trigger. Symptoms that flare on windy days, in fields or near rotting plants are the most useful clue. Some people with this result also react to spinach.",
+      "card_summary": "A dark outdoor mould on plants and decaying leaves, spread by air.",
+      "recommendation_ids": [
+        "mould_fix_damp",
+        "mould_ventilate",
+        "mould_clean_small_patches",
+        "mould_avoid_decay_sites",
+        "pollen_food_link_note"
+      ],
+      "caution": "A positive result does not confirm that Alternaria is causing your symptoms. IgE class does not show how severe they may be.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MOULD"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "spinach"
+        ],
+        "patient_note": "Some people sensitized to Alternaria mould also react to spinach. Tell your doctor if spinach has ever caused symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "alternaria_spinach_syndrome_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [],
+      "evidence_refs": [
+        "E21",
+        "E11"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "curvularia_lunata",
+      "lab_test_name": "Curvularia Lunata",
+      "source_group": "allergy_moulds_yeast",
+      "source_group_display_order": 6,
+      "position_in_source_group": 7,
+      "aliases": [
+        "Curvularia Mould"
+      ],
+      "common_name": "Curvularia Mould",
+      "scientific_name": "Curvularia lunata",
+      "canonical_category": "moulds",
+      "allergen_type": "environmental",
+      "definition": "Curvularia lunata is a dark mould that grows on plants, grasses and soil, especially in warm climates. Its spores are carried in the air in the monsoon.",
+      "exposure_sources": [
+        "Grasses and plants",
+        "Soil",
+        "Decaying plant material",
+        "Damp warm environments"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "This result shows IgE to Curvularia mould. It grows in warm climates, so it may be relevant where you live. If you have long-lasting nasal blockage or sinus symptoms, share this result with your doctor.",
+      "card_summary": "A dark mould found on plants, grasses and soil in warm climates.",
+      "recommendation_ids": [
+        "mould_fix_damp",
+        "mould_ventilate",
+        "mould_clean_small_patches",
+        "mould_avoid_decay_sites",
+        "gen_see_allergist"
+      ],
+      "caution": "Mould sensitization alone is not a diagnosis. Evidence on its clinical value is limited, so discuss the result with a doctor.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MOULD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence",
+        "taxonomy_check"
+      ],
+      "evidence_refs": [
+        "E21"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "trichoderma_viride",
+      "lab_test_name": "Trichoderma Viride",
+      "source_group": "allergy_moulds_yeast",
+      "source_group_display_order": 6,
+      "position_in_source_group": 8,
+      "aliases": [
+        "Trichoderma Mould"
+      ],
+      "common_name": "Trichoderma Mould",
+      "scientific_name": "Trichoderma viride",
+      "canonical_category": "moulds",
+      "allergen_type": "environmental",
+      "definition": "Trichoderma viride is a green mould that grows on soil, decaying wood and damp building materials. It is also used in agriculture and farm products.",
+      "exposure_sources": [
+        "Soil and decaying wood",
+        "Damp walls and wood",
+        "Compost",
+        "Agricultural settings"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result suggests IgE to Trichoderma. This mould may be more relevant if you work with soil, compost or damp wood. It does not prove that it is the cause of your symptoms or that you are allergic.",
+      "card_summary": "A green mould of soil, decaying wood, compost and damp building materials.",
+      "recommendation_ids": [
+        "mould_fix_damp",
+        "mould_ventilate",
+        "mould_clean_small_patches",
+        "mould_avoid_decay_sites"
+      ],
+      "caution": "Evidence on the clinical value of this test is limited. Interpret it together with your symptoms and other mould results.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MOULD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E21"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "phoma_betae",
+      "lab_test_name": "Phoma Betae",
+      "source_group": "allergy_moulds_yeast",
+      "source_group_display_order": 6,
+      "position_in_source_group": 9,
+      "aliases": [
+        "Phoma Mould"
+      ],
+      "common_name": "Phoma Mould",
+      "scientific_name": "Phoma betae",
+      "canonical_category": "moulds",
+      "allergen_type": "environmental",
+      "definition": "Phoma betae is a mould that grows on beet plants and on decaying plant matter. It is less common indoors than many of the other moulds.",
+      "exposure_sources": [
+        "Beet fields and plant waste",
+        "Decaying plant matter",
+        "Soil",
+        "Damp farm stores"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "This result shows IgE to Phoma mould. It matters mostly if you work with plants or farm stores. It does not mean you must avoid beetroot, which is a different matter. Discuss any symptoms with your doctor.",
+      "card_summary": "A mould of beet plants, leaf litter, garden waste and decaying plant matter.",
+      "recommendation_ids": [
+        "mould_fix_damp",
+        "mould_ventilate",
+        "mould_clean_small_patches",
+        "mould_avoid_decay_sites"
+      ],
+      "caution": "This mould is rarely studied, and evidence for clinical value is limited. Do not avoid beetroot because of this result.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MOULD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence",
+        "taxonomy_check"
+      ],
+      "evidence_refs": [
+        "E21"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "rhizopus_nigricans",
+      "lab_test_name": "Rhizopus Nigricans",
+      "source_group": "allergy_moulds_yeast",
+      "source_group_display_order": 6,
+      "position_in_source_group": 10,
+      "aliases": [
+        "Black Bread Mould (Rhizopus)"
+      ],
+      "common_name": "Black Bread Mould (Rhizopus)",
+      "scientific_name": "Rhizopus nigricans",
+      "canonical_category": "moulds",
+      "allergen_type": "environmental",
+      "definition": "Rhizopus nigricans, also called black bread mould, is a fast-growing mould seen on bread, ripe fruit and damp stored food. It forms fluffy white growth that turns black.",
+      "exposure_sources": [
+        "Old bread",
+        "Overripe fruit",
+        "Damp stored food",
+        "Soil and compost"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to Rhizopus mould. This mould grows on food left too long, so spoiled-food areas and old bread may be relevant. This does not show that the mould is causing your symptoms.",
+      "card_summary": "A fast-growing black mould that appears on old bread and overripe fruit.",
+      "recommendation_ids": [
+        "mould_fix_damp",
+        "mould_ventilate",
+        "mould_clean_small_patches",
+        "mould_avoid_decay_sites"
+      ],
+      "caution": "Mould proteins are similar across species. A positive result may reflect a related mould. Your doctor will interpret it with your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_MOULD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "taxonomy_check"
+      ],
+      "evidence_refs": [
+        "E21"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    }
+  ]
+}

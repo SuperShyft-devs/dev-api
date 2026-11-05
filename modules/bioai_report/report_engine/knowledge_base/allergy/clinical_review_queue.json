@@ -1,0 +1,2407 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "item_count": 239,
+  "counts_by_type": {
+    "group_signoff": 15,
+    "allergen_flag": 160,
+    "cross_reactivity_held": 12,
+    "recommendation_citation": 42,
+    "recommendation_note": 1,
+    "evidence_gap": 7,
+    "regional_gap": 1,
+    "policy": 1
+  },
+  "items": [
+    {
+      "queue_id": "CRQ0001",
+      "type": "group_signoff",
+      "target": "allergens/pets.json",
+      "issue": "All 21 records in this group await clinician sign off. No record is medically approved.",
+      "severity": "high",
+      "suggested_reviewer": "Allergist or clinical immunologist",
+      "recommended_action": "Review wording, cautions and recommendation mapping, then set clinical_review_status.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0002",
+      "type": "group_signoff",
+      "target": "allergens/allergy_drugs.json",
+      "issue": "All 24 records in this group await clinician sign off. No record is medically approved.",
+      "severity": "high",
+      "suggested_reviewer": "Allergist or clinical immunologist",
+      "recommended_action": "Review wording, cautions and recommendation mapping, then set clinical_review_status.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0003",
+      "type": "group_signoff",
+      "target": "allergens/allergy_dust_mites.json",
+      "issue": "All 13 records in this group await clinician sign off. No record is medically approved.",
+      "severity": "high",
+      "suggested_reviewer": "Allergist or clinical immunologist",
+      "recommended_action": "Review wording, cautions and recommendation mapping, then set clinical_review_status.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0004",
+      "type": "group_signoff",
+      "target": "allergens/allergy_insects.json",
+      "issue": "All 6 records in this group await clinician sign off. No record is medically approved.",
+      "severity": "high",
+      "suggested_reviewer": "Allergist or clinical immunologist",
+      "recommended_action": "Review wording, cautions and recommendation mapping, then set clinical_review_status.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0005",
+      "type": "group_signoff",
+      "target": "allergens/allergy_grass.json",
+      "issue": "All 8 records in this group await clinician sign off. No record is medically approved.",
+      "severity": "high",
+      "suggested_reviewer": "Allergist or clinical immunologist",
+      "recommended_action": "Review wording, cautions and recommendation mapping, then set clinical_review_status.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0006",
+      "type": "group_signoff",
+      "target": "allergens/allergy_moulds_yeast.json",
+      "issue": "All 10 records in this group await clinician sign off. No record is medically approved.",
+      "severity": "high",
+      "suggested_reviewer": "Allergist or clinical immunologist",
+      "recommended_action": "Review wording, cautions and recommendation mapping, then set clinical_review_status.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0007",
+      "type": "group_signoff",
+      "target": "allergens/allergy_weed_tree.json",
+      "issue": "All 11 records in this group await clinician sign off. No record is medically approved.",
+      "severity": "high",
+      "suggested_reviewer": "Allergist or clinical immunologist",
+      "recommended_action": "Review wording, cautions and recommendation mapping, then set clinical_review_status.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0008",
+      "type": "group_signoff",
+      "target": "allergens/allergy_veg.json",
+      "issue": "All 40 records in this group await clinician sign off. No record is medically approved.",
+      "severity": "high",
+      "suggested_reviewer": "Allergist or clinical immunologist",
+      "recommended_action": "Review wording, cautions and recommendation mapping, then set clinical_review_status.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0009",
+      "type": "group_signoff",
+      "target": "allergens/allergy_non_veg.json",
+      "issue": "All 17 records in this group await clinician sign off. No record is medically approved.",
+      "severity": "high",
+      "suggested_reviewer": "Allergist or clinical immunologist",
+      "recommended_action": "Review wording, cautions and recommendation mapping, then set clinical_review_status.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0010",
+      "type": "group_signoff",
+      "target": "allergens/allergy_dairy.json",
+      "issue": "All 12 records in this group await clinician sign off. No record is medically approved.",
+      "severity": "high",
+      "suggested_reviewer": "Allergist or clinical immunologist",
+      "recommended_action": "Review wording, cautions and recommendation mapping, then set clinical_review_status.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0011",
+      "type": "group_signoff",
+      "target": "allergens/allergy_seeds_nuts_legumes.json",
+      "issue": "All 21 records in this group await clinician sign off. No record is medically approved.",
+      "severity": "high",
+      "suggested_reviewer": "Allergist or clinical immunologist",
+      "recommended_action": "Review wording, cautions and recommendation mapping, then set clinical_review_status.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0012",
+      "type": "group_signoff",
+      "target": "allergens/allergy_spices.json",
+      "issue": "All 19 records in this group await clinician sign off. No record is medically approved.",
+      "severity": "high",
+      "suggested_reviewer": "Allergist or clinical immunologist",
+      "recommended_action": "Review wording, cautions and recommendation mapping, then set clinical_review_status.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0013",
+      "type": "group_signoff",
+      "target": "allergens/allergy_occupational.json",
+      "issue": "All 6 records in this group await clinician sign off. No record is medically approved.",
+      "severity": "high",
+      "suggested_reviewer": "Allergist or clinical immunologist",
+      "recommended_action": "Review wording, cautions and recommendation mapping, then set clinical_review_status.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0014",
+      "type": "group_signoff",
+      "target": "allergens/allergy_parasites.json",
+      "issue": "All 3 records in this group await clinician sign off. No record is medically approved.",
+      "severity": "high",
+      "suggested_reviewer": "Allergist or clinical immunologist",
+      "recommended_action": "Review wording, cautions and recommendation mapping, then set clinical_review_status.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0015",
+      "type": "group_signoff",
+      "target": "total_ige_interpretation.json",
+      "issue": "Total IgE content awaits clinician sign off. Status wording uses the laboratory reference interval only.",
+      "severity": "high",
+      "suggested_reviewer": "Allergist or clinical pathologist",
+      "recommended_action": "Confirm wording, especially below_reference.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0016",
+      "type": "allergen_flag",
+      "target": "pigeon_droppings",
+      "issue": "[mixed_extract] The extract mixes several materials, so interpretation is less specific.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm cautions.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0017",
+      "type": "allergen_flag",
+      "target": "epithelium_serum_proteins_prot_mouse",
+      "issue": "[extract_unclear] It is not stated whether the extract is raw, cooked, processed or a component.",
+      "severity": "medium",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Obtain extract details from the assay manufacturer.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0018",
+      "type": "allergen_flag",
+      "target": "epithelium_serum_proteins_prot_mouse",
+      "issue": "[name_nonstandard] The laboratory name is nonstandard.",
+      "severity": "low",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Confirm what is tested.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0019",
+      "type": "allergen_flag",
+      "target": "cat_epithelium",
+      "issue": "[overlaps_cat_dander] This test overlaps another test in the catalogue, so results may be duplicated in the breakdown.",
+      "severity": "low",
+      "suggested_reviewer": "Content reviewer",
+      "recommended_action": "Confirm the overlap note in the caution text.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0020",
+      "type": "allergen_flag",
+      "target": "cat_dander",
+      "issue": "[overlaps_cat_epithelium] This test overlaps another test in the catalogue, so results may be duplicated in the breakdown.",
+      "severity": "low",
+      "suggested_reviewer": "Content reviewer",
+      "recommended_action": "Confirm the overlap note in the caution text.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0021",
+      "type": "allergen_flag",
+      "target": "dog_epithelium",
+      "issue": "[overlaps_dog_dander] This test overlaps another test in the catalogue, so results may be duplicated in the breakdown.",
+      "severity": "low",
+      "suggested_reviewer": "Content reviewer",
+      "recommended_action": "Confirm the overlap note in the caution text.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0022",
+      "type": "allergen_flag",
+      "target": "dog_dander",
+      "issue": "[overlaps_dog_epithelium] This test overlaps another test in the catalogue, so results may be duplicated in the breakdown.",
+      "severity": "low",
+      "suggested_reviewer": "Content reviewer",
+      "recommended_action": "Confirm the overlap note in the caution text.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0023",
+      "type": "allergen_flag",
+      "target": "chicken_droppings",
+      "issue": "[mixed_extract] The extract mixes several materials, so interpretation is less specific.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm cautions.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0024",
+      "type": "allergen_flag",
+      "target": "gentamycin",
+      "issue": "[name_spelling_variant] The laboratory spelling differs from the standard spelling. The exact lab name is kept and the standard spelling is stored as an alias.",
+      "severity": "low",
+      "suggested_reviewer": "Content reviewer",
+      "recommended_action": "Confirm alias.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0025",
+      "type": "allergen_flag",
+      "target": "cephalosporin",
+      "issue": "[class_not_single_drug] The test name covers a drug class, not a single drug.",
+      "severity": "medium",
+      "suggested_reviewer": "Drug allergy specialist",
+      "recommended_action": "Confirm which drugs the extract represents.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0026",
+      "type": "allergen_flag",
+      "target": "cephalosporin",
+      "issue": "[extract_unclear] It is not stated whether the extract is raw, cooked, processed or a component.",
+      "severity": "medium",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Obtain extract details from the assay manufacturer.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0027",
+      "type": "allergen_flag",
+      "target": "bromhexine",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0028",
+      "type": "allergen_flag",
+      "target": "tobacco_dust",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0029",
+      "type": "allergen_flag",
+      "target": "tobacco_dust",
+      "issue": "[source_group_mismatch] The item sits in a laboratory group that differs from its scientific category. The canonical category was assigned independently.",
+      "severity": "low",
+      "suggested_reviewer": "Clinical reviewer",
+      "recommended_action": "Confirm the canonical category.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0030",
+      "type": "allergen_flag",
+      "target": "house_dust_ifci_1",
+      "issue": "[mixed_extract] The extract mixes several materials, so interpretation is less specific.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm cautions.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0031",
+      "type": "allergen_flag",
+      "target": "house_dust_ifci_1",
+      "issue": "[name_code_unexplained] The name contains a laboratory code that is not explained in the catalogue.",
+      "severity": "medium",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Ask the laboratory what IFCI 1 means.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0032",
+      "type": "allergen_flag",
+      "target": "dermatophagoides_microceras",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0033",
+      "type": "allergen_flag",
+      "target": "glycyphagus_domesticus",
+      "issue": "[category_judgement] Category assignment is a judgement call.",
+      "severity": "low",
+      "suggested_reviewer": "Clinical reviewer",
+      "recommended_action": "Confirm.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0034",
+      "type": "allergen_flag",
+      "target": "hay_dust",
+      "issue": "[mixed_extract] The extract mixes several materials, so interpretation is less specific.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm cautions.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0035",
+      "type": "allergen_flag",
+      "target": "books_dust",
+      "issue": "[mixed_extract] The extract mixes several materials, so interpretation is less specific.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm cautions.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0036",
+      "type": "allergen_flag",
+      "target": "vespula_germanica",
+      "issue": "[extract_unclear] It is not stated whether the extract is raw, cooked, processed or a component.",
+      "severity": "medium",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Obtain extract details from the assay manufacturer.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0037",
+      "type": "allergen_flag",
+      "target": "blatella_germanica",
+      "issue": "[name_spelling_variant] The laboratory spelling differs from the standard spelling. The exact lab name is kept and the standard spelling is stored as an alias.",
+      "severity": "low",
+      "suggested_reviewer": "Content reviewer",
+      "recommended_action": "Confirm alias.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0038",
+      "type": "allergen_flag",
+      "target": "heterocera_mix",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0039",
+      "type": "allergen_flag",
+      "target": "heterocera_mix",
+      "issue": "[mixed_extract] The extract mixes several materials, so interpretation is less specific.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm cautions.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0040",
+      "type": "allergen_flag",
+      "target": "aedes_communis",
+      "issue": "[regional_relevance_unverified] Relevance in India was not verified in retrieved sources.",
+      "severity": "low",
+      "suggested_reviewer": "Allergist in India",
+      "recommended_action": "Confirm regional relevance.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0041",
+      "type": "allergen_flag",
+      "target": "housefly_musca_domestica",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0042",
+      "type": "allergen_flag",
+      "target": "apis_mellifera",
+      "issue": "[extract_unclear] It is not stated whether the extract is raw, cooked, processed or a component.",
+      "severity": "medium",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Obtain extract details from the assay manufacturer.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0043",
+      "type": "allergen_flag",
+      "target": "agrostis_stolonifera",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0044",
+      "type": "allergen_flag",
+      "target": "festuca_elatior",
+      "issue": "[taxonomy_check] Scientific name or botanical identity should be checked against the extract the laboratory uses.",
+      "severity": "low",
+      "suggested_reviewer": "Botanist or laboratory liaison",
+      "recommended_action": "Confirm scientific name.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0045",
+      "type": "allergen_flag",
+      "target": "phragmites_communis",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0046",
+      "type": "allergen_flag",
+      "target": "phragmites_communis",
+      "issue": "[taxonomy_check] Scientific name or botanical identity should be checked against the extract the laboratory uses.",
+      "severity": "low",
+      "suggested_reviewer": "Botanist or laboratory liaison",
+      "recommended_action": "Confirm scientific name.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0047",
+      "type": "allergen_flag",
+      "target": "penicillium_notatum",
+      "issue": "[taxonomy_check] Scientific name or botanical identity should be checked against the extract the laboratory uses.",
+      "severity": "low",
+      "suggested_reviewer": "Botanist or laboratory liaison",
+      "recommended_action": "Confirm scientific name.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0048",
+      "type": "allergen_flag",
+      "target": "candida_albicans",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0049",
+      "type": "allergen_flag",
+      "target": "curvularia_lunata",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0050",
+      "type": "allergen_flag",
+      "target": "curvularia_lunata",
+      "issue": "[taxonomy_check] Scientific name or botanical identity should be checked against the extract the laboratory uses.",
+      "severity": "low",
+      "suggested_reviewer": "Botanist or laboratory liaison",
+      "recommended_action": "Confirm scientific name.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0051",
+      "type": "allergen_flag",
+      "target": "trichoderma_viride",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0052",
+      "type": "allergen_flag",
+      "target": "phoma_betae",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0053",
+      "type": "allergen_flag",
+      "target": "phoma_betae",
+      "issue": "[taxonomy_check] Scientific name or botanical identity should be checked against the extract the laboratory uses.",
+      "severity": "low",
+      "suggested_reviewer": "Botanist or laboratory liaison",
+      "recommended_action": "Confirm scientific name.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0054",
+      "type": "allergen_flag",
+      "target": "rhizopus_nigricans",
+      "issue": "[taxonomy_check] Scientific name or botanical identity should be checked against the extract the laboratory uses.",
+      "severity": "low",
+      "suggested_reviewer": "Botanist or laboratory liaison",
+      "recommended_action": "Confirm scientific name.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0055",
+      "type": "allergen_flag",
+      "target": "amaranthus_retroflexus",
+      "issue": "[regional_relevance_unverified] Relevance in India was not verified in retrieved sources.",
+      "severity": "low",
+      "suggested_reviewer": "Allergist in India",
+      "recommended_action": "Confirm regional relevance.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0056",
+      "type": "allergen_flag",
+      "target": "eucalyptus_spp",
+      "issue": "[species_mix] The extract combines several species.",
+      "severity": "low",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Confirm.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0057",
+      "type": "allergen_flag",
+      "target": "xanthium_commune",
+      "issue": "[regional_relevance_unverified] Relevance in India was not verified in retrieved sources.",
+      "severity": "low",
+      "suggested_reviewer": "Allergist in India",
+      "recommended_action": "Confirm regional relevance.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0058",
+      "type": "allergen_flag",
+      "target": "xanthium_commune",
+      "issue": "[taxonomy_check] Scientific name or botanical identity should be checked against the extract the laboratory uses.",
+      "severity": "low",
+      "suggested_reviewer": "Botanist or laboratory liaison",
+      "recommended_action": "Confirm scientific name.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0059",
+      "type": "allergen_flag",
+      "target": "prosopis_juliflora",
+      "issue": "[regional_relevance_unverified] Relevance in India was not verified in retrieved sources.",
+      "severity": "low",
+      "suggested_reviewer": "Allergist in India",
+      "recommended_action": "Confirm regional relevance.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0060",
+      "type": "allergen_flag",
+      "target": "nart_v1_artemisia_vulgaris",
+      "issue": "[component_or_extract_unclear] It is unclear whether this is a whole extract or a component.",
+      "severity": "medium",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Confirm.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0061",
+      "type": "allergen_flag",
+      "target": "nart_v1_artemisia_vulgaris",
+      "issue": "[name_nonstandard] The laboratory name is nonstandard.",
+      "severity": "low",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Confirm what is tested.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0062",
+      "type": "allergen_flag",
+      "target": "acacia_spp",
+      "issue": "[species_mix] The extract combines several species.",
+      "severity": "low",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Confirm.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0063",
+      "type": "allergen_flag",
+      "target": "oak_wood",
+      "issue": "[extract_unclear] It is not stated whether the extract is raw, cooked, processed or a component.",
+      "severity": "medium",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Obtain extract details from the assay manufacturer.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0064",
+      "type": "allergen_flag",
+      "target": "oak_wood",
+      "issue": "[name_ambiguous] The test name can refer to more than one thing.",
+      "severity": "medium",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Clarify the name.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0065",
+      "type": "allergen_flag",
+      "target": "salix_caprea",
+      "issue": "[regional_relevance_unverified] Relevance in India was not verified in retrieved sources.",
+      "severity": "low",
+      "suggested_reviewer": "Allergist in India",
+      "recommended_action": "Confirm regional relevance.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0066",
+      "type": "allergen_flag",
+      "target": "brassica_napus",
+      "issue": "[extract_unclear] It is not stated whether the extract is raw, cooked, processed or a component.",
+      "severity": "medium",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Obtain extract details from the assay manufacturer.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0067",
+      "type": "allergen_flag",
+      "target": "brassica_napus",
+      "issue": "[name_ambiguous] The test name can refer to more than one thing.",
+      "severity": "medium",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Clarify the name.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0068",
+      "type": "allergen_flag",
+      "target": "pomegranate",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0069",
+      "type": "allergen_flag",
+      "target": "guava",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0070",
+      "type": "allergen_flag",
+      "target": "cranberry",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0071",
+      "type": "allergen_flag",
+      "target": "olive",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0072",
+      "type": "allergen_flag",
+      "target": "lychee",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0073",
+      "type": "allergen_flag",
+      "target": "mackerel",
+      "issue": "[species_unspecified] The laboratory name does not give the species, so exposure and sources are generic.",
+      "severity": "low",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Ask the laboratory which species or extract is used.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0074",
+      "type": "allergen_flag",
+      "target": "sardine",
+      "issue": "[species_unspecified] The laboratory name does not give the species, so exposure and sources are generic.",
+      "severity": "low",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Ask the laboratory which species or extract is used.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0075",
+      "type": "allergen_flag",
+      "target": "carp_fish",
+      "issue": "[species_unspecified] The laboratory name does not give the species, so exposure and sources are generic.",
+      "severity": "low",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Ask the laboratory which species or extract is used.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0076",
+      "type": "allergen_flag",
+      "target": "mutton",
+      "issue": "[name_ambiguous] The test name can refer to more than one thing.",
+      "severity": "medium",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Clarify the name.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0077",
+      "type": "allergen_flag",
+      "target": "mutton",
+      "issue": "[species_unspecified] The laboratory name does not give the species, so exposure and sources are generic.",
+      "severity": "low",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Ask the laboratory which species or extract is used.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0078",
+      "type": "allergen_flag",
+      "target": "crab",
+      "issue": "[species_unspecified] The laboratory name does not give the species, so exposure and sources are generic.",
+      "severity": "low",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Ask the laboratory which species or extract is used.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0079",
+      "type": "allergen_flag",
+      "target": "shrimp",
+      "issue": "[species_unspecified] The laboratory name does not give the species, so exposure and sources are generic.",
+      "severity": "low",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Ask the laboratory which species or extract is used.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0080",
+      "type": "allergen_flag",
+      "target": "lobster",
+      "issue": "[species_unspecified] The laboratory name does not give the species, so exposure and sources are generic.",
+      "severity": "low",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Ask the laboratory which species or extract is used.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0081",
+      "type": "allergen_flag",
+      "target": "egg_yolk_elisa",
+      "issue": "[method_in_name] The laboratory name includes a method such as Elisa, so the reported unit may differ from other specific IgE tests.",
+      "severity": "medium",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Confirm units and reference.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0082",
+      "type": "allergen_flag",
+      "target": "egg_white_elisa",
+      "issue": "[method_in_name] The laboratory name includes a method such as Elisa, so the reported unit may differ from other specific IgE tests.",
+      "severity": "medium",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Confirm units and reference.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0083",
+      "type": "allergen_flag",
+      "target": "cheese_cheddar_type",
+      "issue": "[processed_food_extract] The extract is a processed food, so the allergen source is a mix of ingredients.",
+      "severity": "low",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0084",
+      "type": "allergen_flag",
+      "target": "coconut_milk",
+      "issue": "[source_group_mismatch] The item sits in a laboratory group that differs from its scientific category. The canonical category was assigned independently.",
+      "severity": "low",
+      "suggested_reviewer": "Clinical reviewer",
+      "recommended_action": "Confirm the canonical category.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0085",
+      "type": "allergen_flag",
+      "target": "chocolate",
+      "issue": "[processed_food_extract] The extract is a processed food, so the allergen source is a mix of ingredients.",
+      "severity": "low",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0086",
+      "type": "allergen_flag",
+      "target": "chocolate",
+      "issue": "[source_group_mismatch] The item sits in a laboratory group that differs from its scientific category. The canonical category was assigned independently.",
+      "severity": "low",
+      "suggested_reviewer": "Clinical reviewer",
+      "recommended_action": "Confirm the canonical category.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0087",
+      "type": "allergen_flag",
+      "target": "coffee",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0088",
+      "type": "allergen_flag",
+      "target": "coffee",
+      "issue": "[source_group_mismatch] The item sits in a laboratory group that differs from its scientific category. The canonical category was assigned independently.",
+      "severity": "low",
+      "suggested_reviewer": "Clinical reviewer",
+      "recommended_action": "Confirm the canonical category.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0089",
+      "type": "allergen_flag",
+      "target": "tea",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0090",
+      "type": "allergen_flag",
+      "target": "tea",
+      "issue": "[source_group_mismatch] The item sits in a laboratory group that differs from its scientific category. The canonical category was assigned independently.",
+      "severity": "low",
+      "suggested_reviewer": "Clinical reviewer",
+      "recommended_action": "Confirm the canonical category.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0091",
+      "type": "allergen_flag",
+      "target": "tofu_bean_curd",
+      "issue": "[source_group_mismatch] The item sits in a laboratory group that differs from its scientific category. The canonical category was assigned independently.",
+      "severity": "low",
+      "suggested_reviewer": "Clinical reviewer",
+      "recommended_action": "Confirm the canonical category.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0092",
+      "type": "allergen_flag",
+      "target": "curd",
+      "issue": "[processed_food_extract] The extract is a processed food, so the allergen source is a mix of ingredients.",
+      "severity": "low",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0093",
+      "type": "allergen_flag",
+      "target": "yogurt",
+      "issue": "[processed_food_extract] The extract is a processed food, so the allergen source is a mix of ingredients.",
+      "severity": "low",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0094",
+      "type": "allergen_flag",
+      "target": "yeast",
+      "issue": "[source_group_mismatch] The item sits in a laboratory group that differs from its scientific category. The canonical category was assigned independently.",
+      "severity": "low",
+      "suggested_reviewer": "Clinical reviewer",
+      "recommended_action": "Confirm the canonical category.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0095",
+      "type": "allergen_flag",
+      "target": "yeast",
+      "issue": "[species_unspecified] The laboratory name does not give the species, so exposure and sources are generic.",
+      "severity": "low",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Ask the laboratory which species or extract is used.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0096",
+      "type": "allergen_flag",
+      "target": "mushrooms",
+      "issue": "[source_group_mismatch] The item sits in a laboratory group that differs from its scientific category. The canonical category was assigned independently.",
+      "severity": "low",
+      "suggested_reviewer": "Clinical reviewer",
+      "recommended_action": "Confirm the canonical category.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0097",
+      "type": "allergen_flag",
+      "target": "mushrooms",
+      "issue": "[species_unspecified] The laboratory name does not give the species, so exposure and sources are generic.",
+      "severity": "low",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Ask the laboratory which species or extract is used.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0098",
+      "type": "allergen_flag",
+      "target": "raisin",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0099",
+      "type": "allergen_flag",
+      "target": "raisin",
+      "issue": "[source_group_mismatch] The item sits in a laboratory group that differs from its scientific category. The canonical category was assigned independently.",
+      "severity": "low",
+      "suggested_reviewer": "Clinical reviewer",
+      "recommended_action": "Confirm the canonical category.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0100",
+      "type": "allergen_flag",
+      "target": "wheat_flour",
+      "issue": "[food_lower_performance] Patient text says blood tests for this food type are less reliable. The retrieved guideline (E01) names wheat and soya only, so this is extended to related foods.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the extension, or restrict it to wheat and soya.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0101",
+      "type": "allergen_flag",
+      "target": "pea",
+      "issue": "[cross_reactivity_pending] A cross reactivity link within legumes is plausible but no retrieved source supports it, so no patient note is shown.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0102",
+      "type": "allergen_flag",
+      "target": "pumpkin_seed",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0103",
+      "type": "allergen_flag",
+      "target": "pumpkin_seed",
+      "issue": "[species_unspecified] The laboratory name does not give the species, so exposure and sources are generic.",
+      "severity": "low",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Ask the laboratory which species or extract is used.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0104",
+      "type": "allergen_flag",
+      "target": "barley",
+      "issue": "[food_lower_performance] Patient text says blood tests for this food type are less reliable. The retrieved guideline (E01) names wheat and soya only, so this is extended to related foods.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the extension, or restrict it to wheat and soya.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0105",
+      "type": "allergen_flag",
+      "target": "peanut",
+      "issue": "[serious_reaction_possible] The item belongs to a group where serious reactions are described. Text avoids severity claims.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm cautions.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0106",
+      "type": "allergen_flag",
+      "target": "oats",
+      "issue": "[food_lower_performance] Patient text says blood tests for this food type are less reliable. The retrieved guideline (E01) names wheat and soya only, so this is extended to related foods.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the extension, or restrict it to wheat and soya.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0107",
+      "type": "allergen_flag",
+      "target": "maize",
+      "issue": "[food_lower_performance] Patient text says blood tests for this food type are less reliable. The retrieved guideline (E01) names wheat and soya only, so this is extended to related foods.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the extension, or restrict it to wheat and soya.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0108",
+      "type": "allergen_flag",
+      "target": "soya_bean",
+      "issue": "[food_lower_performance] Patient text says blood tests for this food type are less reliable. The retrieved guideline (E01) names wheat and soya only, so this is extended to related foods.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the extension, or restrict it to wheat and soya.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0109",
+      "type": "allergen_flag",
+      "target": "sunflower_seed",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0110",
+      "type": "allergen_flag",
+      "target": "hazelnut",
+      "issue": "[serious_reaction_possible] The item belongs to a group where serious reactions are described. Text avoids severity claims.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm cautions.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0111",
+      "type": "allergen_flag",
+      "target": "semolina",
+      "issue": "[food_lower_performance] Patient text says blood tests for this food type are less reliable. The retrieved guideline (E01) names wheat and soya only, so this is extended to related foods.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the extension, or restrict it to wheat and soya.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0112",
+      "type": "allergen_flag",
+      "target": "semolina",
+      "issue": "[overlaps_wheat] This test overlaps another test in the catalogue, so results may be duplicated in the breakdown.",
+      "severity": "low",
+      "suggested_reviewer": "Content reviewer",
+      "recommended_action": "Confirm the overlap note in the caution text.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0113",
+      "type": "allergen_flag",
+      "target": "walnut",
+      "issue": "[serious_reaction_possible] The item belongs to a group where serious reactions are described. Text avoids severity claims.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm cautions.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0114",
+      "type": "allergen_flag",
+      "target": "almond",
+      "issue": "[serious_reaction_possible] The item belongs to a group where serious reactions are described. Text avoids severity claims.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm cautions.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0115",
+      "type": "allergen_flag",
+      "target": "cashew_nut",
+      "issue": "[serious_reaction_possible] The item belongs to a group where serious reactions are described. Text avoids severity claims.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm cautions.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0116",
+      "type": "allergen_flag",
+      "target": "sesame_seed",
+      "issue": "[serious_reaction_possible] The item belongs to a group where serious reactions are described. Text avoids severity claims.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm cautions.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0117",
+      "type": "allergen_flag",
+      "target": "poppy_seed",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0118",
+      "type": "allergen_flag",
+      "target": "pistachio_nut",
+      "issue": "[serious_reaction_possible] The item belongs to a group where serious reactions are described. Text avoids severity claims.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm cautions.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0119",
+      "type": "allergen_flag",
+      "target": "flaxseed",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0120",
+      "type": "allergen_flag",
+      "target": "lentil",
+      "issue": "[cross_reactivity_pending] A cross reactivity link within legumes is plausible but no retrieved source supports it, so no patient note is shown.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0121",
+      "type": "allergen_flag",
+      "target": "coconut",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0122",
+      "type": "allergen_flag",
+      "target": "cinnamon",
+      "issue": "[contact_irritant_possible] Text says the item can irritate mouth or skin without allergy. This is general knowledge with no retrieved citation.",
+      "severity": "low",
+      "suggested_reviewer": "Allergist or dermatologist",
+      "recommended_action": "Supply a citation or remove.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0123",
+      "type": "allergen_flag",
+      "target": "cinnamon",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0124",
+      "type": "allergen_flag",
+      "target": "mint",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0125",
+      "type": "allergen_flag",
+      "target": "mint",
+      "issue": "[taxonomy_check] Scientific name or botanical identity should be checked against the extract the laboratory uses.",
+      "severity": "low",
+      "suggested_reviewer": "Botanist or laboratory liaison",
+      "recommended_action": "Confirm scientific name.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0126",
+      "type": "allergen_flag",
+      "target": "mustard",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0127",
+      "type": "allergen_flag",
+      "target": "mustard",
+      "issue": "[species_unspecified] The laboratory name does not give the species, so exposure and sources are generic.",
+      "severity": "low",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Ask the laboratory which species or extract is used.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0128",
+      "type": "allergen_flag",
+      "target": "vanilla",
+      "issue": "[extract_unclear] It is not stated whether the extract is raw, cooked, processed or a component.",
+      "severity": "medium",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Obtain extract details from the assay manufacturer.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0129",
+      "type": "allergen_flag",
+      "target": "vanilla",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0130",
+      "type": "allergen_flag",
+      "target": "coriander",
+      "issue": "[leaf_or_seed_unclear] It is unclear whether the extract is leaf, seed or both.",
+      "severity": "low",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Confirm.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0131",
+      "type": "allergen_flag",
+      "target": "coriander",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0132",
+      "type": "allergen_flag",
+      "target": "ginger",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0133",
+      "type": "allergen_flag",
+      "target": "anise",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0134",
+      "type": "allergen_flag",
+      "target": "anise",
+      "issue": "[name_ambiguous] The test name can refer to more than one thing.",
+      "severity": "medium",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Clarify the name.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0135",
+      "type": "allergen_flag",
+      "target": "cardamon",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0136",
+      "type": "allergen_flag",
+      "target": "cardamon",
+      "issue": "[name_spelling_variant] The laboratory spelling differs from the standard spelling. The exact lab name is kept and the standard spelling is stored as an alias.",
+      "severity": "low",
+      "suggested_reviewer": "Content reviewer",
+      "recommended_action": "Confirm alias.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0137",
+      "type": "allergen_flag",
+      "target": "saffron",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0138",
+      "type": "allergen_flag",
+      "target": "thyme",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0139",
+      "type": "allergen_flag",
+      "target": "thyme",
+      "issue": "[taxonomy_check] Scientific name or botanical identity should be checked against the extract the laboratory uses.",
+      "severity": "low",
+      "suggested_reviewer": "Botanist or laboratory liaison",
+      "recommended_action": "Confirm scientific name.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0140",
+      "type": "allergen_flag",
+      "target": "basil",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0141",
+      "type": "allergen_flag",
+      "target": "basil",
+      "issue": "[species_unspecified] The laboratory name does not give the species, so exposure and sources are generic.",
+      "severity": "low",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Ask the laboratory which species or extract is used.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0142",
+      "type": "allergen_flag",
+      "target": "oregano",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0143",
+      "type": "allergen_flag",
+      "target": "oregano",
+      "issue": "[taxonomy_check] Scientific name or botanical identity should be checked against the extract the laboratory uses.",
+      "severity": "low",
+      "suggested_reviewer": "Botanist or laboratory liaison",
+      "recommended_action": "Confirm scientific name.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0144",
+      "type": "allergen_flag",
+      "target": "fennel",
+      "issue": "[leaf_or_seed_unclear] It is unclear whether the extract is leaf, seed or both.",
+      "severity": "low",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Confirm.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0145",
+      "type": "allergen_flag",
+      "target": "fennel",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0146",
+      "type": "allergen_flag",
+      "target": "sweet_pepper",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0147",
+      "type": "allergen_flag",
+      "target": "sweet_pepper",
+      "issue": "[source_group_mismatch] The item sits in a laboratory group that differs from its scientific category. The canonical category was assigned independently.",
+      "severity": "low",
+      "suggested_reviewer": "Clinical reviewer",
+      "recommended_action": "Confirm the canonical category.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0148",
+      "type": "allergen_flag",
+      "target": "cloves",
+      "issue": "[contact_irritant_possible] Text says the item can irritate mouth or skin without allergy. This is general knowledge with no retrieved citation.",
+      "severity": "low",
+      "suggested_reviewer": "Allergist or dermatologist",
+      "recommended_action": "Supply a citation or remove.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0149",
+      "type": "allergen_flag",
+      "target": "cloves",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0150",
+      "type": "allergen_flag",
+      "target": "curry",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0151",
+      "type": "allergen_flag",
+      "target": "curry",
+      "issue": "[mixed_extract] The extract mixes several materials, so interpretation is less specific.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm cautions.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0152",
+      "type": "allergen_flag",
+      "target": "curry",
+      "issue": "[species_mix] The extract combines several species.",
+      "severity": "low",
+      "suggested_reviewer": "Laboratory liaison",
+      "recommended_action": "Confirm.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0153",
+      "type": "allergen_flag",
+      "target": "black_pepper",
+      "issue": "[contact_irritant_possible] Text says the item can irritate mouth or skin without allergy. This is general knowledge with no retrieved citation.",
+      "severity": "low",
+      "suggested_reviewer": "Allergist or dermatologist",
+      "recommended_action": "Supply a citation or remove.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0154",
+      "type": "allergen_flag",
+      "target": "black_pepper",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0155",
+      "type": "allergen_flag",
+      "target": "nutmeg",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0156",
+      "type": "allergen_flag",
+      "target": "curcuma",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0157",
+      "type": "allergen_flag",
+      "target": "curcuma",
+      "issue": "[name_botanical] The laboratory uses a botanical name for a common food. Common name is stored as an alias.",
+      "severity": "low",
+      "suggested_reviewer": "Content reviewer",
+      "recommended_action": "Confirm alias.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0158",
+      "type": "allergen_flag",
+      "target": "jute",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0159",
+      "type": "allergen_flag",
+      "target": "jute",
+      "issue": "[occupational_context] Relevance depends on work exposure, which the report does not capture.",
+      "severity": "low",
+      "suggested_reviewer": "Occupational physician",
+      "recommended_action": "Confirm gating by occupational_exposure.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0160",
+      "type": "allergen_flag",
+      "target": "sheep_wool_treated",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0161",
+      "type": "allergen_flag",
+      "target": "sheep_wool_treated",
+      "issue": "[occupational_context] Relevance depends on work exposure, which the report does not capture.",
+      "severity": "low",
+      "suggested_reviewer": "Occupational physician",
+      "recommended_action": "Confirm gating by occupational_exposure.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0162",
+      "type": "allergen_flag",
+      "target": "sheep_wool_treated",
+      "issue": "[overlaps_sheep_epithelium] This test overlaps another test in the catalogue, so results may be duplicated in the breakdown.",
+      "severity": "low",
+      "suggested_reviewer": "Content reviewer",
+      "recommended_action": "Confirm the overlap note in the caution text.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0163",
+      "type": "allergen_flag",
+      "target": "silk_bombyx_mori",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0164",
+      "type": "allergen_flag",
+      "target": "silk_bombyx_mori",
+      "issue": "[occupational_context] Relevance depends on work exposure, which the report does not capture.",
+      "severity": "low",
+      "suggested_reviewer": "Occupational physician",
+      "recommended_action": "Confirm gating by occupational_exposure.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0165",
+      "type": "allergen_flag",
+      "target": "latex",
+      "issue": "[occupational_context] Relevance depends on work exposure, which the report does not capture.",
+      "severity": "low",
+      "suggested_reviewer": "Occupational physician",
+      "recommended_action": "Confirm gating by occupational_exposure.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0166",
+      "type": "allergen_flag",
+      "target": "latex",
+      "issue": "[serious_reaction_possible] The item belongs to a group where serious reactions are described. Text avoids severity claims.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm cautions.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0167",
+      "type": "allergen_flag",
+      "target": "henna",
+      "issue": "[contact_dermatitis_not_ige] Text says skin reactions to henna are often not IgE mediated. Source is general knowledge plus E16 on contact urticaria.",
+      "severity": "medium",
+      "suggested_reviewer": "Dermatologist",
+      "recommended_action": "Confirm.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0168",
+      "type": "allergen_flag",
+      "target": "henna",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0169",
+      "type": "allergen_flag",
+      "target": "henna",
+      "issue": "[occupational_context] Relevance depends on work exposure, which the report does not capture.",
+      "severity": "low",
+      "suggested_reviewer": "Occupational physician",
+      "recommended_action": "Confirm gating by occupational_exposure.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0170",
+      "type": "allergen_flag",
+      "target": "cotton_linters",
+      "issue": "[limited_published_evidence] Little or no retrieved evidence supports allergy to this item as a clinical entity. Patient text says published information is limited.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm the wording is fair, or supply a citation.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0171",
+      "type": "allergen_flag",
+      "target": "cotton_linters",
+      "issue": "[occupational_context] Relevance depends on work exposure, which the report does not capture.",
+      "severity": "low",
+      "suggested_reviewer": "Occupational physician",
+      "recommended_action": "Confirm gating by occupational_exposure.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0172",
+      "type": "allergen_flag",
+      "target": "ascaris",
+      "issue": "[not_diagnostic_of_infection] Text states that IgE to a parasite does not confirm infection. Evidence is general (E14, E15).",
+      "severity": "medium",
+      "suggested_reviewer": "Infectious disease or allergy specialist",
+      "recommended_action": "Confirm.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0173",
+      "type": "allergen_flag",
+      "target": "toxocara_canis",
+      "issue": "[not_diagnostic_of_infection] Text states that IgE to a parasite does not confirm infection. Evidence is general (E14, E15).",
+      "severity": "medium",
+      "suggested_reviewer": "Infectious disease or allergy specialist",
+      "recommended_action": "Confirm.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0174",
+      "type": "allergen_flag",
+      "target": "anisakis",
+      "issue": "[not_diagnostic_of_infection] Text states that IgE to a parasite does not confirm infection. Evidence is general (E14, E15).",
+      "severity": "medium",
+      "suggested_reviewer": "Infectious disease or allergy specialist",
+      "recommended_action": "Confirm.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0175",
+      "type": "allergen_flag",
+      "target": "anisakis",
+      "issue": "[serious_reaction_possible] The item belongs to a group where serious reactions are described. Text avoids severity claims.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Confirm cautions.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0176",
+      "type": "cross_reactivity_held",
+      "target": "dactylis_glomerata",
+      "issue": "Cross reactivity note held back (grass_group_relatedness_pending). Held text: Grass pollens are closely related, so positives to several grasses may reflect one underlying sensitization.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a citation, then set shown_to_patient.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0177",
+      "type": "cross_reactivity_held",
+      "target": "phleum_pratense",
+      "issue": "Cross reactivity note held back (grass_group_relatedness_pending). Held text: Grass pollens are closely related, so positives to several grasses may reflect one underlying sensitization.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a citation, then set shown_to_patient.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0178",
+      "type": "cross_reactivity_held",
+      "target": "cynodon_dactylon",
+      "issue": "Cross reactivity note held back (grass_group_relatedness_pending). Held text: Grass pollens are closely related, so positives to several grasses may reflect one underlying sensitization.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a citation, then set shown_to_patient.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0179",
+      "type": "cross_reactivity_held",
+      "target": "lolium_perenne",
+      "issue": "Cross reactivity note held back (grass_group_relatedness_pending). Held text: Grass pollens are closely related, so positives to several grasses may reflect one underlying sensitization.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a citation, then set shown_to_patient.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0180",
+      "type": "cross_reactivity_held",
+      "target": "agrostis_stolonifera",
+      "issue": "Cross reactivity note held back (grass_group_relatedness_pending). Held text: Grass pollens are closely related, so positives to several grasses may reflect one underlying sensitization.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a citation, then set shown_to_patient.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0181",
+      "type": "cross_reactivity_held",
+      "target": "sorghum_halepense",
+      "issue": "Cross reactivity note held back (grass_group_relatedness_pending). Held text: Grass pollens are closely related, so positives to several grasses may reflect one underlying sensitization.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a citation, then set shown_to_patient.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0182",
+      "type": "cross_reactivity_held",
+      "target": "festuca_elatior",
+      "issue": "Cross reactivity note held back (grass_group_relatedness_pending). Held text: Grass pollens are closely related, so positives to several grasses may reflect one underlying sensitization.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a citation, then set shown_to_patient.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0183",
+      "type": "cross_reactivity_held",
+      "target": "phragmites_communis",
+      "issue": "Cross reactivity note held back (grass_group_relatedness_pending). Held text: Grass pollens are closely related, so positives to several grasses may reflect one underlying sensitization.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a citation, then set shown_to_patient.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0184",
+      "type": "cross_reactivity_held",
+      "target": "fig",
+      "issue": "Cross reactivity note held back (latex_fruit_syndrome_E13_fig_unverified). Held text: Latex-related fruit reactions have been described for several fruits. Ask your doctor whether latex is relevant to you.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a citation, then set shown_to_patient.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0185",
+      "type": "cross_reactivity_held",
+      "target": "rice",
+      "issue": "Cross reactivity note held back (grass_cereal_link_pending). Held text: A positive rice result may sometimes reflect grass pollen sensitization. Your doctor can help sort this out.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a citation, then set shown_to_patient.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0186",
+      "type": "cross_reactivity_held",
+      "target": "cashew_nut",
+      "issue": "Cross reactivity note held back (cashew_pistachio_pending_review). Held text: Cashew and pistachio are close relatives, and people can react to both. Ask your doctor whether pistachio matters for you.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a citation, then set shown_to_patient.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0187",
+      "type": "cross_reactivity_held",
+      "target": "pistachio_nut",
+      "issue": "Cross reactivity note held back (cashew_pistachio_pending_review). Held text: Cashew and pistachio are close relatives, and people can react to both. Ask your doctor whether cashew matters for you.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a citation, then set shown_to_patient.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0188",
+      "type": "recommendation_citation",
+      "target": "gen_note_symptoms",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0189",
+      "type": "recommendation_citation",
+      "target": "animal_bedroom_free",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0190",
+      "type": "recommendation_citation",
+      "target": "animal_clean_surfaces",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0191",
+      "type": "recommendation_citation",
+      "target": "animal_wash_hands",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0192",
+      "type": "recommendation_citation",
+      "target": "farm_animal_protection",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0193",
+      "type": "recommendation_citation",
+      "target": "bird_cage_cleaning",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0194",
+      "type": "recommendation_citation",
+      "target": "bird_cough_review",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0195",
+      "type": "recommendation_citation",
+      "target": "rodent_exposure_control",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0196",
+      "type": "recommendation_citation",
+      "target": "hdm_wash_bedding",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0197",
+      "type": "recommendation_citation",
+      "target": "hdm_reduce_humidity",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0198",
+      "type": "recommendation_citation",
+      "target": "hdm_damp_dusting",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0199",
+      "type": "recommendation_citation",
+      "target": "hdm_soft_furnishings",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0200",
+      "type": "recommendation_citation",
+      "target": "dust_cleaning_mask",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0201",
+      "type": "recommendation_citation",
+      "target": "safe_dry_food_storage",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0202",
+      "type": "recommendation_citation",
+      "target": "storage_moisture_control",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0203",
+      "type": "recommendation_citation",
+      "target": "reduce_storage_dust",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0204",
+      "type": "recommendation_citation",
+      "target": "check_flour_before_use",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0205",
+      "type": "recommendation_citation",
+      "target": "hay_dust_handling",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0206",
+      "type": "recommendation_citation",
+      "target": "book_dust_handling",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0207",
+      "type": "recommendation_citation",
+      "target": "pollen_check_forecast",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0208",
+      "type": "recommendation_citation",
+      "target": "pollen_clean_up",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0209",
+      "type": "recommendation_citation",
+      "target": "pollen_indoor_air",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0210",
+      "type": "recommendation_citation",
+      "target": "grass_cutting_care",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0211",
+      "type": "recommendation_citation",
+      "target": "mould_fix_damp",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0212",
+      "type": "recommendation_citation",
+      "target": "mould_ventilate",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0213",
+      "type": "recommendation_citation",
+      "target": "mould_clean_small_patches",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0214",
+      "type": "recommendation_citation",
+      "target": "mould_avoid_decay_sites",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0215",
+      "type": "recommendation_citation",
+      "target": "candida_doctor_review",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0216",
+      "type": "recommendation_citation",
+      "target": "venom_nest_safety",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0217",
+      "type": "recommendation_citation",
+      "target": "cockroach_seal_food",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0218",
+      "type": "recommendation_citation",
+      "target": "cockroach_pest_control",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0219",
+      "type": "recommendation_citation",
+      "target": "mosquito_bite_prevention",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0220",
+      "type": "recommendation_citation",
+      "target": "housefly_cover_food",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0221",
+      "type": "recommendation_citation",
+      "target": "moth_light_screens",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0222",
+      "type": "recommendation_citation",
+      "target": "food_label_reading",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0223",
+      "type": "recommendation_citation",
+      "target": "beverage_symptom_review",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0224",
+      "type": "recommendation_citation",
+      "target": "drug_tell_providers",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0225",
+      "type": "recommendation_citation",
+      "target": "drug_pain_reliever_review",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0226",
+      "type": "recommendation_citation",
+      "target": "drug_vitamin_ingredients",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0227",
+      "type": "recommendation_citation",
+      "target": "fibre_dust_control",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0228",
+      "type": "recommendation_citation",
+      "target": "parasite_hand_hygiene",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0229",
+      "type": "recommendation_citation",
+      "target": "parasite_pet_care",
+      "issue": "Practical advice with no retrieved citation. Wording is general and non-promissory.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply a guideline citation or confirm as standard practical advice.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0230",
+      "type": "recommendation_note",
+      "target": "ige_interpret_with_doctor",
+      "issue": "Statement that total IgE alone cannot confirm or exclude allergy is tied to E01 (diagnosis rests on history plus specific IgE or skin test). Reviewer to confirm.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Resolve the reviewer note.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0231",
+      "type": "evidence_gap",
+      "target": "evidence_registry.json",
+      "issue": "WAO position papers were named in the brief but were not retrieved in this session.",
+      "severity": "medium",
+      "suggested_reviewer": "KB owner",
+      "recommended_action": "Retrieve and add to the registry with verification level.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0232",
+      "type": "evidence_gap",
+      "target": "evidence_registry.json",
+      "issue": "ACAAI practice parameters were named in the brief but were not retrieved in this session.",
+      "severity": "medium",
+      "suggested_reviewer": "KB owner",
+      "recommended_action": "Retrieve and add to the registry with verification level.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0233",
+      "type": "evidence_gap",
+      "target": "evidence_registry.json",
+      "issue": "BSACI guidelines were named in the brief but were not retrieved in this session.",
+      "severity": "medium",
+      "suggested_reviewer": "KB owner",
+      "recommended_action": "Retrieve and add to the registry with verification level.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0234",
+      "type": "evidence_gap",
+      "target": "evidence_registry.json",
+      "issue": "NICE guidance were named in the brief but were not retrieved in this session.",
+      "severity": "medium",
+      "suggested_reviewer": "KB owner",
+      "recommended_action": "Retrieve and add to the registry with verification level.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0235",
+      "type": "evidence_gap",
+      "target": "evidence_registry.json",
+      "issue": "NIAID sponsored food allergy guidelines were named in the brief but were not retrieved in this session.",
+      "severity": "medium",
+      "suggested_reviewer": "KB owner",
+      "recommended_action": "Retrieve and add to the registry with verification level.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0236",
+      "type": "evidence_gap",
+      "target": "evidence_registry.json",
+      "issue": "Assay manufacturer documentation for reporting units, classes and flags were named in the brief but were not retrieved in this session.",
+      "severity": "medium",
+      "suggested_reviewer": "KB owner",
+      "recommended_action": "Retrieve and add to the registry with verification level.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0237",
+      "type": "evidence_gap",
+      "target": "allergen_categories.json",
+      "issue": "Several patient statements about mould, pollen, bird, mixed dust and Candida results rely on general immunology knowledge, not retrieved citations (see caution_library entries with empty evidence_refs).",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist",
+      "recommended_action": "Supply citations or confirm.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0238",
+      "type": "regional_gap",
+      "target": "all",
+      "issue": "Indian prevalence and exposure details (for example local pollen seasons, common local foods) were not verified beyond E17 and E18.",
+      "severity": "medium",
+      "suggested_reviewer": "Allergist in India",
+      "recommended_action": "Add regional evidence.",
+      "status": "open"
+    },
+    {
+      "queue_id": "CRQ0239",
+      "type": "policy",
+      "target": "dash_in_lab_name",
+      "issue": "The laboratory name for the mixed house dust test contains a dash character (the name ends with IFCI 1). It is preserved exactly in lab_test_name as required, and no other text uses dashes.",
+      "severity": "low",
+      "suggested_reviewer": "KB owner",
+      "recommended_action": "Confirm exact name handling in the Normalizer.",
+      "status": "open"
+    }
+  ]
+}

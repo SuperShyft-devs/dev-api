@@ -1,0 +1,345 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "source_group": "allergy_insects",
+  "source_group_display_order": 4,
+  "patient_group_name": "Insects",
+  "patient_group_explanation": "Stinging insects, cockroaches, mosquitoes, flies and moths.",
+  "group_caution_rule_ids": [
+    "C_SENS",
+    "C_CLASS"
+  ],
+  "test_count": 6,
+  "clinical_review_status": "pending",
+  "allergens": [
+    {
+      "allergen_id": "vespula_germanica",
+      "lab_test_name": "Vespula Germanica",
+      "source_group": "allergy_insects",
+      "source_group_display_order": 4,
+      "position_in_source_group": 1,
+      "aliases": [
+        "German Wasp"
+      ],
+      "common_name": "German Wasp",
+      "scientific_name": "Vespula germanica",
+      "canonical_category": "stinging_insect_venoms",
+      "allergen_type": "insect",
+      "definition": "Vespula germanica is a wasp species, also called the German or European wasp. Wasps sting by injecting venom, which is different from breathing in everyday dust or pollen.",
+      "exposure_sources": [
+        "Gardens and orchards",
+        "Near ripe fruit and sweet drinks",
+        "Bins and food waste",
+        "Nests in walls, soil or roof spaces"
+      ],
+      "typical_symptoms": [
+        "Pain and swelling at the sting site",
+        "Hives away from the sting",
+        "Facial swelling",
+        "Dizziness",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "A positive result suggests sensitization to wasp-related proteins. It does not tell how you would react to a sting. The sting history matters most: a reaction beyond the sting site, such as widespread hives, swelling of the face or breathing trouble, deserves an allergist's review.",
+      "card_summary": "A wasp species whose sting venom can cause allergic reactions in some people.",
+      "recommendation_ids": [
+        "venom_reaction_review",
+        "venom_avoid_stings",
+        "venom_nest_safety",
+        "gen_emergency_signs"
+      ],
+      "caution": "Wasp and bee venoms can cross-react, and results can differ depending on whether venom or a whole-insect extract was tested. Ask the laboratory which was used.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_VENOM"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "apis_mellifera"
+        ],
+        "patient_note": "Results to wasp and bee venom can overlap. An allergist can tell whether you react to one or both.",
+        "held_note_for_review": null,
+        "evidence_status": "venom_overlap_E08",
+        "shown_to_patient": true
+      },
+      "review_flags": [
+        "extract_unclear"
+      ],
+      "evidence_refs": [
+        "E08"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "blatella_germanica",
+      "lab_test_name": "Blatella Germanica",
+      "source_group": "allergy_insects",
+      "source_group_display_order": 4,
+      "position_in_source_group": 2,
+      "aliases": [
+        "Blattella germanica",
+        "German Cockroach"
+      ],
+      "common_name": "German Cockroach",
+      "scientific_name": "Blattella germanica",
+      "canonical_category": "cockroach",
+      "allergen_type": "insect",
+      "definition": "Blattella germanica is the German cockroach, a small brown cockroach common in kitchens and food stores. Its body parts, saliva and droppings become part of household dust.",
+      "exposure_sources": [
+        "Kitchens and pantries",
+        "Under sinks and appliances",
+        "Food waste and bins",
+        "Drains and damp corners"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny or blocked nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to German cockroach. In tropical settings it often appears together with dust mite sensitization. It is more meaningful if symptoms are worse in kitchens, in damp areas or in homes with visible cockroaches.",
+      "card_summary": "A common household cockroach whose droppings and body parts enter house dust.",
+      "recommendation_ids": [
+        "cockroach_seal_food",
+        "cockroach_pest_control",
+        "gen_note_symptoms"
+      ],
+      "caution": "Cockroach and dust mite results often occur together because they share similar proteins. A positive result does not prove which one is responsible.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_INSECT_XR"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "dermatophagoides_pteronyssinus",
+          "dermatophagoides_farinae",
+          "shrimp"
+        ],
+        "patient_note": "Cockroach, dust mites and shellfish share a similar protein, so positives can appear together. Tell your doctor if shellfish ever caused symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "tropomyosin_link_E09_E10",
+        "shown_to_patient": true
+      },
+      "review_flags": [
+        "name_spelling_variant"
+      ],
+      "evidence_refs": [
+        "E10",
+        "E09"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "heterocera_mix",
+      "lab_test_name": "Heterocera Mix",
+      "source_group": "allergy_insects",
+      "source_group_display_order": 4,
+      "position_in_source_group": 3,
+      "aliases": [
+        "Moth Mix"
+      ],
+      "common_name": "Moth Mix",
+      "scientific_name": "Heterocera (moths, mixed)",
+      "canonical_category": "other_insects",
+      "allergen_type": "insect",
+      "definition": "Heterocera is a large group that includes most moths. This test uses a mixed extract, so it does not point to one named moth species or type.",
+      "exposure_sources": [
+        "Lights near open windows",
+        "Gardens at night",
+        "Stored clothes and grains",
+        "Farms and orchards"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to a mix of moth proteins. Moth scales and dust can enter the air near lights and in stores. This mixed test is not specific, so the result is best read together with any symptoms you notice around moths.",
+      "card_summary": "A mixed moth extract, not specific to any one moth species or type.",
+      "recommendation_ids": [
+        "moth_light_screens",
+        "gen_note_symptoms"
+      ],
+      "caution": "This test uses a mixed extract, so it cannot show which moth or protein you react to. Evidence for its clinical value is limited.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_INSECT_OTHER"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence",
+        "mixed_extract"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "aedes_communis",
+      "lab_test_name": "Aedes Communis",
+      "source_group": "allergy_insects",
+      "source_group_display_order": 4,
+      "position_in_source_group": 4,
+      "aliases": [
+        "Mosquito (Aedes communis)"
+      ],
+      "common_name": "Mosquito (Aedes communis)",
+      "scientific_name": "Aedes communis",
+      "canonical_category": "other_insects",
+      "allergen_type": "insect",
+      "definition": "Aedes communis is a mosquito species. Mosquito bites inject saliva proteins that can cause itching, redness and swelling at the bite site in some people.",
+      "exposure_sources": [
+        "Outdoor evenings and mornings",
+        "Damp shaded areas",
+        "Standing water around homes",
+        "Gardens and wooded areas"
+      ],
+      "typical_symptoms": [
+        "Itchy bite swelling",
+        "Large local swelling",
+        "Redness",
+        "Blisters at bite site",
+        "Hives"
+      ],
+      "interpretation_insight": "A positive result shows IgE to proteins from this mosquito species. It does not predict how you would react to a bite. This species may not be the one that bites you locally, so a positive result may reflect similar proteins from other mosquitoes.",
+      "card_summary": "A mosquito species whose bite saliva can cause itching, redness and swelling.",
+      "recommendation_ids": [
+        "mosquito_bite_prevention",
+        "gen_note_symptoms",
+        "gen_see_allergist"
+      ],
+      "caution": "Mosquito bite reactions are often local and may not involve IgE. This blood test does not predict bite reaction size or severity.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_INSECT_OTHER"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "regional_relevance_unverified"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "general_knowledge_pending_citation",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "housefly_musca_domestica",
+      "lab_test_name": "Housefly Musca Domestica",
+      "source_group": "allergy_insects",
+      "source_group_display_order": 4,
+      "position_in_source_group": 5,
+      "aliases": [
+        "Housefly"
+      ],
+      "common_name": "Housefly",
+      "scientific_name": "Musca domestica",
+      "canonical_category": "other_insects",
+      "allergen_type": "insect",
+      "definition": "Musca domestica is the common housefly. Houseflies settle on food and waste, and their body parts and droppings can enter dust in kitchens, markets and farms.",
+      "exposure_sources": [
+        "Kitchens and eating areas",
+        "Markets and food stalls",
+        "Farms and cattle sheds",
+        "Garbage and waste areas"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Runny nose",
+        "Itchy eyes",
+        "Cough",
+        "Wheezing"
+      ],
+      "interpretation_insight": "A positive result shows IgE to housefly proteins. This is uncommon to be the main cause of symptoms, so context matters. It may be more relevant if you work around flies, such as in farms, markets or food handling.",
+      "card_summary": "The common housefly, found around food, waste, markets, animals and open kitchens.",
+      "recommendation_ids": [
+        "housefly_cover_food",
+        "gen_note_symptoms"
+      ],
+      "caution": "Evidence for housefly sensitization as a cause of symptoms is limited. A positive result should be read with great caution.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_INSECT_OTHER"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "apis_mellifera",
+      "lab_test_name": "Apis Mellifera",
+      "source_group": "allergy_insects",
+      "source_group_display_order": 4,
+      "position_in_source_group": 6,
+      "aliases": [
+        "Honey Bee"
+      ],
+      "common_name": "Honey Bee",
+      "scientific_name": "Apis mellifera",
+      "canonical_category": "stinging_insect_venoms",
+      "allergen_type": "insect",
+      "definition": "Apis mellifera is the honey bee. Honey bees sting by injecting venom, so exposure is mainly through stings near hives, flowers, orchards or beekeeping work.",
+      "exposure_sources": [
+        "Beehives and apiaries",
+        "Flowering gardens",
+        "Orchards and farms",
+        "Beekeeping work"
+      ],
+      "typical_symptoms": [
+        "Pain and swelling at the sting site",
+        "Hives away from the sting",
+        "Facial swelling",
+        "Dizziness",
+        "Breathing difficulty"
+      ],
+      "interpretation_insight": "A positive result suggests sensitization to honey bee proteins. It does not tell how you would react to a sting. If a sting ever caused hives away from the sting, facial swelling or breathing trouble, see an allergist for a proper assessment.",
+      "card_summary": "The honey bee, whose sting venom can cause allergic reactions in some people.",
+      "recommendation_ids": [
+        "venom_reaction_review",
+        "venom_avoid_stings",
+        "venom_nest_safety",
+        "gen_emergency_signs"
+      ],
+      "caution": "This result does not cover allergy to honey or other bee products, which is a separate question. Ask the laboratory whether venom or whole-body extract was used.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_VENOM"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "vespula_germanica"
+        ],
+        "patient_note": "Results to wasp and bee venom can overlap. An allergist can tell whether you react to one or both.",
+        "held_note_for_review": null,
+        "evidence_status": "venom_overlap_E08",
+        "shown_to_patient": true
+      },
+      "review_flags": [
+        "extract_unclear"
+      ],
+      "evidence_refs": [
+        "E08"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    }
+  ]
+}

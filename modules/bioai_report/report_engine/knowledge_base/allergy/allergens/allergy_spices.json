@@ -1,0 +1,1113 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "source_group": "allergy_spices",
+  "source_group_display_order": 12,
+  "patient_group_name": "Spices and Herbs",
+  "patient_group_explanation": "Common spices, herbs and curry blends.",
+  "group_caution_rule_ids": [
+    "C_SENS",
+    "C_CLASS",
+    "C_FOOD",
+    "C_FOOD_LOWER_PERF"
+  ],
+  "test_count": 19,
+  "clinical_review_status": "pending",
+  "allergens": [
+    {
+      "allergen_id": "cinnamon",
+      "lab_test_name": "Cinnamon",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 1,
+      "aliases": [
+        "Cinnamon (Dalchini)"
+      ],
+      "common_name": "Cinnamon (Dalchini)",
+      "scientific_name": "Cinnamomum species",
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "definition": "Cinnamon is the dried bark of a tree. It is used in garam masala, biryani, tea, sweets, baked goods and as a flavouring in toothpaste and chewing gum.",
+      "exposure_sources": [
+        "Garam masala and biryani",
+        "Masala chai and sweets",
+        "Baked goods and desserts",
+        "Toothpaste and chewing gum"
+      ],
+      "typical_symptoms": [
+        "Itching",
+        "Hives",
+        "Mouth soreness",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to cinnamon. Cinnamon can also irritate the mouth and skin without any allergy. A positive result alone does not prove allergy. Tell your doctor which products caused symptoms before changing your diet.",
+      "card_summary": "Dried tree bark used in garam masala, tea, sweets, toothpaste and gum.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs"
+      ],
+      "caution": "Cinnamon can irritate the mouth and skin without being an allergy. Blood tests cannot separate irritation from allergy.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "contact_irritant_possible",
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "mint",
+      "lab_test_name": "Mint",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 2,
+      "aliases": [
+        "Mint (Pudina)"
+      ],
+      "common_name": "Mint (Pudina)",
+      "scientific_name": "Mentha species",
+      "canonical_category": "culinary_herbs",
+      "allergen_type": "food",
+      "definition": "Mint is a fresh green herb with a cooling taste. It is used in chutneys, raita, drinks, biryani and as a flavour in sweets, toothpaste and chewing gum.",
+      "exposure_sources": [
+        "Pudina chutney and raita",
+        "Drinks, chaas and mocktails",
+        "Biryani and pulao",
+        "Toothpaste, gum and candies"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips",
+        "Cough"
+      ],
+      "interpretation_insight": "This result shows IgE to mint. Published information on mint allergy is limited, and a positive result alone does not prove it. Mint flavouring is present in many oral care products, so tell your doctor which products caused symptoms.",
+      "card_summary": "A fresh cooling herb used in chutneys, drinks, toothpaste and sweets today.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs"
+      ],
+      "caution": "Spice allergy information is limited and test performance is uncertain. A positive result alone does not show a true allergy, so your doctor will look at your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence",
+        "taxonomy_check"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "mustard",
+      "lab_test_name": "Mustard",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 3,
+      "aliases": [
+        "Mustard (Sarson, Rai)"
+      ],
+      "common_name": "Mustard (Sarson, Rai)",
+      "scientific_name": "Brassica and Sinapis species",
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "definition": "Mustard seeds and mustard oil are used in tadka, pickles, sauces and curries, especially in Bengali, Punjabi and South Indian home cooking and street food.",
+      "exposure_sources": [
+        "Tadka and curries",
+        "Pickles and chutneys",
+        "Mustard oil in cooking",
+        "Sauces, dressings and spice mixes"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to mustard. Mustard can cause allergic reactions in some people, but a positive result alone does not prove allergy. Mustard is often hidden in sauces and spice mixes, so your doctor will review your history.",
+      "card_summary": "Seeds and oil used in tadka, pickles, sauces, curries and spice mixes.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs"
+      ],
+      "caution": "Spice allergy information is limited and test performance is uncertain. A positive result alone does not show a true allergy, so your doctor will look at your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "nart_v1_artemisia_vulgaris"
+        ],
+        "patient_note": "Some people sensitized to mugwort pollen also react to certain spices and herbs. Tell your doctor if this spice causes mouth itching or other symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "celery_mugwort_spice_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [
+        "limited_published_evidence",
+        "species_unspecified"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E11"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "vanilla",
+      "lab_test_name": "Vanilla",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 4,
+      "aliases": [],
+      "common_name": "Vanilla",
+      "scientific_name": "Vanilla planifolia",
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "definition": "Vanilla is a sweet flavouring made from the pods of an orchid. It is used in ice creams, cakes, custards, milkshakes and many other desserts.",
+      "exposure_sources": [
+        "Ice creams and custards",
+        "Cakes and biscuits",
+        "Milkshakes and desserts",
+        "Perfumes and flavoured products"
+      ],
+      "typical_symptoms": [
+        "Itching",
+        "Hives",
+        "Mouth soreness",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to vanilla. Artificial vanillin flavouring in many foods may not be covered by this test. Published information on vanilla allergy is limited, and a positive result alone does not prove it. Tell your doctor which products caused symptoms.",
+      "card_summary": "A sweet orchid pod flavouring used in ice creams, cakes and desserts.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs"
+      ],
+      "caution": "Spice allergy information is limited and test performance is uncertain. A positive result alone does not show a true allergy, so your doctor will look at your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "extract_unclear",
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "coriander",
+      "lab_test_name": "Coriander",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 5,
+      "aliases": [
+        "Coriander (Dhania)"
+      ],
+      "common_name": "Coriander (Dhania)",
+      "scientific_name": "Coriandrum sativum",
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "definition": "Coriander is a plant whose leaves and seeds are both used in cooking. Leaves garnish many dishes and the ground seeds are a base of most curry powders.",
+      "exposure_sources": [
+        "Fresh leaves as garnish",
+        "Ground seed in masalas",
+        "Chutneys and raita",
+        "Curries and dals"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to coriander. Coriander is related to celery and carrot, and some people with pollen allergy react to it. A positive result alone does not prove allergy. Your doctor will review your history.",
+      "card_summary": "A plant whose leaves and seeds flavour most Indian dishes and masalas.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "spice_pollen_link_note",
+        "gen_emergency_signs"
+      ],
+      "caution": "Spice allergy information is limited and test performance is uncertain. A positive result alone does not show a true allergy, so your doctor will look at your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "nart_v1_artemisia_vulgaris"
+        ],
+        "patient_note": "Some people sensitized to mugwort pollen also react to certain spices and herbs. Tell your doctor if this spice causes mouth itching or other symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "celery_mugwort_spice_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [
+        "leaf_or_seed_unclear",
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E11"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "ginger",
+      "lab_test_name": "Ginger",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 6,
+      "aliases": [
+        "Ginger (Adrak)"
+      ],
+      "common_name": "Ginger (Adrak)",
+      "scientific_name": "Zingiber officinale",
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "definition": "Ginger is an underground stem with a sharp, warm taste. It is used fresh or dried in tea, curries, pastes, pickles, sweets and home remedies.",
+      "exposure_sources": [
+        "Masala chai and kadha",
+        "Ginger garlic paste",
+        "Curries and pickles",
+        "Sweets and home remedies"
+      ],
+      "typical_symptoms": [
+        "Itching",
+        "Hives",
+        "Mouth soreness",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to ginger. Ginger can also irritate the mouth and stomach without any allergy. A positive result alone does not prove allergy. Tell your doctor if ginger has caused hives or swelling.",
+      "card_summary": "A sharp, warm root used fresh or dried in tea and curries.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs"
+      ],
+      "caution": "Ginger can irritate the mouth and stomach without being an allergy. A positive result alone does not show which one applies to you.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "anise",
+      "lab_test_name": "Anise",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 7,
+      "aliases": [
+        "Anise (Saunf Seed Type)"
+      ],
+      "common_name": "Anise (Saunf Seed Type)",
+      "scientific_name": "Pimpinella anisum",
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "definition": "Anise is a small seed with a sweet, liquorice-like taste. It is used in sweets, liqueurs, baked goods, mouth fresheners and some regional spice mixes.",
+      "exposure_sources": [
+        "Mouth fresheners",
+        "Sweets and baked goods",
+        "Liqueurs and flavoured drinks",
+        "Some spice mixes"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to anise. Anise is related to fennel and celery, and some people with pollen allergy react to it. A positive result alone does not prove allergy. Your doctor will review your history.",
+      "card_summary": "A sweet seed with a liquorice taste, used in sweets and drinks.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "spice_pollen_link_note",
+        "gen_emergency_signs"
+      ],
+      "caution": "Spice allergy information is limited and test performance is uncertain. A positive result alone does not show a true allergy, so your doctor will look at your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "nart_v1_artemisia_vulgaris"
+        ],
+        "patient_note": "Some people sensitized to mugwort pollen also react to certain spices and herbs. Tell your doctor if this spice causes mouth itching or other symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "celery_mugwort_spice_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [
+        "limited_published_evidence",
+        "name_ambiguous"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E11"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "cardamon",
+      "lab_test_name": "Cardamon",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 8,
+      "aliases": [
+        "Cardamom",
+        "Cardamom (Elaichi)",
+        "Elaichi"
+      ],
+      "common_name": "Cardamom (Elaichi)",
+      "scientific_name": "Elettaria cardamomum",
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "definition": "Cardamom is a fragrant spice from small green pods. It is used in chai, sweets, kheer, biryani and as a mouth freshener after most meals.",
+      "exposure_sources": [
+        "Masala chai and sweets",
+        "Kheer and desserts",
+        "Biryani and pulao",
+        "Mouth fresheners"
+      ],
+      "typical_symptoms": [
+        "Itching",
+        "Hives",
+        "Mouth soreness",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to cardamom. Published information on cardamom allergy is limited, and a positive result alone does not prove it. Tell your doctor if cardamom or foods containing it have caused hives, swelling or stomach upset.",
+      "card_summary": "A fragrant green pod spice used in chai, sweets and rice dishes.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs"
+      ],
+      "caution": "Spice allergy information is limited and test performance is uncertain. A positive result alone does not show a true allergy, so your doctor will look at your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence",
+        "name_spelling_variant"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "saffron",
+      "lab_test_name": "Saffron",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 9,
+      "aliases": [
+        "Saffron (Kesar)"
+      ],
+      "common_name": "Saffron (Kesar)",
+      "scientific_name": "Crocus sativus",
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "definition": "Saffron is a costly spice made from dried flower threads. It gives colour and aroma to biryani, kheer, sweets, milk and many festive dishes at home.",
+      "exposure_sources": [
+        "Biryani and pulao",
+        "Kheer and sweets",
+        "Saffron milk",
+        "Festive dishes"
+      ],
+      "typical_symptoms": [
+        "Itching",
+        "Hives",
+        "Mouth soreness",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to saffron. Published information on saffron allergy is limited, and a positive result alone does not prove it. Tell your doctor if saffron or foods containing it have caused hives, swelling or stomach upset.",
+      "card_summary": "Dried flower threads that colour and flavour rice, milk, sweets and desserts.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs"
+      ],
+      "caution": "Spice allergy information is limited and test performance is uncertain. A positive result alone does not show a true allergy, so your doctor will look at your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "thyme",
+      "lab_test_name": "Thyme",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 10,
+      "aliases": [],
+      "common_name": "Thyme",
+      "scientific_name": "Thymus species",
+      "canonical_category": "culinary_herbs",
+      "allergen_type": "food",
+      "definition": "Thyme is a small leafy herb with a strong aroma. It is used in soups, pizzas, breads, marinades, herbal teas and mixed herb blends at home.",
+      "exposure_sources": [
+        "Pizzas and pasta",
+        "Soups and breads",
+        "Marinades and herb blends",
+        "Herbal teas"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips",
+        "Cough"
+      ],
+      "interpretation_insight": "This result shows IgE to thyme. Published information on thyme allergy is limited, and a positive result alone does not prove it. Tell your doctor which foods or products caused symptoms before you change your diet in any way.",
+      "card_summary": "A small leafy herb used in pizzas, soups, breads and herbal teas.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs"
+      ],
+      "caution": "Spice allergy information is limited and test performance is uncertain. A positive result alone does not show a true allergy, so your doctor will look at your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence",
+        "taxonomy_check"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "basil",
+      "lab_test_name": "Basil",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 11,
+      "aliases": [
+        "Basil (Tulsi Type)"
+      ],
+      "common_name": "Basil (Tulsi Type)",
+      "scientific_name": "Ocimum species",
+      "canonical_category": "culinary_herbs",
+      "allergen_type": "food",
+      "definition": "Basil is a fragrant leafy herb. It is used in pizzas, pasta, pesto, salads and drinks. Holy basil (tulsi) is a related plant used in teas and rituals.",
+      "exposure_sources": [
+        "Pizzas, pasta and pesto",
+        "Salads and drinks",
+        "Herbal teas and kadha",
+        "Garnish for sandwiches"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips",
+        "Cough"
+      ],
+      "interpretation_insight": "This result shows IgE to basil. Published information on basil allergy is limited, and a positive result alone does not prove it. Holy basil may not be the same plant as the test. Tell your doctor which foods caused symptoms.",
+      "card_summary": "A fragrant leafy herb used in pizzas, pasta, pesto, salads and drinks.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs"
+      ],
+      "caution": "The test species is not stated, so it may not match holy basil. A positive result needs a doctor's review.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence",
+        "species_unspecified"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "oregano",
+      "lab_test_name": "Oregano",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 12,
+      "aliases": [],
+      "common_name": "Oregano",
+      "scientific_name": "Origanum species",
+      "canonical_category": "culinary_herbs",
+      "allergen_type": "food",
+      "definition": "Oregano is a leafy herb with a strong, warm flavour. It is sprinkled on pizzas and used in pasta sauces, garlic breads, salads and seasoning mixes.",
+      "exposure_sources": [
+        "Pizzas and pasta sauces",
+        "Garlic bread and sandwiches",
+        "Seasoning sachets",
+        "Salads and dressings"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips",
+        "Cough"
+      ],
+      "interpretation_insight": "This result shows IgE to oregano. Published information on oregano allergy is limited, and a positive result alone does not prove it. Tell your doctor which foods or products caused symptoms before you change your diet in any way.",
+      "card_summary": "A leafy herb sprinkled on pizzas and used in sauces and seasonings.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs"
+      ],
+      "caution": "Spice allergy information is limited and test performance is uncertain. A positive result alone does not show a true allergy, so your doctor will look at your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence",
+        "taxonomy_check"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "fennel",
+      "lab_test_name": "Fennel",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 13,
+      "aliases": [
+        "Fennel (Saunf)"
+      ],
+      "common_name": "Fennel (Saunf)",
+      "scientific_name": "Foeniculum vulgare",
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "definition": "Fennel is a plant whose seeds are chewed after meals and used in cooking. Its bulb and fronds are also eaten in some dishes and salads.",
+      "exposure_sources": [
+        "Mouth freshener after meals",
+        "Pickles and masalas",
+        "Curries and sweets",
+        "Herbal teas and digestive drinks"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to fennel. Fennel is related to celery, carrot and coriander, and some people with pollen allergy react to it. A positive result alone does not prove allergy. Your doctor will review your history.",
+      "card_summary": "Sweet seeds chewed after meals and used in cooking, pickles and teas.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "spice_pollen_link_note",
+        "gen_emergency_signs"
+      ],
+      "caution": "Spice allergy information is limited and test performance is uncertain. A positive result alone does not show a true allergy, so your doctor will look at your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": {
+        "related_allergen_ids": [
+          "nart_v1_artemisia_vulgaris"
+        ],
+        "patient_note": "Some people sensitized to mugwort pollen also react to certain spices and herbs. Tell your doctor if this spice causes mouth itching or other symptoms.",
+        "held_note_for_review": null,
+        "evidence_status": "celery_mugwort_spice_E11",
+        "shown_to_patient": true
+      },
+      "review_flags": [
+        "leaf_or_seed_unclear",
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02",
+        "E11"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "sweet_pepper",
+      "lab_test_name": "Sweet Pepper",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 14,
+      "aliases": [
+        "Sweet Pepper (Capsicum, Shimla Mirch)"
+      ],
+      "common_name": "Sweet Pepper (Capsicum, Shimla Mirch)",
+      "scientific_name": "Capsicum annuum",
+      "canonical_category": "vegetables_nightshade",
+      "allergen_type": "food",
+      "definition": "Sweet pepper is a mild green, red or yellow vegetable also called capsicum. It is eaten raw in salads and cooked in curries, pizzas, pasta and stir fries.",
+      "exposure_sources": [
+        "Salads and sandwiches",
+        "Pizzas and pasta",
+        "Stir fries and Chinese dishes",
+        "Curries and pulao"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth",
+        "Hives",
+        "Swelling of lips",
+        "Stomach upset",
+        "Cough"
+      ],
+      "interpretation_insight": "This result shows IgE to sweet pepper. Sweet pepper is a vegetable and differs from hot chilli. A positive result alone does not prove allergy. Tell your doctor if raw capsicum causes itching or other symptoms.",
+      "card_summary": "A mild vegetable eaten raw in salads and cooked in many dishes.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs"
+      ],
+      "caution": "A positive sweet pepper result does not mean you must avoid chilli or other spices. Do not change your diet based on this result.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence",
+        "source_group_mismatch"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "cloves",
+      "lab_test_name": "Cloves",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 15,
+      "aliases": [
+        "Cloves (Laung)"
+      ],
+      "common_name": "Cloves (Laung)",
+      "scientific_name": "Syzygium aromaticum",
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "definition": "Cloves are dried flower buds with a strong, warm aroma. They are used in garam masala, biryani and chai, and in dental products and home remedies for toothache.",
+      "exposure_sources": [
+        "Garam masala and biryani",
+        "Masala chai and kadha",
+        "Dental products and oils",
+        "Home remedies for toothache"
+      ],
+      "typical_symptoms": [
+        "Itching",
+        "Hives",
+        "Mouth soreness",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to cloves. Clove oil can also irritate the mouth and skin without any allergy. A positive result alone does not prove allergy. Tell your doctor which products caused symptoms and when they started.",
+      "card_summary": "Dried flower buds used in masalas, chai, biryani, and dental home remedies.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs"
+      ],
+      "caution": "Clove oil often irritates the mouth and skin without being an allergy. Blood tests cannot separate irritation from allergy.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "contact_irritant_possible",
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "curry",
+      "lab_test_name": "Curry",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 16,
+      "aliases": [
+        "Curry Powder"
+      ],
+      "common_name": "Curry Powder",
+      "scientific_name": "Mixture of spices",
+      "canonical_category": "spice_mixtures",
+      "allergen_type": "food",
+      "definition": "Curry powder is a ready-made blend of several ground spices such as turmeric, coriander, cumin and chilli. The mix differs between brands, shops and recipes.",
+      "exposure_sources": [
+        "Home curries and gravies",
+        "Ready-to-cook sauces",
+        "Packaged snacks and noodles",
+        "Restaurant dishes"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to a curry powder extract. Because curry powder mixes several spices and differs by brand, the result cannot show which spice is the cause. It does not prove allergy to any single spice.",
+      "card_summary": "A ready-made blend of several ground spices used in gravies and snacks.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs"
+      ],
+      "caution": "Curry powder is a mixture, so this test cannot identify the spice involved. Your doctor may suggest tests or a history review for individual spices.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_MIXED"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence",
+        "mixed_extract",
+        "species_mix"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "black_pepper",
+      "lab_test_name": "Black Pepper",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 17,
+      "aliases": [
+        "Black Pepper (Kali Mirch)"
+      ],
+      "common_name": "Black Pepper (Kali Mirch)",
+      "scientific_name": "Piper nigrum",
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "definition": "Black pepper is a dried berry ground into a hot, sharp spice. It is used in almost all savoury dishes, soups, marinades, tea and spice blends.",
+      "exposure_sources": [
+        "Curries, soups and marinades",
+        "Masala chai and kadha",
+        "Spice blends",
+        "Salad and egg seasoning"
+      ],
+      "typical_symptoms": [
+        "Sneezing",
+        "Hives",
+        "Mouth soreness",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to black pepper. Pepper can also trigger sneezing and mouth burning without any allergy. A positive result alone does not prove allergy. Tell your doctor if pepper has caused hives or swelling.",
+      "card_summary": "A dried berry ground into a hot spice for most savoury dishes.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs"
+      ],
+      "caution": "Pepper often irritates the nose and mouth without being an allergy. Blood tests cannot separate irritation from allergy.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "contact_irritant_possible",
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "nutmeg",
+      "lab_test_name": "Nutmeg",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 18,
+      "aliases": [
+        "Nutmeg (Jaiphal)"
+      ],
+      "common_name": "Nutmeg (Jaiphal)",
+      "scientific_name": "Myristica fragrans",
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "definition": "Nutmeg is a hard seed grated into a warm, sweet spice. It is used in garam masala, biryani, sweets, cakes, milk drinks and some home remedies.",
+      "exposure_sources": [
+        "Garam masala and biryani",
+        "Sweets, cakes and kheer",
+        "Milk drinks",
+        "Home remedies"
+      ],
+      "typical_symptoms": [
+        "Itching",
+        "Hives",
+        "Mouth soreness",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to nutmeg. Published information on nutmeg allergy is limited, and a positive result alone does not prove it. Tell your doctor which foods caused symptoms and when they started, so the result can be read in context.",
+      "card_summary": "A hard seed grated as a warm spice in sweets and masalas.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs"
+      ],
+      "caution": "Spice allergy information is limited and test performance is uncertain. A positive result alone does not show a true allergy, so your doctor will look at your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "curcuma",
+      "lab_test_name": "Curcuma",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 19,
+      "aliases": [
+        "Haldi",
+        "Turmeric",
+        "Turmeric (Haldi)"
+      ],
+      "common_name": "Turmeric (Haldi)",
+      "scientific_name": "Curcuma longa",
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "definition": "Curcuma is the botanical name for turmeric, a yellow root spice. It is used in almost every Indian dish, in haldi milk, home remedies and skin pastes.",
+      "exposure_sources": [
+        "Dals, curries and sabzis",
+        "Haldi milk and kadha",
+        "Pickles and rice dishes",
+        "Skin pastes and cosmetics"
+      ],
+      "typical_symptoms": [
+        "Itching",
+        "Hives",
+        "Skin rash",
+        "Stomach upset",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "This result shows IgE to turmeric. Published information on turmeric allergy is limited, and a positive result alone does not prove it. Turmeric can also stain or irritate skin. Tell your doctor if it has caused hives or swelling.",
+      "card_summary": "A yellow root spice used in nearly all Indian cooking and remedies.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_label_reading",
+        "gen_emergency_signs"
+      ],
+      "caution": "Do not remove turmeric from your diet based on this result alone. Many people are positive without symptoms, so your doctor will look at your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence",
+        "name_botanical"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    }
+  ]
+}

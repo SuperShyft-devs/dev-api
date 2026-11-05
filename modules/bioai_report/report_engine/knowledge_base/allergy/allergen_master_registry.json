@@ -1,0 +1,3536 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "total_tests": 212,
+  "specific_allergen_tests": 211,
+  "counts_by_source_group": {
+    "pets": 21,
+    "allergy_drugs": 24,
+    "allergy_dust_mites": 13,
+    "allergy_insects": 6,
+    "allergy_grass": 8,
+    "allergy_moulds_yeast": 10,
+    "allergy_weed_tree": 11,
+    "allergy_veg": 40,
+    "allergy_non_veg": 17,
+    "allergy_dairy": 12,
+    "allergy_seeds_nuts_legumes": 21,
+    "allergy_spices": 19,
+    "allergy_occupational": 6,
+    "allergy_parasites": 3,
+    "ige": 1
+  },
+  "id_rule": "allergen_id is the lower case slug of lab_test_name (non alphanumeric runs become one underscore). The Total IgE test uses the fixed id ige_total. IDs are stable and must not change once released.",
+  "entries": [
+    {
+      "allergen_id": "pigeon_droppings",
+      "lab_test_name": "Pigeon Droppings",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 1,
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "common_name": "Pigeon Droppings",
+      "scientific_name": null,
+      "aliases": [],
+      "file": "allergens/pets.json",
+      "review_flags": [
+        "mixed_extract"
+      ]
+    },
+    {
+      "allergen_id": "pigeon_feathers",
+      "lab_test_name": "Pigeon Feathers",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 2,
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "common_name": "Pigeon Feathers",
+      "scientific_name": null,
+      "aliases": [],
+      "file": "allergens/pets.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "turkey_feathers",
+      "lab_test_name": "Turkey Feathers",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 3,
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "common_name": "Turkey Feathers",
+      "scientific_name": "Meleagris gallopavo",
+      "aliases": [],
+      "file": "allergens/pets.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "epithelium_serum_proteins_prot_mouse",
+      "lab_test_name": "Epithelium + Serum Proteins Prot. Mouse",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 4,
+      "canonical_category": "animal_epithelia_dander",
+      "allergen_type": "animal",
+      "common_name": "Mouse (Skin, Hair and Serum Proteins)",
+      "scientific_name": "Mus musculus",
+      "aliases": [
+        "Mouse (Skin, Hair and Serum Proteins)"
+      ],
+      "file": "allergens/pets.json",
+      "review_flags": [
+        "extract_unclear",
+        "name_nonstandard"
+      ]
+    },
+    {
+      "allergen_id": "pig_epithelium",
+      "lab_test_name": "Pig Epithelium",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 5,
+      "canonical_category": "animal_epithelia_dander",
+      "allergen_type": "animal",
+      "common_name": "Pig Skin and Hair",
+      "scientific_name": "Sus scrofa domesticus",
+      "aliases": [
+        "Pig Skin and Hair"
+      ],
+      "file": "allergens/pets.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "goose_feathers",
+      "lab_test_name": "Goose Feathers",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 6,
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "common_name": "Goose Feathers",
+      "scientific_name": null,
+      "aliases": [],
+      "file": "allergens/pets.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "cat_epithelium",
+      "lab_test_name": "Cat Epithelium",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 7,
+      "canonical_category": "animal_epithelia_dander",
+      "allergen_type": "animal",
+      "common_name": "Cat Skin and Hair",
+      "scientific_name": "Felis catus",
+      "aliases": [
+        "Cat Skin and Hair"
+      ],
+      "file": "allergens/pets.json",
+      "review_flags": [
+        "overlaps_cat_dander"
+      ]
+    },
+    {
+      "allergen_id": "cat_dander",
+      "lab_test_name": "Cat Dander",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 8,
+      "canonical_category": "animal_epithelia_dander",
+      "allergen_type": "animal",
+      "common_name": "Cat Dander",
+      "scientific_name": "Felis catus",
+      "aliases": [],
+      "file": "allergens/pets.json",
+      "review_flags": [
+        "overlaps_cat_epithelium"
+      ]
+    },
+    {
+      "allergen_id": "budgerigar_dropping",
+      "lab_test_name": "Budgerigar Dropping",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 9,
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "common_name": "Budgerigar Droppings",
+      "scientific_name": "Melopsittacus undulatus",
+      "aliases": [
+        "Budgerigar Droppings"
+      ],
+      "file": "allergens/pets.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "dog_epithelium",
+      "lab_test_name": "Dog Epithelium",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 10,
+      "canonical_category": "animal_epithelia_dander",
+      "allergen_type": "animal",
+      "common_name": "Dog Skin and Hair",
+      "scientific_name": "Canis lupus familiaris",
+      "aliases": [
+        "Dog Skin and Hair"
+      ],
+      "file": "allergens/pets.json",
+      "review_flags": [
+        "overlaps_dog_dander"
+      ]
+    },
+    {
+      "allergen_id": "budgerigar_feathers",
+      "lab_test_name": "Budgerigar Feathers",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 11,
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "common_name": "Budgerigar Feathers",
+      "scientific_name": "Melopsittacus undulatus",
+      "aliases": [],
+      "file": "allergens/pets.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "dog_dander",
+      "lab_test_name": "Dog Dander",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 12,
+      "canonical_category": "animal_epithelia_dander",
+      "allergen_type": "animal",
+      "common_name": "Dog Dander",
+      "scientific_name": "Canis lupus familiaris",
+      "aliases": [],
+      "file": "allergens/pets.json",
+      "review_flags": [
+        "overlaps_dog_epithelium"
+      ]
+    },
+    {
+      "allergen_id": "canarian_feathers",
+      "lab_test_name": "Canarian Feathers",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 13,
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "common_name": "Canary Feathers",
+      "scientific_name": "Serinus canaria",
+      "aliases": [
+        "Canary Feathers"
+      ],
+      "file": "allergens/pets.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "budgerigar_serum_proteins",
+      "lab_test_name": "Budgerigar Serum Proteins",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 14,
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "common_name": "Budgerigar Blood Proteins",
+      "scientific_name": "Melopsittacus undulatus",
+      "aliases": [
+        "Budgerigar Blood Proteins"
+      ],
+      "file": "allergens/pets.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "rabbit_epithelium",
+      "lab_test_name": "Rabbit Epithelium",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 15,
+      "canonical_category": "animal_epithelia_dander",
+      "allergen_type": "animal",
+      "common_name": "Rabbit Skin and Hair",
+      "scientific_name": "Oryctolagus cuniculus",
+      "aliases": [
+        "Rabbit Skin and Hair"
+      ],
+      "file": "allergens/pets.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "goat_epithelium",
+      "lab_test_name": "Goat Epithelium",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 16,
+      "canonical_category": "animal_epithelia_dander",
+      "allergen_type": "animal",
+      "common_name": "Goat Skin and Hair",
+      "scientific_name": "Capra hircus",
+      "aliases": [
+        "Goat Skin and Hair"
+      ],
+      "file": "allergens/pets.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "chicken_feathers",
+      "lab_test_name": "Chicken Feathers",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 17,
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "common_name": "Chicken Feathers",
+      "scientific_name": "Gallus gallus domesticus",
+      "aliases": [],
+      "file": "allergens/pets.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "chicken_droppings",
+      "lab_test_name": "Chicken Droppings",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 18,
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "common_name": "Chicken Droppings",
+      "scientific_name": "Gallus gallus domesticus",
+      "aliases": [],
+      "file": "allergens/pets.json",
+      "review_flags": [
+        "mixed_extract"
+      ]
+    },
+    {
+      "allergen_id": "sheep_epithelium",
+      "lab_test_name": "Sheep Epithelium",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 19,
+      "canonical_category": "animal_epithelia_dander",
+      "allergen_type": "animal",
+      "common_name": "Sheep Skin and Hair",
+      "scientific_name": "Ovis aries",
+      "aliases": [
+        "Sheep Skin and Hair"
+      ],
+      "file": "allergens/pets.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "duck_feathers",
+      "lab_test_name": "Duck Feathers",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 20,
+      "canonical_category": "bird_feathers_droppings",
+      "allergen_type": "animal",
+      "common_name": "Duck Feathers",
+      "scientific_name": null,
+      "aliases": [],
+      "file": "allergens/pets.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "cow_dander",
+      "lab_test_name": "Cow Dander",
+      "source_group": "pets",
+      "source_group_display_order": 1,
+      "position_in_source_group": 21,
+      "canonical_category": "animal_epithelia_dander",
+      "allergen_type": "animal",
+      "common_name": "Cow Dander",
+      "scientific_name": "Bos taurus",
+      "aliases": [],
+      "file": "allergens/pets.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "penicillin_v",
+      "lab_test_name": "Penicillin V",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 1,
+      "canonical_category": "beta_lactam_antibiotics",
+      "allergen_type": "drug",
+      "common_name": "Penicillin V",
+      "scientific_name": "Phenoxymethylpenicillin",
+      "aliases": [],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "penicillin_g",
+      "lab_test_name": "Penicillin G",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 2,
+      "canonical_category": "beta_lactam_antibiotics",
+      "allergen_type": "drug",
+      "common_name": "Penicillin G (Benzylpenicillin)",
+      "scientific_name": "Benzylpenicillin",
+      "aliases": [
+        "Penicillin G (Benzylpenicillin)"
+      ],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "benzocaine",
+      "lab_test_name": "Benzocaine",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 3,
+      "canonical_category": "local_anaesthetics",
+      "allergen_type": "drug",
+      "common_name": "Benzocaine",
+      "scientific_name": "Benzocaine",
+      "aliases": [],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "aspirin",
+      "lab_test_name": "Aspirin",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 4,
+      "canonical_category": "nsaids_and_analgesics",
+      "allergen_type": "drug",
+      "common_name": "Aspirin",
+      "scientific_name": "Acetylsalicylic acid",
+      "aliases": [],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "ibuprofen",
+      "lab_test_name": "Ibuprofen",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 5,
+      "canonical_category": "nsaids_and_analgesics",
+      "allergen_type": "drug",
+      "common_name": "Ibuprofen",
+      "scientific_name": "Ibuprofen",
+      "aliases": [],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "diclofenac",
+      "lab_test_name": "Diclofenac",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 6,
+      "canonical_category": "nsaids_and_analgesics",
+      "allergen_type": "drug",
+      "common_name": "Diclofenac",
+      "scientific_name": "Diclofenac",
+      "aliases": [],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "azithromycin",
+      "lab_test_name": "Azithromycin",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 7,
+      "canonical_category": "other_antibiotics",
+      "allergen_type": "drug",
+      "common_name": "Azithromycin",
+      "scientific_name": "Azithromycin",
+      "aliases": [],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "sulfamethoxazole",
+      "lab_test_name": "Sulfamethoxazole",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 8,
+      "canonical_category": "other_antibiotics",
+      "allergen_type": "drug",
+      "common_name": "Sulfamethoxazole (Sulfa Antibiotic)",
+      "scientific_name": "Sulfamethoxazole",
+      "aliases": [
+        "Sulfamethoxazole (Sulfa Antibiotic)"
+      ],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "gentamycin",
+      "lab_test_name": "Gentamycin",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 9,
+      "canonical_category": "other_antibiotics",
+      "allergen_type": "drug",
+      "common_name": "Gentamicin (listed as Gentamycin)",
+      "scientific_name": "Gentamicin",
+      "aliases": [
+        "Gentamicin",
+        "Gentamicin (listed as Gentamycin)"
+      ],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": [
+        "name_spelling_variant"
+      ]
+    },
+    {
+      "allergen_id": "ascorbic_acid_vitamin_c",
+      "lab_test_name": "Ascorbic Acid (Vitamin C)",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 10,
+      "canonical_category": "vitamins_and_other_medicines",
+      "allergen_type": "drug",
+      "common_name": "Vitamin C (Ascorbic Acid)",
+      "scientific_name": "Ascorbic acid",
+      "aliases": [
+        "Vitamin C (Ascorbic Acid)"
+      ],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "cobalamin_vitamin_b12",
+      "lab_test_name": "Cobalamin (Vitamin B12)",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 11,
+      "canonical_category": "vitamins_and_other_medicines",
+      "allergen_type": "drug",
+      "common_name": "Vitamin B12 (Cobalamin)",
+      "scientific_name": "Cobalamin",
+      "aliases": [
+        "Vitamin B12 (Cobalamin)"
+      ],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "cephalosporin",
+      "lab_test_name": "Cephalosporin",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 12,
+      "canonical_category": "beta_lactam_antibiotics",
+      "allergen_type": "drug",
+      "common_name": "Cephalosporin Antibiotics (Group)",
+      "scientific_name": "Cephalosporins",
+      "aliases": [
+        "Cephalosporin Antibiotics (Group)"
+      ],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": [
+        "class_not_single_drug",
+        "extract_unclear"
+      ]
+    },
+    {
+      "allergen_id": "metronidazole",
+      "lab_test_name": "Metronidazole",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 13,
+      "canonical_category": "other_antibiotics",
+      "allergen_type": "drug",
+      "common_name": "Metronidazole",
+      "scientific_name": "Metronidazole",
+      "aliases": [],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "chloramphenicol",
+      "lab_test_name": "Chloramphenicol",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 14,
+      "canonical_category": "other_antibiotics",
+      "allergen_type": "drug",
+      "common_name": "Chloramphenicol",
+      "scientific_name": "Chloramphenicol",
+      "aliases": [],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "tetracycline",
+      "lab_test_name": "Tetracycline",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 15,
+      "canonical_category": "other_antibiotics",
+      "allergen_type": "drug",
+      "common_name": "Tetracycline",
+      "scientific_name": "Tetracycline",
+      "aliases": [],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "ofloxacin",
+      "lab_test_name": "Ofloxacin",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 16,
+      "canonical_category": "other_antibiotics",
+      "allergen_type": "drug",
+      "common_name": "Ofloxacin",
+      "scientific_name": "Ofloxacin",
+      "aliases": [],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "bromhexine",
+      "lab_test_name": "Bromhexine",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 17,
+      "canonical_category": "vitamins_and_other_medicines",
+      "allergen_type": "drug",
+      "common_name": "Bromhexine",
+      "scientific_name": "Bromhexine",
+      "aliases": [],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": [
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "amoxicillin",
+      "lab_test_name": "Amoxicillin",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 18,
+      "canonical_category": "beta_lactam_antibiotics",
+      "allergen_type": "drug",
+      "common_name": "Amoxicillin",
+      "scientific_name": "Amoxicillin",
+      "aliases": [],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "oxacillin",
+      "lab_test_name": "Oxacillin",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 19,
+      "canonical_category": "beta_lactam_antibiotics",
+      "allergen_type": "drug",
+      "common_name": "Oxacillin",
+      "scientific_name": "Oxacillin",
+      "aliases": [],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "ampicillin",
+      "lab_test_name": "Ampicillin",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 20,
+      "canonical_category": "beta_lactam_antibiotics",
+      "allergen_type": "drug",
+      "common_name": "Ampicillin",
+      "scientific_name": "Ampicillin",
+      "aliases": [],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "ciprofloxacin",
+      "lab_test_name": "Ciprofloxacin",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 21,
+      "canonical_category": "other_antibiotics",
+      "allergen_type": "drug",
+      "common_name": "Ciprofloxacin",
+      "scientific_name": "Ciprofloxacin",
+      "aliases": [],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "paracetamol",
+      "lab_test_name": "Paracetamol",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 22,
+      "canonical_category": "nsaids_and_analgesics",
+      "allergen_type": "drug",
+      "common_name": "Paracetamol (Acetaminophen)",
+      "scientific_name": "Paracetamol (acetaminophen)",
+      "aliases": [
+        "Paracetamol (Acetaminophen)"
+      ],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "thiamine_vitamin_b1",
+      "lab_test_name": "Thiamine (Vitamin B1)",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 23,
+      "canonical_category": "vitamins_and_other_medicines",
+      "allergen_type": "drug",
+      "common_name": "Vitamin B1 (Thiamine)",
+      "scientific_name": "Thiamine",
+      "aliases": [
+        "Vitamin B1 (Thiamine)"
+      ],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "prilocaine",
+      "lab_test_name": "Prilocaine",
+      "source_group": "allergy_drugs",
+      "source_group_display_order": 2,
+      "position_in_source_group": 24,
+      "canonical_category": "local_anaesthetics",
+      "allergen_type": "drug",
+      "common_name": "Prilocaine",
+      "scientific_name": "Prilocaine",
+      "aliases": [],
+      "file": "allergens/allergy_drugs.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "euroglyphus_maynei",
+      "lab_test_name": "Euroglyphus Maynei",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 1,
+      "canonical_category": "house_dust_mites",
+      "allergen_type": "environmental",
+      "common_name": "House Dust Mite (Euroglyphus maynei)",
+      "scientific_name": "Euroglyphus maynei",
+      "aliases": [
+        "House Dust Mite (Euroglyphus maynei)"
+      ],
+      "file": "allergens/allergy_dust_mites.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "tyrophagus_putrescentiae",
+      "lab_test_name": "Tyrophagus Putrescentiae",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 2,
+      "canonical_category": "storage_mites",
+      "allergen_type": "environmental",
+      "common_name": "Storage Mite (Tyrophagus putrescentiae)",
+      "scientific_name": "Tyrophagus putrescentiae",
+      "aliases": [
+        "Storage Mite (Tyrophagus putrescentiae)"
+      ],
+      "file": "allergens/allergy_dust_mites.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "tobacco_dust",
+      "lab_test_name": "Tobacco Dust",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 3,
+      "canonical_category": "plant_fibres_and_dusts",
+      "allergen_type": "occupational",
+      "common_name": "Tobacco Leaf Dust",
+      "scientific_name": "Nicotiana tabacum",
+      "aliases": [
+        "Tobacco Leaf Dust"
+      ],
+      "file": "allergens/allergy_dust_mites.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "source_group_mismatch"
+      ]
+    },
+    {
+      "allergen_id": "lepidoglyphus_destructor",
+      "lab_test_name": "Lepidoglyphus Destructor",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 4,
+      "canonical_category": "storage_mites",
+      "allergen_type": "environmental",
+      "common_name": "Storage Mite (Lepidoglyphus destructor)",
+      "scientific_name": "Lepidoglyphus destructor",
+      "aliases": [
+        "Storage Mite (Lepidoglyphus destructor)"
+      ],
+      "file": "allergens/allergy_dust_mites.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "house_dust_ifci_1",
+      "lab_test_name": "House Dust – IFCI 1",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 5,
+      "canonical_category": "mixed_environmental_dusts",
+      "allergen_type": "environmental",
+      "common_name": "Mixed House Dust (IFCI 1)",
+      "scientific_name": null,
+      "aliases": [
+        "Mixed House Dust (IFCI 1)"
+      ],
+      "file": "allergens/allergy_dust_mites.json",
+      "review_flags": [
+        "mixed_extract",
+        "name_code_unexplained"
+      ]
+    },
+    {
+      "allergen_id": "dermatophagoides_microceras",
+      "lab_test_name": "Dermatophagoides Microceras",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 6,
+      "canonical_category": "house_dust_mites",
+      "allergen_type": "environmental",
+      "common_name": "House Dust Mite (Dermatophagoides microceras)",
+      "scientific_name": "Dermatophagoides microceras",
+      "aliases": [
+        "House Dust Mite (Dermatophagoides microceras)"
+      ],
+      "file": "allergens/allergy_dust_mites.json",
+      "review_flags": [
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "acarus_siro",
+      "lab_test_name": "Acarus Siro",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 7,
+      "canonical_category": "storage_mites",
+      "allergen_type": "environmental",
+      "common_name": "Flour Mite (Acarus siro)",
+      "scientific_name": "Acarus siro",
+      "aliases": [
+        "Flour Mite (Acarus siro)"
+      ],
+      "file": "allergens/allergy_dust_mites.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "blomia_tropicalis",
+      "lab_test_name": "Blomia Tropicalis",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 8,
+      "canonical_category": "house_dust_mites",
+      "allergen_type": "environmental",
+      "common_name": "Tropical Dust Mite (Blomia tropicalis)",
+      "scientific_name": "Blomia tropicalis",
+      "aliases": [
+        "Tropical Dust Mite (Blomia tropicalis)"
+      ],
+      "file": "allergens/allergy_dust_mites.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "glycyphagus_domesticus",
+      "lab_test_name": "Glycyphagus Domesticus",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 9,
+      "canonical_category": "storage_mites",
+      "allergen_type": "environmental",
+      "common_name": "House and Storage Mite (Glycyphagus domesticus)",
+      "scientific_name": "Glycyphagus domesticus",
+      "aliases": [
+        "House and Storage Mite (Glycyphagus domesticus)"
+      ],
+      "file": "allergens/allergy_dust_mites.json",
+      "review_flags": [
+        "category_judgement"
+      ]
+    },
+    {
+      "allergen_id": "dermatophagoides_farinae",
+      "lab_test_name": "Dermatophagoides Farinae",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 10,
+      "canonical_category": "house_dust_mites",
+      "allergen_type": "environmental",
+      "common_name": "House Dust Mite (D. farinae)",
+      "scientific_name": "Dermatophagoides farinae",
+      "aliases": [
+        "House Dust Mite (D. farinae)"
+      ],
+      "file": "allergens/allergy_dust_mites.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "dermatophagoides_pteronyssinus",
+      "lab_test_name": "Dermatophagoides Pteronyssinus",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 11,
+      "canonical_category": "house_dust_mites",
+      "allergen_type": "environmental",
+      "common_name": "House Dust Mite (D. pteronyssinus)",
+      "scientific_name": "Dermatophagoides pteronyssinus",
+      "aliases": [
+        "House Dust Mite (D. pteronyssinus)"
+      ],
+      "file": "allergens/allergy_dust_mites.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "hay_dust",
+      "lab_test_name": "Hay Dust",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 12,
+      "canonical_category": "mixed_environmental_dusts",
+      "allergen_type": "environmental",
+      "common_name": "Hay Dust",
+      "scientific_name": null,
+      "aliases": [],
+      "file": "allergens/allergy_dust_mites.json",
+      "review_flags": [
+        "mixed_extract"
+      ]
+    },
+    {
+      "allergen_id": "books_dust",
+      "lab_test_name": "Books Dust",
+      "source_group": "allergy_dust_mites",
+      "source_group_display_order": 3,
+      "position_in_source_group": 13,
+      "canonical_category": "mixed_environmental_dusts",
+      "allergen_type": "environmental",
+      "common_name": "Book Dust",
+      "scientific_name": null,
+      "aliases": [
+        "Book Dust"
+      ],
+      "file": "allergens/allergy_dust_mites.json",
+      "review_flags": [
+        "mixed_extract"
+      ]
+    },
+    {
+      "allergen_id": "vespula_germanica",
+      "lab_test_name": "Vespula Germanica",
+      "source_group": "allergy_insects",
+      "source_group_display_order": 4,
+      "position_in_source_group": 1,
+      "canonical_category": "stinging_insect_venoms",
+      "allergen_type": "insect",
+      "common_name": "German Wasp",
+      "scientific_name": "Vespula germanica",
+      "aliases": [
+        "German Wasp"
+      ],
+      "file": "allergens/allergy_insects.json",
+      "review_flags": [
+        "extract_unclear"
+      ]
+    },
+    {
+      "allergen_id": "blatella_germanica",
+      "lab_test_name": "Blatella Germanica",
+      "source_group": "allergy_insects",
+      "source_group_display_order": 4,
+      "position_in_source_group": 2,
+      "canonical_category": "cockroach",
+      "allergen_type": "insect",
+      "common_name": "German Cockroach",
+      "scientific_name": "Blattella germanica",
+      "aliases": [
+        "Blattella germanica",
+        "German Cockroach"
+      ],
+      "file": "allergens/allergy_insects.json",
+      "review_flags": [
+        "name_spelling_variant"
+      ]
+    },
+    {
+      "allergen_id": "heterocera_mix",
+      "lab_test_name": "Heterocera Mix",
+      "source_group": "allergy_insects",
+      "source_group_display_order": 4,
+      "position_in_source_group": 3,
+      "canonical_category": "other_insects",
+      "allergen_type": "insect",
+      "common_name": "Moth Mix",
+      "scientific_name": "Heterocera (moths, mixed)",
+      "aliases": [
+        "Moth Mix"
+      ],
+      "file": "allergens/allergy_insects.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "mixed_extract"
+      ]
+    },
+    {
+      "allergen_id": "aedes_communis",
+      "lab_test_name": "Aedes Communis",
+      "source_group": "allergy_insects",
+      "source_group_display_order": 4,
+      "position_in_source_group": 4,
+      "canonical_category": "other_insects",
+      "allergen_type": "insect",
+      "common_name": "Mosquito (Aedes communis)",
+      "scientific_name": "Aedes communis",
+      "aliases": [
+        "Mosquito (Aedes communis)"
+      ],
+      "file": "allergens/allergy_insects.json",
+      "review_flags": [
+        "regional_relevance_unverified"
+      ]
+    },
+    {
+      "allergen_id": "housefly_musca_domestica",
+      "lab_test_name": "Housefly Musca Domestica",
+      "source_group": "allergy_insects",
+      "source_group_display_order": 4,
+      "position_in_source_group": 5,
+      "canonical_category": "other_insects",
+      "allergen_type": "insect",
+      "common_name": "Housefly",
+      "scientific_name": "Musca domestica",
+      "aliases": [
+        "Housefly"
+      ],
+      "file": "allergens/allergy_insects.json",
+      "review_flags": [
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "apis_mellifera",
+      "lab_test_name": "Apis Mellifera",
+      "source_group": "allergy_insects",
+      "source_group_display_order": 4,
+      "position_in_source_group": 6,
+      "canonical_category": "stinging_insect_venoms",
+      "allergen_type": "insect",
+      "common_name": "Honey Bee",
+      "scientific_name": "Apis mellifera",
+      "aliases": [
+        "Honey Bee"
+      ],
+      "file": "allergens/allergy_insects.json",
+      "review_flags": [
+        "extract_unclear"
+      ]
+    },
+    {
+      "allergen_id": "dactylis_glomerata",
+      "lab_test_name": "Dactylis Glomerata",
+      "source_group": "allergy_grass",
+      "source_group_display_order": 5,
+      "position_in_source_group": 1,
+      "canonical_category": "grass_pollen",
+      "allergen_type": "environmental",
+      "common_name": "Cocksfoot (Orchard Grass)",
+      "scientific_name": "Dactylis glomerata",
+      "aliases": [
+        "Cocksfoot (Orchard Grass)"
+      ],
+      "file": "allergens/allergy_grass.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "phleum_pratense",
+      "lab_test_name": "Phleum Pratense",
+      "source_group": "allergy_grass",
+      "source_group_display_order": 5,
+      "position_in_source_group": 2,
+      "canonical_category": "grass_pollen",
+      "allergen_type": "environmental",
+      "common_name": "Timothy Grass",
+      "scientific_name": "Phleum pratense",
+      "aliases": [
+        "Timothy Grass"
+      ],
+      "file": "allergens/allergy_grass.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "cynodon_dactylon",
+      "lab_test_name": "Cynodon Dactylon",
+      "source_group": "allergy_grass",
+      "source_group_display_order": 5,
+      "position_in_source_group": 3,
+      "canonical_category": "grass_pollen",
+      "allergen_type": "environmental",
+      "common_name": "Bermuda Grass (Doob)",
+      "scientific_name": "Cynodon dactylon",
+      "aliases": [
+        "Bermuda Grass (Doob)",
+        "Bermuda grass",
+        "Doob grass"
+      ],
+      "file": "allergens/allergy_grass.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "lolium_perenne",
+      "lab_test_name": "Lolium Perenne",
+      "source_group": "allergy_grass",
+      "source_group_display_order": 5,
+      "position_in_source_group": 4,
+      "canonical_category": "grass_pollen",
+      "allergen_type": "environmental",
+      "common_name": "Perennial Ryegrass",
+      "scientific_name": "Lolium perenne",
+      "aliases": [
+        "Perennial Ryegrass"
+      ],
+      "file": "allergens/allergy_grass.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "agrostis_stolonifera",
+      "lab_test_name": "Agrostis Stolonifera",
+      "source_group": "allergy_grass",
+      "source_group_display_order": 5,
+      "position_in_source_group": 5,
+      "canonical_category": "grass_pollen",
+      "allergen_type": "environmental",
+      "common_name": "Creeping Bentgrass",
+      "scientific_name": "Agrostis stolonifera",
+      "aliases": [
+        "Creeping Bentgrass"
+      ],
+      "file": "allergens/allergy_grass.json",
+      "review_flags": [
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "sorghum_halepense",
+      "lab_test_name": "Sorghum Halepense",
+      "source_group": "allergy_grass",
+      "source_group_display_order": 5,
+      "position_in_source_group": 6,
+      "canonical_category": "grass_pollen",
+      "allergen_type": "environmental",
+      "common_name": "Johnson Grass",
+      "scientific_name": "Sorghum halepense",
+      "aliases": [
+        "Johnson Grass"
+      ],
+      "file": "allergens/allergy_grass.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "festuca_elatior",
+      "lab_test_name": "Festuca Elatior",
+      "source_group": "allergy_grass",
+      "source_group_display_order": 5,
+      "position_in_source_group": 7,
+      "canonical_category": "grass_pollen",
+      "allergen_type": "environmental",
+      "common_name": "Meadow Fescue",
+      "scientific_name": "Festuca elatior",
+      "aliases": [
+        "Meadow Fescue"
+      ],
+      "file": "allergens/allergy_grass.json",
+      "review_flags": [
+        "taxonomy_check"
+      ]
+    },
+    {
+      "allergen_id": "phragmites_communis",
+      "lab_test_name": "Phragmites Communis",
+      "source_group": "allergy_grass",
+      "source_group_display_order": 5,
+      "position_in_source_group": 8,
+      "canonical_category": "grass_pollen",
+      "allergen_type": "environmental",
+      "common_name": "Common Reed",
+      "scientific_name": "Phragmites communis",
+      "aliases": [
+        "Common Reed"
+      ],
+      "file": "allergens/allergy_grass.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "taxonomy_check"
+      ]
+    },
+    {
+      "allergen_id": "penicillium_notatum",
+      "lab_test_name": "Penicillium Notatum",
+      "source_group": "allergy_moulds_yeast",
+      "source_group_display_order": 6,
+      "position_in_source_group": 1,
+      "canonical_category": "moulds",
+      "allergen_type": "environmental",
+      "common_name": "Penicillium Mould (P. notatum)",
+      "scientific_name": "Penicillium notatum",
+      "aliases": [
+        "Penicillium Mould (P. notatum)"
+      ],
+      "file": "allergens/allergy_moulds_yeast.json",
+      "review_flags": [
+        "taxonomy_check"
+      ]
+    },
+    {
+      "allergen_id": "cladosporium_herbarum",
+      "lab_test_name": "Cladosporium Herbarum",
+      "source_group": "allergy_moulds_yeast",
+      "source_group_display_order": 6,
+      "position_in_source_group": 2,
+      "canonical_category": "moulds",
+      "allergen_type": "environmental",
+      "common_name": "Cladosporium Mould",
+      "scientific_name": "Cladosporium herbarum",
+      "aliases": [
+        "Cladosporium Mould"
+      ],
+      "file": "allergens/allergy_moulds_yeast.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "aspergillus_fumigatus",
+      "lab_test_name": "Aspergillus Fumigatus",
+      "source_group": "allergy_moulds_yeast",
+      "source_group_display_order": 6,
+      "position_in_source_group": 3,
+      "canonical_category": "moulds",
+      "allergen_type": "environmental",
+      "common_name": "Aspergillus Mould (A. fumigatus)",
+      "scientific_name": "Aspergillus fumigatus",
+      "aliases": [
+        "Aspergillus Mould (A. fumigatus)"
+      ],
+      "file": "allergens/allergy_moulds_yeast.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "mucor_racemosus",
+      "lab_test_name": "Mucor Racemosus",
+      "source_group": "allergy_moulds_yeast",
+      "source_group_display_order": 6,
+      "position_in_source_group": 4,
+      "canonical_category": "moulds",
+      "allergen_type": "environmental",
+      "common_name": "Mucor Mould",
+      "scientific_name": "Mucor racemosus",
+      "aliases": [
+        "Mucor Mould"
+      ],
+      "file": "allergens/allergy_moulds_yeast.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "candida_albicans",
+      "lab_test_name": "Candida Albicans",
+      "source_group": "allergy_moulds_yeast",
+      "source_group_display_order": 6,
+      "position_in_source_group": 5,
+      "canonical_category": "yeasts_and_candida",
+      "allergen_type": "environmental",
+      "common_name": "Candida (Yeast)",
+      "scientific_name": "Candida albicans",
+      "aliases": [
+        "Candida (Yeast)"
+      ],
+      "file": "allergens/allergy_moulds_yeast.json",
+      "review_flags": [
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "alternaria_alternata",
+      "lab_test_name": "Alternaria Alternata",
+      "source_group": "allergy_moulds_yeast",
+      "source_group_display_order": 6,
+      "position_in_source_group": 6,
+      "canonical_category": "moulds",
+      "allergen_type": "environmental",
+      "common_name": "Alternaria Mould",
+      "scientific_name": "Alternaria alternata",
+      "aliases": [
+        "Alternaria Mould"
+      ],
+      "file": "allergens/allergy_moulds_yeast.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "curvularia_lunata",
+      "lab_test_name": "Curvularia Lunata",
+      "source_group": "allergy_moulds_yeast",
+      "source_group_display_order": 6,
+      "position_in_source_group": 7,
+      "canonical_category": "moulds",
+      "allergen_type": "environmental",
+      "common_name": "Curvularia Mould",
+      "scientific_name": "Curvularia lunata",
+      "aliases": [
+        "Curvularia Mould"
+      ],
+      "file": "allergens/allergy_moulds_yeast.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "taxonomy_check"
+      ]
+    },
+    {
+      "allergen_id": "trichoderma_viride",
+      "lab_test_name": "Trichoderma Viride",
+      "source_group": "allergy_moulds_yeast",
+      "source_group_display_order": 6,
+      "position_in_source_group": 8,
+      "canonical_category": "moulds",
+      "allergen_type": "environmental",
+      "common_name": "Trichoderma Mould",
+      "scientific_name": "Trichoderma viride",
+      "aliases": [
+        "Trichoderma Mould"
+      ],
+      "file": "allergens/allergy_moulds_yeast.json",
+      "review_flags": [
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "phoma_betae",
+      "lab_test_name": "Phoma Betae",
+      "source_group": "allergy_moulds_yeast",
+      "source_group_display_order": 6,
+      "position_in_source_group": 9,
+      "canonical_category": "moulds",
+      "allergen_type": "environmental",
+      "common_name": "Phoma Mould",
+      "scientific_name": "Phoma betae",
+      "aliases": [
+        "Phoma Mould"
+      ],
+      "file": "allergens/allergy_moulds_yeast.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "taxonomy_check"
+      ]
+    },
+    {
+      "allergen_id": "rhizopus_nigricans",
+      "lab_test_name": "Rhizopus Nigricans",
+      "source_group": "allergy_moulds_yeast",
+      "source_group_display_order": 6,
+      "position_in_source_group": 10,
+      "canonical_category": "moulds",
+      "allergen_type": "environmental",
+      "common_name": "Black Bread Mould (Rhizopus)",
+      "scientific_name": "Rhizopus nigricans",
+      "aliases": [
+        "Black Bread Mould (Rhizopus)"
+      ],
+      "file": "allergens/allergy_moulds_yeast.json",
+      "review_flags": [
+        "taxonomy_check"
+      ]
+    },
+    {
+      "allergen_id": "amaranthus_retroflexus",
+      "lab_test_name": "Amaranthus Retroflexus",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 1,
+      "canonical_category": "weed_pollen",
+      "allergen_type": "environmental",
+      "common_name": "Redroot Pigweed",
+      "scientific_name": "Amaranthus retroflexus",
+      "aliases": [
+        "Redroot Pigweed"
+      ],
+      "file": "allergens/allergy_weed_tree.json",
+      "review_flags": [
+        "regional_relevance_unverified"
+      ]
+    },
+    {
+      "allergen_id": "eucalyptus_spp",
+      "lab_test_name": "Eucalyptus Spp",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 2,
+      "canonical_category": "tree_pollen",
+      "allergen_type": "environmental",
+      "common_name": "Eucalyptus Tree",
+      "scientific_name": "Eucalyptus species",
+      "aliases": [
+        "Eucalyptus Tree"
+      ],
+      "file": "allergens/allergy_weed_tree.json",
+      "review_flags": [
+        "species_mix"
+      ]
+    },
+    {
+      "allergen_id": "xanthium_commune",
+      "lab_test_name": "Xanthium Commune",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 3,
+      "canonical_category": "weed_pollen",
+      "allergen_type": "environmental",
+      "common_name": "Cocklebur",
+      "scientific_name": "Xanthium (cocklebur)",
+      "aliases": [
+        "Cocklebur"
+      ],
+      "file": "allergens/allergy_weed_tree.json",
+      "review_flags": [
+        "regional_relevance_unverified",
+        "taxonomy_check"
+      ]
+    },
+    {
+      "allergen_id": "morus_alba",
+      "lab_test_name": "Morus Alba",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 4,
+      "canonical_category": "tree_pollen",
+      "allergen_type": "environmental",
+      "common_name": "White Mulberry",
+      "scientific_name": "Morus alba",
+      "aliases": [
+        "White Mulberry"
+      ],
+      "file": "allergens/allergy_weed_tree.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "prosopis_juliflora",
+      "lab_test_name": "Prosopis Juliflora",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 5,
+      "canonical_category": "tree_pollen",
+      "allergen_type": "environmental",
+      "common_name": "Mesquite (Vilayati Babool)",
+      "scientific_name": "Prosopis juliflora",
+      "aliases": [
+        "Mesquite (Vilayati Babool)"
+      ],
+      "file": "allergens/allergy_weed_tree.json",
+      "review_flags": [
+        "regional_relevance_unverified"
+      ]
+    },
+    {
+      "allergen_id": "nart_v1_artemisia_vulgaris",
+      "lab_test_name": "Nart V1 / Artemisia Vulgaris",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 6,
+      "canonical_category": "weed_pollen",
+      "allergen_type": "environmental",
+      "common_name": "Mugwort (Artemisia vulgaris)",
+      "scientific_name": "Artemisia vulgaris",
+      "aliases": [
+        "Mugwort (Artemisia vulgaris)"
+      ],
+      "file": "allergens/allergy_weed_tree.json",
+      "review_flags": [
+        "component_or_extract_unclear",
+        "name_nonstandard"
+      ]
+    },
+    {
+      "allergen_id": "acacia_spp",
+      "lab_test_name": "Acacia Spp",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 7,
+      "canonical_category": "tree_pollen",
+      "allergen_type": "environmental",
+      "common_name": "Acacia Trees",
+      "scientific_name": "Acacia species",
+      "aliases": [
+        "Acacia Trees"
+      ],
+      "file": "allergens/allergy_weed_tree.json",
+      "review_flags": [
+        "species_mix"
+      ]
+    },
+    {
+      "allergen_id": "oak_wood",
+      "lab_test_name": "Oak Wood",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 8,
+      "canonical_category": "tree_pollen",
+      "allergen_type": "environmental",
+      "common_name": "Oak (Wood or Pollen)",
+      "scientific_name": "Quercus species",
+      "aliases": [
+        "Oak (Wood or Pollen)"
+      ],
+      "file": "allergens/allergy_weed_tree.json",
+      "review_flags": [
+        "extract_unclear",
+        "name_ambiguous"
+      ]
+    },
+    {
+      "allergen_id": "salix_caprea",
+      "lab_test_name": "Salix Caprea",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 9,
+      "canonical_category": "tree_pollen",
+      "allergen_type": "environmental",
+      "common_name": "Goat Willow",
+      "scientific_name": "Salix caprea",
+      "aliases": [
+        "Goat Willow"
+      ],
+      "file": "allergens/allergy_weed_tree.json",
+      "review_flags": [
+        "regional_relevance_unverified"
+      ]
+    },
+    {
+      "allergen_id": "chenopodium_album",
+      "lab_test_name": "Chenopodium Album",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 10,
+      "canonical_category": "weed_pollen",
+      "allergen_type": "environmental",
+      "common_name": "Lamb's Quarters (Bathua)",
+      "scientific_name": "Chenopodium album",
+      "aliases": [
+        "Lamb's Quarters (Bathua)"
+      ],
+      "file": "allergens/allergy_weed_tree.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "brassica_napus",
+      "lab_test_name": "Brassica Napus",
+      "source_group": "allergy_weed_tree",
+      "source_group_display_order": 7,
+      "position_in_source_group": 11,
+      "canonical_category": "crop_plant_pollen",
+      "allergen_type": "environmental",
+      "common_name": "Rapeseed (Canola)",
+      "scientific_name": "Brassica napus",
+      "aliases": [
+        "Rapeseed (Canola)"
+      ],
+      "file": "allergens/allergy_weed_tree.json",
+      "review_flags": [
+        "extract_unclear",
+        "name_ambiguous"
+      ]
+    },
+    {
+      "allergen_id": "egg_plant_aubergine",
+      "lab_test_name": "Egg Plant / Aubergine",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 1,
+      "canonical_category": "vegetables_nightshade",
+      "allergen_type": "food",
+      "common_name": "Brinjal (Eggplant)",
+      "scientific_name": "Solanum melongena",
+      "aliases": [
+        "Brinjal",
+        "Brinjal (Eggplant)",
+        "Eggplant"
+      ],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "onion",
+      "lab_test_name": "Onion",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 2,
+      "canonical_category": "vegetables_allium",
+      "allergen_type": "food",
+      "common_name": "Onion",
+      "scientific_name": "Allium cepa",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "garlic",
+      "lab_test_name": "Garlic",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 3,
+      "canonical_category": "vegetables_allium",
+      "allergen_type": "food",
+      "common_name": "Garlic",
+      "scientific_name": "Allium sativum",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "cauliflower",
+      "lab_test_name": "Cauliflower",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 4,
+      "canonical_category": "vegetables_brassica",
+      "allergen_type": "food",
+      "common_name": "Cauliflower",
+      "scientific_name": "Brassica oleracea var. botrytis",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "pumpkin",
+      "lab_test_name": "Pumpkin",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 5,
+      "canonical_category": "vegetables_gourd",
+      "allergen_type": "food",
+      "common_name": "Pumpkin",
+      "scientific_name": "Cucurbita species",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "red_radish",
+      "lab_test_name": "Red Radish",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 6,
+      "canonical_category": "vegetables_brassica",
+      "allergen_type": "food",
+      "common_name": "Red Radish",
+      "scientific_name": "Raphanus sativus",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "sweet_potato",
+      "lab_test_name": "Sweet Potato",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 7,
+      "canonical_category": "vegetables_root",
+      "allergen_type": "food",
+      "common_name": "Sweet Potato",
+      "scientific_name": "Ipomoea batatas",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "spinach",
+      "lab_test_name": "Spinach",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 8,
+      "canonical_category": "vegetables_leafy",
+      "allergen_type": "food",
+      "common_name": "Spinach (Palak)",
+      "scientific_name": "Spinacia oleracea",
+      "aliases": [
+        "Palak",
+        "Spinach (Palak)"
+      ],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "lettuce",
+      "lab_test_name": "Lettuce",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 9,
+      "canonical_category": "vegetables_leafy",
+      "allergen_type": "food",
+      "common_name": "Lettuce",
+      "scientific_name": "Lactuca sativa",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "cabbage",
+      "lab_test_name": "Cabbage",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 10,
+      "canonical_category": "vegetables_brassica",
+      "allergen_type": "food",
+      "common_name": "Cabbage",
+      "scientific_name": "Brassica oleracea var. capitata",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "cucumber",
+      "lab_test_name": "Cucumber",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 11,
+      "canonical_category": "vegetables_gourd",
+      "allergen_type": "food",
+      "common_name": "Cucumber",
+      "scientific_name": "Cucumis sativus",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "carrot",
+      "lab_test_name": "Carrot",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 12,
+      "canonical_category": "vegetables_root",
+      "allergen_type": "food",
+      "common_name": "Carrot",
+      "scientific_name": "Daucus carota",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "french_bean",
+      "lab_test_name": "French Bean",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 13,
+      "canonical_category": "legumes_pulses",
+      "allergen_type": "food",
+      "common_name": "French Bean",
+      "scientific_name": "Phaseolus vulgaris",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "broccoli",
+      "lab_test_name": "Broccoli",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 14,
+      "canonical_category": "vegetables_brassica",
+      "allergen_type": "food",
+      "common_name": "Broccoli",
+      "scientific_name": "Brassica oleracea var. italica",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "tomato",
+      "lab_test_name": "Tomato",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 15,
+      "canonical_category": "vegetables_nightshade",
+      "allergen_type": "food",
+      "common_name": "Tomato",
+      "scientific_name": "Solanum lycopersicum",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "beet",
+      "lab_test_name": "Beet",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 16,
+      "canonical_category": "vegetables_root",
+      "allergen_type": "food",
+      "common_name": "Beetroot",
+      "scientific_name": "Beta vulgaris",
+      "aliases": [
+        "Beetroot"
+      ],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "potato",
+      "lab_test_name": "Potato",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 17,
+      "canonical_category": "vegetables_nightshade",
+      "allergen_type": "food",
+      "common_name": "Potato",
+      "scientific_name": "Solanum tuberosum",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "date",
+      "lab_test_name": "Date",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 18,
+      "canonical_category": "fruits_other",
+      "allergen_type": "food",
+      "common_name": "Date",
+      "scientific_name": "Phoenix dactylifera",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "apricot",
+      "lab_test_name": "Apricot",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 19,
+      "canonical_category": "fruits_rosaceae",
+      "allergen_type": "food",
+      "common_name": "Apricot",
+      "scientific_name": "Prunus armeniaca",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "cherry",
+      "lab_test_name": "Cherry",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 20,
+      "canonical_category": "fruits_rosaceae",
+      "allergen_type": "food",
+      "common_name": "Cherry",
+      "scientific_name": "Prunus species",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "pineapple",
+      "lab_test_name": "Pineapple",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 21,
+      "canonical_category": "fruits_tropical",
+      "allergen_type": "food",
+      "common_name": "Pineapple",
+      "scientific_name": "Ananas comosus",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "plum",
+      "lab_test_name": "Plum",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 22,
+      "canonical_category": "fruits_rosaceae",
+      "allergen_type": "food",
+      "common_name": "Plum",
+      "scientific_name": "Prunus domestica",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "orange",
+      "lab_test_name": "Orange",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 23,
+      "canonical_category": "fruits_citrus",
+      "allergen_type": "food",
+      "common_name": "Orange",
+      "scientific_name": "Citrus sinensis",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "grape",
+      "lab_test_name": "Grape",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 24,
+      "canonical_category": "fruits_other",
+      "allergen_type": "food",
+      "common_name": "Grape",
+      "scientific_name": "Vitis vinifera",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "pomegranate",
+      "lab_test_name": "Pomegranate",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 25,
+      "canonical_category": "fruits_other",
+      "allergen_type": "food",
+      "common_name": "Pomegranate",
+      "scientific_name": "Punica granatum",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": [
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "guava",
+      "lab_test_name": "Guava",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 26,
+      "canonical_category": "fruits_tropical",
+      "allergen_type": "food",
+      "common_name": "Guava",
+      "scientific_name": "Psidium guajava",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": [
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "cranberry",
+      "lab_test_name": "Cranberry",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 27,
+      "canonical_category": "fruits_other",
+      "allergen_type": "food",
+      "common_name": "Cranberry",
+      "scientific_name": "Vaccinium macrocarpon",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": [
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "fig",
+      "lab_test_name": "Fig",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 28,
+      "canonical_category": "fruits_other",
+      "allergen_type": "food",
+      "common_name": "Fig (Anjeer)",
+      "scientific_name": "Ficus carica",
+      "aliases": [
+        "Anjeer",
+        "Fig (Anjeer)"
+      ],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "olive",
+      "lab_test_name": "Olive",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 29,
+      "canonical_category": "fruits_other",
+      "allergen_type": "food",
+      "common_name": "Olive",
+      "scientific_name": "Olea europaea",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": [
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "watermelon",
+      "lab_test_name": "Watermelon",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 30,
+      "canonical_category": "fruits_melons",
+      "allergen_type": "food",
+      "common_name": "Watermelon",
+      "scientific_name": "Citrullus lanatus",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "lychee",
+      "lab_test_name": "Lychee",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 31,
+      "canonical_category": "fruits_tropical",
+      "allergen_type": "food",
+      "common_name": "Lychee",
+      "scientific_name": "Litchi chinensis",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": [
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "papaya",
+      "lab_test_name": "Papaya",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 32,
+      "canonical_category": "fruits_tropical",
+      "allergen_type": "food",
+      "common_name": "Papaya",
+      "scientific_name": "Carica papaya",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "strawberry",
+      "lab_test_name": "Strawberry",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 33,
+      "canonical_category": "fruits_rosaceae",
+      "allergen_type": "food",
+      "common_name": "Strawberry",
+      "scientific_name": "Fragaria x ananassa",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "mango",
+      "lab_test_name": "Mango",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 34,
+      "canonical_category": "fruits_tropical",
+      "allergen_type": "food",
+      "common_name": "Mango",
+      "scientific_name": "Mangifera indica",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "apple",
+      "lab_test_name": "Apple",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 35,
+      "canonical_category": "fruits_rosaceae",
+      "allergen_type": "food",
+      "common_name": "Apple",
+      "scientific_name": "Malus domestica",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "banana",
+      "lab_test_name": "Banana",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 36,
+      "canonical_category": "fruits_tropical",
+      "allergen_type": "food",
+      "common_name": "Banana",
+      "scientific_name": "Musa species",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "kiwi",
+      "lab_test_name": "Kiwi",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 37,
+      "canonical_category": "fruits_tropical",
+      "allergen_type": "food",
+      "common_name": "Kiwi",
+      "scientific_name": "Actinidia species",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "melon",
+      "lab_test_name": "Melon",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 38,
+      "canonical_category": "fruits_melons",
+      "allergen_type": "food",
+      "common_name": "Melon",
+      "scientific_name": "Cucumis melo",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "peach",
+      "lab_test_name": "Peach",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 39,
+      "canonical_category": "fruits_rosaceae",
+      "allergen_type": "food",
+      "common_name": "Peach",
+      "scientific_name": "Prunus persica",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "rice",
+      "lab_test_name": "Rice",
+      "source_group": "allergy_veg",
+      "source_group_display_order": 8,
+      "position_in_source_group": 40,
+      "canonical_category": "cereals_grains",
+      "allergen_type": "food",
+      "common_name": "Rice",
+      "scientific_name": "Oryza sativa",
+      "aliases": [],
+      "file": "allergens/allergy_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "mackerel",
+      "lab_test_name": "Mackerel",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 1,
+      "canonical_category": "fish",
+      "allergen_type": "food",
+      "common_name": "Mackerel (Bangda)",
+      "scientific_name": null,
+      "aliases": [
+        "Bangda",
+        "Mackerel (Bangda)"
+      ],
+      "file": "allergens/allergy_non_veg.json",
+      "review_flags": [
+        "species_unspecified"
+      ]
+    },
+    {
+      "allergen_id": "sardine",
+      "lab_test_name": "Sardine",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 2,
+      "canonical_category": "fish",
+      "allergen_type": "food",
+      "common_name": "Sardine",
+      "scientific_name": null,
+      "aliases": [],
+      "file": "allergens/allergy_non_veg.json",
+      "review_flags": [
+        "species_unspecified"
+      ]
+    },
+    {
+      "allergen_id": "carp_fish",
+      "lab_test_name": "Carp Fish",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 3,
+      "canonical_category": "fish",
+      "allergen_type": "food",
+      "common_name": "Carp (Rohu, Catla and Related Fish)",
+      "scientific_name": "Cyprinus carpio (and related carps)",
+      "aliases": [
+        "Carp (Rohu, Catla and Related Fish)"
+      ],
+      "file": "allergens/allergy_non_veg.json",
+      "review_flags": [
+        "species_unspecified"
+      ]
+    },
+    {
+      "allergen_id": "salmon",
+      "lab_test_name": "Salmon",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 4,
+      "canonical_category": "fish",
+      "allergen_type": "food",
+      "common_name": "Salmon",
+      "scientific_name": "Salmo salar",
+      "aliases": [],
+      "file": "allergens/allergy_non_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "fish_cod",
+      "lab_test_name": "Fish (Cod)",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 5,
+      "canonical_category": "fish",
+      "allergen_type": "food",
+      "common_name": "Cod",
+      "scientific_name": "Gadus morhua",
+      "aliases": [
+        "Cod"
+      ],
+      "file": "allergens/allergy_non_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "mutton",
+      "lab_test_name": "Mutton",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 6,
+      "canonical_category": "red_meat_and_pork",
+      "allergen_type": "food",
+      "common_name": "Mutton (Goat or Sheep Meat)",
+      "scientific_name": "Capra hircus or Ovis aries",
+      "aliases": [
+        "Mutton (Goat or Sheep Meat)"
+      ],
+      "file": "allergens/allergy_non_veg.json",
+      "review_flags": [
+        "name_ambiguous",
+        "species_unspecified"
+      ]
+    },
+    {
+      "allergen_id": "chicken_meat",
+      "lab_test_name": "Chicken Meat",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 7,
+      "canonical_category": "poultry_meat",
+      "allergen_type": "food",
+      "common_name": "Chicken Meat",
+      "scientific_name": "Gallus gallus domesticus",
+      "aliases": [],
+      "file": "allergens/allergy_non_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "turkey",
+      "lab_test_name": "Turkey",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 8,
+      "canonical_category": "poultry_meat",
+      "allergen_type": "food",
+      "common_name": "Turkey Meat",
+      "scientific_name": "Meleagris gallopavo",
+      "aliases": [
+        "Turkey Meat"
+      ],
+      "file": "allergens/allergy_non_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "duck_meat",
+      "lab_test_name": "Duck Meat",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 9,
+      "canonical_category": "poultry_meat",
+      "allergen_type": "food",
+      "common_name": "Duck Meat",
+      "scientific_name": "Anas platyrhynchos domesticus",
+      "aliases": [],
+      "file": "allergens/allergy_non_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "beef",
+      "lab_test_name": "Beef",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 10,
+      "canonical_category": "red_meat_and_pork",
+      "allergen_type": "food",
+      "common_name": "Beef",
+      "scientific_name": "Bos taurus",
+      "aliases": [],
+      "file": "allergens/allergy_non_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "pork",
+      "lab_test_name": "Pork",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 11,
+      "canonical_category": "red_meat_and_pork",
+      "allergen_type": "food",
+      "common_name": "Pork",
+      "scientific_name": "Sus scrofa domesticus",
+      "aliases": [],
+      "file": "allergens/allergy_non_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "crab",
+      "lab_test_name": "Crab",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 12,
+      "canonical_category": "shellfish_crustaceans",
+      "allergen_type": "food",
+      "common_name": "Crab",
+      "scientific_name": null,
+      "aliases": [],
+      "file": "allergens/allergy_non_veg.json",
+      "review_flags": [
+        "species_unspecified"
+      ]
+    },
+    {
+      "allergen_id": "shrimp",
+      "lab_test_name": "Shrimp",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 13,
+      "canonical_category": "shellfish_crustaceans",
+      "allergen_type": "food",
+      "common_name": "Shrimp (Prawn)",
+      "scientific_name": null,
+      "aliases": [
+        "Prawn",
+        "Shrimp (Prawn)"
+      ],
+      "file": "allergens/allergy_non_veg.json",
+      "review_flags": [
+        "species_unspecified"
+      ]
+    },
+    {
+      "allergen_id": "lobster",
+      "lab_test_name": "Lobster",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 14,
+      "canonical_category": "shellfish_crustaceans",
+      "allergen_type": "food",
+      "common_name": "Lobster",
+      "scientific_name": null,
+      "aliases": [],
+      "file": "allergens/allergy_non_veg.json",
+      "review_flags": [
+        "species_unspecified"
+      ]
+    },
+    {
+      "allergen_id": "whole_egg_hen",
+      "lab_test_name": "Whole Egg (Hen)",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 15,
+      "canonical_category": "hen_egg",
+      "allergen_type": "food",
+      "common_name": "Whole Hen's Egg",
+      "scientific_name": "Gallus gallus domesticus",
+      "aliases": [
+        "Whole Hen's Egg"
+      ],
+      "file": "allergens/allergy_non_veg.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "egg_yolk_elisa",
+      "lab_test_name": "Egg Yolk Elisa",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 16,
+      "canonical_category": "hen_egg",
+      "allergen_type": "food",
+      "common_name": "Egg Yolk",
+      "scientific_name": "Gallus gallus domesticus",
+      "aliases": [
+        "Egg Yolk"
+      ],
+      "file": "allergens/allergy_non_veg.json",
+      "review_flags": [
+        "method_in_name"
+      ]
+    },
+    {
+      "allergen_id": "egg_white_elisa",
+      "lab_test_name": "Egg White Elisa",
+      "source_group": "allergy_non_veg",
+      "source_group_display_order": 9,
+      "position_in_source_group": 17,
+      "canonical_category": "hen_egg",
+      "allergen_type": "food",
+      "common_name": "Egg White",
+      "scientific_name": "Gallus gallus domesticus",
+      "aliases": [
+        "Egg White"
+      ],
+      "file": "allergens/allergy_non_veg.json",
+      "review_flags": [
+        "method_in_name"
+      ]
+    },
+    {
+      "allergen_id": "cheese_cheddar_type",
+      "lab_test_name": "Cheese Cheddar Type",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 1,
+      "canonical_category": "milk_and_dairy",
+      "allergen_type": "food",
+      "common_name": "Cheddar-Type Cheese",
+      "scientific_name": null,
+      "aliases": [
+        "Cheddar-Type Cheese"
+      ],
+      "file": "allergens/allergy_dairy.json",
+      "review_flags": [
+        "processed_food_extract"
+      ]
+    },
+    {
+      "allergen_id": "coconut_milk",
+      "lab_test_name": "Coconut Milk",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 2,
+      "canonical_category": "coconut_products",
+      "allergen_type": "food",
+      "common_name": "Coconut Milk",
+      "scientific_name": "Cocos nucifera",
+      "aliases": [],
+      "file": "allergens/allergy_dairy.json",
+      "review_flags": [
+        "source_group_mismatch"
+      ]
+    },
+    {
+      "allergen_id": "chocolate",
+      "lab_test_name": "Chocolate",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 3,
+      "canonical_category": "coffee_tea_cocoa",
+      "allergen_type": "food",
+      "common_name": "Chocolate",
+      "scientific_name": "Theobroma cacao",
+      "aliases": [],
+      "file": "allergens/allergy_dairy.json",
+      "review_flags": [
+        "processed_food_extract",
+        "source_group_mismatch"
+      ]
+    },
+    {
+      "allergen_id": "coffee",
+      "lab_test_name": "Coffee",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 4,
+      "canonical_category": "coffee_tea_cocoa",
+      "allergen_type": "food",
+      "common_name": "Coffee",
+      "scientific_name": "Coffea species",
+      "aliases": [],
+      "file": "allergens/allergy_dairy.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "source_group_mismatch"
+      ]
+    },
+    {
+      "allergen_id": "tea",
+      "lab_test_name": "Tea",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 5,
+      "canonical_category": "coffee_tea_cocoa",
+      "allergen_type": "food",
+      "common_name": "Tea",
+      "scientific_name": "Camellia sinensis",
+      "aliases": [],
+      "file": "allergens/allergy_dairy.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "source_group_mismatch"
+      ]
+    },
+    {
+      "allergen_id": "tofu_bean_curd",
+      "lab_test_name": "Tofu (Bean Curd)",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 6,
+      "canonical_category": "legumes_pulses",
+      "allergen_type": "food",
+      "common_name": "Tofu (Soya Paneer)",
+      "scientific_name": "Glycine max",
+      "aliases": [
+        "Tofu (Soya Paneer)"
+      ],
+      "file": "allergens/allergy_dairy.json",
+      "review_flags": [
+        "source_group_mismatch"
+      ]
+    },
+    {
+      "allergen_id": "curd",
+      "lab_test_name": "Curd",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 7,
+      "canonical_category": "milk_and_dairy",
+      "allergen_type": "food",
+      "common_name": "Curd (Dahi)",
+      "scientific_name": null,
+      "aliases": [
+        "Curd (Dahi)"
+      ],
+      "file": "allergens/allergy_dairy.json",
+      "review_flags": [
+        "processed_food_extract"
+      ]
+    },
+    {
+      "allergen_id": "cow_milk",
+      "lab_test_name": "Cow Milk",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 8,
+      "canonical_category": "milk_and_dairy",
+      "allergen_type": "food",
+      "common_name": "Cow's Milk",
+      "scientific_name": "Bos taurus",
+      "aliases": [
+        "Cow's Milk"
+      ],
+      "file": "allergens/allergy_dairy.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "yogurt",
+      "lab_test_name": "Yogurt",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 9,
+      "canonical_category": "milk_and_dairy",
+      "allergen_type": "food",
+      "common_name": "Yogurt",
+      "scientific_name": null,
+      "aliases": [],
+      "file": "allergens/allergy_dairy.json",
+      "review_flags": [
+        "processed_food_extract"
+      ]
+    },
+    {
+      "allergen_id": "yeast",
+      "lab_test_name": "Yeast",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 10,
+      "canonical_category": "edible_fungi_and_yeast_foods",
+      "allergen_type": "food",
+      "common_name": "Yeast (Baker's or Brewer's)",
+      "scientific_name": "Saccharomyces cerevisiae (probable)",
+      "aliases": [
+        "Yeast (Baker's or Brewer's)"
+      ],
+      "file": "allergens/allergy_dairy.json",
+      "review_flags": [
+        "source_group_mismatch",
+        "species_unspecified"
+      ]
+    },
+    {
+      "allergen_id": "mushrooms",
+      "lab_test_name": "Mushrooms",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 11,
+      "canonical_category": "edible_fungi_and_yeast_foods",
+      "allergen_type": "food",
+      "common_name": "Mushrooms",
+      "scientific_name": "Agaricus bisporus (probable)",
+      "aliases": [],
+      "file": "allergens/allergy_dairy.json",
+      "review_flags": [
+        "source_group_mismatch",
+        "species_unspecified"
+      ]
+    },
+    {
+      "allergen_id": "casein_milk_protein",
+      "lab_test_name": "Casein (Milk Protein)",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 12,
+      "canonical_category": "milk_and_dairy",
+      "allergen_type": "food",
+      "common_name": "Casein (Milk Protein)",
+      "scientific_name": null,
+      "aliases": [],
+      "file": "allergens/allergy_dairy.json",
+      "review_flags": []
+    },
+    {
+      "allergen_id": "raisin",
+      "lab_test_name": "Raisin",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 1,
+      "canonical_category": "fruits_other",
+      "allergen_type": "food",
+      "common_name": "Raisin (Dried Grape)",
+      "scientific_name": "Vitis vinifera",
+      "aliases": [
+        "Raisin (Dried Grape)"
+      ],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "source_group_mismatch"
+      ]
+    },
+    {
+      "allergen_id": "wheat_flour",
+      "lab_test_name": "Wheat Flour",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 2,
+      "canonical_category": "cereals_grains",
+      "allergen_type": "food",
+      "common_name": "Wheat Flour (Atta)",
+      "scientific_name": "Triticum aestivum",
+      "aliases": [
+        "Wheat Flour (Atta)"
+      ],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "food_lower_performance"
+      ]
+    },
+    {
+      "allergen_id": "pea",
+      "lab_test_name": "Pea",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 3,
+      "canonical_category": "legumes_pulses",
+      "allergen_type": "food",
+      "common_name": "Green Pea (Matar)",
+      "scientific_name": "Pisum sativum",
+      "aliases": [
+        "Green Pea (Matar)"
+      ],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "cross_reactivity_pending"
+      ]
+    },
+    {
+      "allergen_id": "pumpkin_seed",
+      "lab_test_name": "Pumpkin Seed",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 4,
+      "canonical_category": "edible_seeds",
+      "allergen_type": "food",
+      "common_name": "Pumpkin Seed",
+      "scientific_name": null,
+      "aliases": [],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "species_unspecified"
+      ]
+    },
+    {
+      "allergen_id": "barley",
+      "lab_test_name": "Barley",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 5,
+      "canonical_category": "cereals_grains",
+      "allergen_type": "food",
+      "common_name": "Barley (Jau)",
+      "scientific_name": "Hordeum vulgare",
+      "aliases": [
+        "Barley (Jau)"
+      ],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "food_lower_performance"
+      ]
+    },
+    {
+      "allergen_id": "peanut",
+      "lab_test_name": "Peanut",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 6,
+      "canonical_category": "peanut",
+      "allergen_type": "food",
+      "common_name": "Peanut (Groundnut, Moongfali)",
+      "scientific_name": "Arachis hypogaea",
+      "aliases": [
+        "Peanut (Groundnut, Moongfali)"
+      ],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "serious_reaction_possible"
+      ]
+    },
+    {
+      "allergen_id": "oats",
+      "lab_test_name": "Oats",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 7,
+      "canonical_category": "cereals_grains",
+      "allergen_type": "food",
+      "common_name": "Oats (Jai)",
+      "scientific_name": "Avena sativa",
+      "aliases": [
+        "Oats (Jai)"
+      ],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "food_lower_performance"
+      ]
+    },
+    {
+      "allergen_id": "maize",
+      "lab_test_name": "Maize",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 8,
+      "canonical_category": "cereals_grains",
+      "allergen_type": "food",
+      "common_name": "Maize (Corn, Makka)",
+      "scientific_name": "Zea mays",
+      "aliases": [
+        "Maize (Corn, Makka)"
+      ],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "food_lower_performance"
+      ]
+    },
+    {
+      "allergen_id": "soya_bean",
+      "lab_test_name": "Soya Bean",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 9,
+      "canonical_category": "legumes_pulses",
+      "allergen_type": "food",
+      "common_name": "Soya Bean (Soy)",
+      "scientific_name": "Glycine max",
+      "aliases": [
+        "Soya Bean (Soy)"
+      ],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "food_lower_performance"
+      ]
+    },
+    {
+      "allergen_id": "sunflower_seed",
+      "lab_test_name": "Sunflower Seed",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 10,
+      "canonical_category": "edible_seeds",
+      "allergen_type": "food",
+      "common_name": "Sunflower Seed (Surajmukhi)",
+      "scientific_name": "Helianthus annuus",
+      "aliases": [
+        "Sunflower Seed (Surajmukhi)"
+      ],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "hazelnut",
+      "lab_test_name": "Hazelnut",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 11,
+      "canonical_category": "tree_nuts",
+      "allergen_type": "food",
+      "common_name": "Hazelnut",
+      "scientific_name": "Corylus avellana",
+      "aliases": [],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "serious_reaction_possible"
+      ]
+    },
+    {
+      "allergen_id": "semolina",
+      "lab_test_name": "Semolina",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 12,
+      "canonical_category": "cereals_grains",
+      "allergen_type": "food",
+      "common_name": "Semolina (Suji, Rava)",
+      "scientific_name": "Triticum durum",
+      "aliases": [
+        "Semolina (Suji, Rava)"
+      ],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "food_lower_performance",
+        "overlaps_wheat"
+      ]
+    },
+    {
+      "allergen_id": "walnut",
+      "lab_test_name": "Walnut",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 13,
+      "canonical_category": "tree_nuts",
+      "allergen_type": "food",
+      "common_name": "Walnut (Akhrot)",
+      "scientific_name": "Juglans regia",
+      "aliases": [
+        "Walnut (Akhrot)"
+      ],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "serious_reaction_possible"
+      ]
+    },
+    {
+      "allergen_id": "almond",
+      "lab_test_name": "Almond",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 14,
+      "canonical_category": "tree_nuts",
+      "allergen_type": "food",
+      "common_name": "Almond (Badam)",
+      "scientific_name": "Prunus dulcis",
+      "aliases": [
+        "Almond (Badam)"
+      ],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "serious_reaction_possible"
+      ]
+    },
+    {
+      "allergen_id": "cashew_nut",
+      "lab_test_name": "Cashew Nut",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 15,
+      "canonical_category": "tree_nuts",
+      "allergen_type": "food",
+      "common_name": "Cashew Nut (Kaju)",
+      "scientific_name": "Anacardium occidentale",
+      "aliases": [
+        "Cashew Nut (Kaju)"
+      ],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "serious_reaction_possible"
+      ]
+    },
+    {
+      "allergen_id": "sesame_seed",
+      "lab_test_name": "Sesame Seed",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 16,
+      "canonical_category": "edible_seeds",
+      "allergen_type": "food",
+      "common_name": "Sesame Seed (Til)",
+      "scientific_name": "Sesamum indicum",
+      "aliases": [
+        "Sesame Seed (Til)"
+      ],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "serious_reaction_possible"
+      ]
+    },
+    {
+      "allergen_id": "poppy_seed",
+      "lab_test_name": "Poppy (Seed)",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 17,
+      "canonical_category": "edible_seeds",
+      "allergen_type": "food",
+      "common_name": "Poppy Seed (Khus Khus)",
+      "scientific_name": "Papaver somniferum",
+      "aliases": [
+        "Poppy Seed (Khus Khus)"
+      ],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "pistachio_nut",
+      "lab_test_name": "Pistachio Nut",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 18,
+      "canonical_category": "tree_nuts",
+      "allergen_type": "food",
+      "common_name": "Pistachio (Pista)",
+      "scientific_name": "Pistacia vera",
+      "aliases": [
+        "Pistachio (Pista)"
+      ],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "serious_reaction_possible"
+      ]
+    },
+    {
+      "allergen_id": "flaxseed",
+      "lab_test_name": "Flaxseed",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 19,
+      "canonical_category": "edible_seeds",
+      "allergen_type": "food",
+      "common_name": "Flaxseed (Alsi)",
+      "scientific_name": "Linum usitatissimum",
+      "aliases": [
+        "Flaxseed (Alsi)"
+      ],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "lentil",
+      "lab_test_name": "Lentil",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 20,
+      "canonical_category": "legumes_pulses",
+      "allergen_type": "food",
+      "common_name": "Lentil (Masoor Dal)",
+      "scientific_name": "Lens culinaris",
+      "aliases": [
+        "Lentil (Masoor Dal)"
+      ],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "cross_reactivity_pending"
+      ]
+    },
+    {
+      "allergen_id": "coconut",
+      "lab_test_name": "Coconut",
+      "source_group": "allergy_seeds_nuts_legumes",
+      "source_group_display_order": 11,
+      "position_in_source_group": 21,
+      "canonical_category": "coconut_products",
+      "allergen_type": "food",
+      "common_name": "Coconut (Nariyal)",
+      "scientific_name": "Cocos nucifera",
+      "aliases": [
+        "Coconut (Nariyal)"
+      ],
+      "file": "allergens/allergy_seeds_nuts_legumes.json",
+      "review_flags": [
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "cinnamon",
+      "lab_test_name": "Cinnamon",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 1,
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "common_name": "Cinnamon (Dalchini)",
+      "scientific_name": "Cinnamomum species",
+      "aliases": [
+        "Cinnamon (Dalchini)"
+      ],
+      "file": "allergens/allergy_spices.json",
+      "review_flags": [
+        "contact_irritant_possible",
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "mint",
+      "lab_test_name": "Mint",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 2,
+      "canonical_category": "culinary_herbs",
+      "allergen_type": "food",
+      "common_name": "Mint (Pudina)",
+      "scientific_name": "Mentha species",
+      "aliases": [
+        "Mint (Pudina)"
+      ],
+      "file": "allergens/allergy_spices.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "taxonomy_check"
+      ]
+    },
+    {
+      "allergen_id": "mustard",
+      "lab_test_name": "Mustard",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 3,
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "common_name": "Mustard (Sarson, Rai)",
+      "scientific_name": "Brassica and Sinapis species",
+      "aliases": [
+        "Mustard (Sarson, Rai)"
+      ],
+      "file": "allergens/allergy_spices.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "species_unspecified"
+      ]
+    },
+    {
+      "allergen_id": "vanilla",
+      "lab_test_name": "Vanilla",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 4,
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "common_name": "Vanilla",
+      "scientific_name": "Vanilla planifolia",
+      "aliases": [],
+      "file": "allergens/allergy_spices.json",
+      "review_flags": [
+        "extract_unclear",
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "coriander",
+      "lab_test_name": "Coriander",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 5,
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "common_name": "Coriander (Dhania)",
+      "scientific_name": "Coriandrum sativum",
+      "aliases": [
+        "Coriander (Dhania)"
+      ],
+      "file": "allergens/allergy_spices.json",
+      "review_flags": [
+        "leaf_or_seed_unclear",
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "ginger",
+      "lab_test_name": "Ginger",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 6,
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "common_name": "Ginger (Adrak)",
+      "scientific_name": "Zingiber officinale",
+      "aliases": [
+        "Ginger (Adrak)"
+      ],
+      "file": "allergens/allergy_spices.json",
+      "review_flags": [
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "anise",
+      "lab_test_name": "Anise",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 7,
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "common_name": "Anise (Saunf Seed Type)",
+      "scientific_name": "Pimpinella anisum",
+      "aliases": [
+        "Anise (Saunf Seed Type)"
+      ],
+      "file": "allergens/allergy_spices.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "name_ambiguous"
+      ]
+    },
+    {
+      "allergen_id": "cardamon",
+      "lab_test_name": "Cardamon",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 8,
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "common_name": "Cardamom (Elaichi)",
+      "scientific_name": "Elettaria cardamomum",
+      "aliases": [
+        "Cardamom",
+        "Cardamom (Elaichi)",
+        "Elaichi"
+      ],
+      "file": "allergens/allergy_spices.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "name_spelling_variant"
+      ]
+    },
+    {
+      "allergen_id": "saffron",
+      "lab_test_name": "Saffron",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 9,
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "common_name": "Saffron (Kesar)",
+      "scientific_name": "Crocus sativus",
+      "aliases": [
+        "Saffron (Kesar)"
+      ],
+      "file": "allergens/allergy_spices.json",
+      "review_flags": [
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "thyme",
+      "lab_test_name": "Thyme",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 10,
+      "canonical_category": "culinary_herbs",
+      "allergen_type": "food",
+      "common_name": "Thyme",
+      "scientific_name": "Thymus species",
+      "aliases": [],
+      "file": "allergens/allergy_spices.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "taxonomy_check"
+      ]
+    },
+    {
+      "allergen_id": "basil",
+      "lab_test_name": "Basil",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 11,
+      "canonical_category": "culinary_herbs",
+      "allergen_type": "food",
+      "common_name": "Basil (Tulsi Type)",
+      "scientific_name": "Ocimum species",
+      "aliases": [
+        "Basil (Tulsi Type)"
+      ],
+      "file": "allergens/allergy_spices.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "species_unspecified"
+      ]
+    },
+    {
+      "allergen_id": "oregano",
+      "lab_test_name": "Oregano",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 12,
+      "canonical_category": "culinary_herbs",
+      "allergen_type": "food",
+      "common_name": "Oregano",
+      "scientific_name": "Origanum species",
+      "aliases": [],
+      "file": "allergens/allergy_spices.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "taxonomy_check"
+      ]
+    },
+    {
+      "allergen_id": "fennel",
+      "lab_test_name": "Fennel",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 13,
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "common_name": "Fennel (Saunf)",
+      "scientific_name": "Foeniculum vulgare",
+      "aliases": [
+        "Fennel (Saunf)"
+      ],
+      "file": "allergens/allergy_spices.json",
+      "review_flags": [
+        "leaf_or_seed_unclear",
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "sweet_pepper",
+      "lab_test_name": "Sweet Pepper",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 14,
+      "canonical_category": "vegetables_nightshade",
+      "allergen_type": "food",
+      "common_name": "Sweet Pepper (Capsicum, Shimla Mirch)",
+      "scientific_name": "Capsicum annuum",
+      "aliases": [
+        "Sweet Pepper (Capsicum, Shimla Mirch)"
+      ],
+      "file": "allergens/allergy_spices.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "source_group_mismatch"
+      ]
+    },
+    {
+      "allergen_id": "cloves",
+      "lab_test_name": "Cloves",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 15,
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "common_name": "Cloves (Laung)",
+      "scientific_name": "Syzygium aromaticum",
+      "aliases": [
+        "Cloves (Laung)"
+      ],
+      "file": "allergens/allergy_spices.json",
+      "review_flags": [
+        "contact_irritant_possible",
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "curry",
+      "lab_test_name": "Curry",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 16,
+      "canonical_category": "spice_mixtures",
+      "allergen_type": "food",
+      "common_name": "Curry Powder",
+      "scientific_name": "Mixture of spices",
+      "aliases": [
+        "Curry Powder"
+      ],
+      "file": "allergens/allergy_spices.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "mixed_extract",
+        "species_mix"
+      ]
+    },
+    {
+      "allergen_id": "black_pepper",
+      "lab_test_name": "Black Pepper",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 17,
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "common_name": "Black Pepper (Kali Mirch)",
+      "scientific_name": "Piper nigrum",
+      "aliases": [
+        "Black Pepper (Kali Mirch)"
+      ],
+      "file": "allergens/allergy_spices.json",
+      "review_flags": [
+        "contact_irritant_possible",
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "nutmeg",
+      "lab_test_name": "Nutmeg",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 18,
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "common_name": "Nutmeg (Jaiphal)",
+      "scientific_name": "Myristica fragrans",
+      "aliases": [
+        "Nutmeg (Jaiphal)"
+      ],
+      "file": "allergens/allergy_spices.json",
+      "review_flags": [
+        "limited_published_evidence"
+      ]
+    },
+    {
+      "allergen_id": "curcuma",
+      "lab_test_name": "Curcuma",
+      "source_group": "allergy_spices",
+      "source_group_display_order": 12,
+      "position_in_source_group": 19,
+      "canonical_category": "culinary_spices",
+      "allergen_type": "food",
+      "common_name": "Turmeric (Haldi)",
+      "scientific_name": "Curcuma longa",
+      "aliases": [
+        "Haldi",
+        "Turmeric",
+        "Turmeric (Haldi)"
+      ],
+      "file": "allergens/allergy_spices.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "name_botanical"
+      ]
+    },
+    {
+      "allergen_id": "jute",
+      "lab_test_name": "Jute",
+      "source_group": "allergy_occupational",
+      "source_group_display_order": 13,
+      "position_in_source_group": 1,
+      "canonical_category": "plant_fibres_and_dusts",
+      "allergen_type": "occupational",
+      "common_name": "Jute (Pat)",
+      "scientific_name": "Corchorus species",
+      "aliases": [
+        "Jute (Pat)"
+      ],
+      "file": "allergens/allergy_occupational.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "occupational_context"
+      ]
+    },
+    {
+      "allergen_id": "sheep_wool_treated",
+      "lab_test_name": "Sheep Wool (Treated)",
+      "source_group": "allergy_occupational",
+      "source_group_display_order": 13,
+      "position_in_source_group": 2,
+      "canonical_category": "animal_fibres_and_silk",
+      "allergen_type": "occupational",
+      "common_name": "Sheep Wool (Treated)",
+      "scientific_name": "Ovis aries",
+      "aliases": [],
+      "file": "allergens/allergy_occupational.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "occupational_context",
+        "overlaps_sheep_epithelium"
+      ]
+    },
+    {
+      "allergen_id": "silk_bombyx_mori",
+      "lab_test_name": "Silk (Bombyx Mori)",
+      "source_group": "allergy_occupational",
+      "source_group_display_order": 13,
+      "position_in_source_group": 3,
+      "canonical_category": "animal_fibres_and_silk",
+      "allergen_type": "occupational",
+      "common_name": "Silk (Bombyx Mori)",
+      "scientific_name": "Bombyx mori",
+      "aliases": [],
+      "file": "allergens/allergy_occupational.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "occupational_context"
+      ]
+    },
+    {
+      "allergen_id": "latex",
+      "lab_test_name": "Latex",
+      "source_group": "allergy_occupational",
+      "source_group_display_order": 13,
+      "position_in_source_group": 4,
+      "canonical_category": "natural_rubber_latex",
+      "allergen_type": "occupational",
+      "common_name": "Natural Rubber Latex",
+      "scientific_name": "Hevea brasiliensis",
+      "aliases": [
+        "Natural Rubber Latex"
+      ],
+      "file": "allergens/allergy_occupational.json",
+      "review_flags": [
+        "occupational_context",
+        "serious_reaction_possible"
+      ]
+    },
+    {
+      "allergen_id": "henna",
+      "lab_test_name": "Henna",
+      "source_group": "allergy_occupational",
+      "source_group_display_order": 13,
+      "position_in_source_group": 5,
+      "canonical_category": "henna_cosmetic_plant",
+      "allergen_type": "occupational",
+      "common_name": "Henna (Mehndi)",
+      "scientific_name": "Lawsonia inermis",
+      "aliases": [
+        "Henna (Mehndi)"
+      ],
+      "file": "allergens/allergy_occupational.json",
+      "review_flags": [
+        "contact_dermatitis_not_ige",
+        "limited_published_evidence",
+        "occupational_context"
+      ]
+    },
+    {
+      "allergen_id": "cotton_linters",
+      "lab_test_name": "Cotton Linters",
+      "source_group": "allergy_occupational",
+      "source_group_display_order": 13,
+      "position_in_source_group": 6,
+      "canonical_category": "plant_fibres_and_dusts",
+      "allergen_type": "occupational",
+      "common_name": "Cotton Linters",
+      "scientific_name": "Gossypium species",
+      "aliases": [],
+      "file": "allergens/allergy_occupational.json",
+      "review_flags": [
+        "limited_published_evidence",
+        "occupational_context"
+      ]
+    },
+    {
+      "allergen_id": "ascaris",
+      "lab_test_name": "Ascaris",
+      "source_group": "allergy_parasites",
+      "source_group_display_order": 14,
+      "position_in_source_group": 1,
+      "canonical_category": "parasitic_worms",
+      "allergen_type": "parasite",
+      "common_name": "Roundworm (Ascaris)",
+      "scientific_name": "Ascaris lumbricoides",
+      "aliases": [
+        "Roundworm (Ascaris)"
+      ],
+      "file": "allergens/allergy_parasites.json",
+      "review_flags": [
+        "not_diagnostic_of_infection"
+      ]
+    },
+    {
+      "allergen_id": "toxocara_canis",
+      "lab_test_name": "Toxocara Canis",
+      "source_group": "allergy_parasites",
+      "source_group_display_order": 14,
+      "position_in_source_group": 2,
+      "canonical_category": "parasitic_worms",
+      "allergen_type": "parasite",
+      "common_name": "Dog Roundworm (Toxocara canis)",
+      "scientific_name": "Toxocara canis",
+      "aliases": [
+        "Dog Roundworm (Toxocara canis)"
+      ],
+      "file": "allergens/allergy_parasites.json",
+      "review_flags": [
+        "not_diagnostic_of_infection"
+      ]
+    },
+    {
+      "allergen_id": "anisakis",
+      "lab_test_name": "Anisakis",
+      "source_group": "allergy_parasites",
+      "source_group_display_order": 14,
+      "position_in_source_group": 3,
+      "canonical_category": "fish_parasite_anisakis",
+      "allergen_type": "parasite",
+      "common_name": "Fish Worm (Anisakis)",
+      "scientific_name": "Anisakis simplex complex",
+      "aliases": [
+        "Fish Worm (Anisakis)"
+      ],
+      "file": "allergens/allergy_parasites.json",
+      "review_flags": [
+        "not_diagnostic_of_infection",
+        "serious_reaction_possible"
+      ]
+    },
+    {
+      "allergen_id": "ige_total",
+      "lab_test_name": "IGE total",
+      "source_group": "ige",
+      "source_group_display_order": 15,
+      "position_in_source_group": 1,
+      "canonical_category": "total_ige",
+      "allergen_type": "total_ige",
+      "common_name": "Total IgE",
+      "scientific_name": null,
+      "aliases": [
+        "Total IgE",
+        "Serum total IgE",
+        "IgE"
+      ],
+      "file": "total_ige_interpretation.json",
+      "review_flags": [
+        "reference_interval_from_lab",
+        "below_reference_wording_for_review"
+      ]
+    }
+  ]
+}

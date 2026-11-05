@@ -1,0 +1,33 @@
+{
+  "rules_version": "1.0.0",
+  "purpose": "Assay-specific classification. This file does not copy allergen education from the knowledge base.",
+  "note": "No laboratory has documented a verified cutoff, class table, or assay method for this deployment. Numeric fields stay null so results are not classified by assumption.",
+  "laboratories": [
+    {
+      "laboratory_id": "unverified",
+      "assay_id": null,
+      "manufacturer": null,
+      "method": null,
+      "unit": null,
+      "effective_date": null,
+      "documentation_reference": null,
+      "profiles": {
+        "specific_ige_default": {
+          "status": "pending_verification",
+          "unit": null,
+          "reporting_limit": null,
+          "positive_cutoff": null,
+          "cutoff_inclusive": null,
+          "classes": [],
+          "accept_laboratory_flag": false
+        },
+        "total_ige_printed_interval": {
+          "status": "pending_verification",
+          "unit": null,
+          "use_result_reference_interval": false
+        }
+      },
+      "analyte_rules": {}
+    }
+  ]
+}

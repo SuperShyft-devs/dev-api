@@ -1,0 +1,3724 @@
+{
+  "id": 1,
+  "user_id": 1,
+  "engagement_id": 1,
+  "booking_id": "fixture-booking",
+  "collection_date": "2026-01-01",
+  "blood_parameters": [
+    {
+      "group_name": "Allergy Pets",
+      "tests": [
+        {
+          "test_id": 189,
+          "test_name": "Pigeon Droppings",
+          "provider_test_name": "Pigeon Droppings",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 200,
+          "test_name": "Pigeon Feathers",
+          "provider_test_name": "Pigeon feathers",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 209,
+          "test_name": "Turkey Feathers",
+          "provider_test_name": "Turkey Feathers",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 208,
+          "test_name": "Epithelium + Serum Proteins Prot. Mouse",
+          "provider_test_name": "Epith.+Serum-Urine Prot. Mouse",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 207,
+          "test_name": "Pig Epithelium",
+          "provider_test_name": "Pig Epithelium",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 190,
+          "test_name": "Goose Feathers",
+          "provider_test_name": "Goose Feathers",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 191,
+          "test_name": "Cat Epithelium",
+          "provider_test_name": "Cat Epithelium",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 192,
+          "test_name": "Cat Dander",
+          "provider_test_name": "Cat Dander",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 193,
+          "test_name": "Budgerigar Dropping",
+          "provider_test_name": "Budgerigar Dropping",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 194,
+          "test_name": "Dog Epithelium",
+          "provider_test_name": "Dog Epithelium",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 195,
+          "test_name": "Budgerigar Feathers",
+          "provider_test_name": "Budgerigar Feathers",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 196,
+          "test_name": "Dog Dander",
+          "provider_test_name": "Dog Dander",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 197,
+          "test_name": "Canarian Feathers",
+          "provider_test_name": "Canarian Feathers",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 198,
+          "test_name": "Budgerigar Serum Proteins",
+          "provider_test_name": "Budgerigar Serum Proteins",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 199,
+          "test_name": "Rabbit Epithelium",
+          "provider_test_name": "Rabbit Epithelium",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 201,
+          "test_name": "Goat Epithelium",
+          "provider_test_name": "Goat Epithelium",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 202,
+          "test_name": "Chicken Feathers",
+          "provider_test_name": "Chicken Feathers",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 203,
+          "test_name": "Chicken Droppings",
+          "provider_test_name": "Chicken Droppings",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 204,
+          "test_name": "Sheep Epithelium",
+          "provider_test_name": "Sheep Epithelium",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 205,
+          "test_name": "Duck Feathers",
+          "provider_test_name": "Duck Feathers",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 206,
+          "test_name": "Cow Dander",
+          "provider_test_name": "Cow Dander",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        }
+      ]
+    },
+    {
+      "group_name": "Allergy Drugs",
+      "tests": [
+        {
+          "test_id": 165,
+          "test_name": "Penicillin V",
+          "provider_test_name": "Penicilloyl V",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 166,
+          "test_name": "Penicillin G",
+          "provider_test_name": "Penicilloyl G",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 188,
+          "test_name": "Benzocaine",
+          "provider_test_name": "Benzocaine , Has",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 187,
+          "test_name": "Aspirin",
+          "provider_test_name": "Aspirin, Has",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 186,
+          "test_name": "Ibuprofen",
+          "provider_test_name": "Ibuprofen",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 185,
+          "test_name": "Diclofenac",
+          "provider_test_name": "Diclofenac",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 184,
+          "test_name": "Azithromycin",
+          "provider_test_name": "Azithromycin",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 183,
+          "test_name": "Sulfamethoxazole",
+          "provider_test_name": "Sulfamethoxazole",
+          "unit": "IU/ML",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 182,
+          "test_name": "Gentamycin",
+          "provider_test_name": "Gentamycin, Has",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 181,
+          "test_name": "Ascorbic Acid (Vitamin C)",
+          "provider_test_name": "Ascorbic Acid (Vitamin C)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 180,
+          "test_name": "Cobalamin (Vitamin B12)",
+          "provider_test_name": "Cobalamin (Vitamin B12)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 179,
+          "test_name": "Cephalosporin",
+          "provider_test_name": "Cephalosporin, Has",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 178,
+          "test_name": "Metronidazole",
+          "provider_test_name": "Metronidazole",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 177,
+          "test_name": "Chloramphenicol",
+          "provider_test_name": "Chloramphenicol",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 176,
+          "test_name": "Tetracycline",
+          "provider_test_name": "Tetracycline, Has",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 175,
+          "test_name": "Ofloxacin",
+          "provider_test_name": "Ofloxacin",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 174,
+          "test_name": "Bromhexine",
+          "provider_test_name": "Bromhexine",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 173,
+          "test_name": "Amoxicillin",
+          "provider_test_name": "Amoxicillin, Has",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 172,
+          "test_name": "Oxacillin",
+          "provider_test_name": "Oxacillin",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 171,
+          "test_name": "Ampicillin",
+          "provider_test_name": "Ampicillin, Has",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 170,
+          "test_name": "Ciprofloxacin",
+          "provider_test_name": "Ciprofloxacin , Has",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 169,
+          "test_name": "Paracetamol",
+          "provider_test_name": "Paracetamol",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 168,
+          "test_name": "Thiamine (Vitamin B1)",
+          "provider_test_name": "Thiamine (Vitamin B1)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 167,
+          "test_name": "Prilocaine",
+          "provider_test_name": "Prilocaine",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        }
+      ]
+    },
+    {
+      "group_name": "Allergy Dust Mites",
+      "tests": [
+        {
+          "test_id": 222,
+          "test_name": "Euroglyphus Maynei",
+          "provider_test_name": "Euroglyphus Maynei",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 221,
+          "test_name": "Tyrophagus Putrescentiae",
+          "provider_test_name": "Tyrophagus Putresentiae",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 220,
+          "test_name": "Tobacco Dust",
+          "provider_test_name": "Tobacco Dust",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 219,
+          "test_name": "Lepidoglyphus Destructor",
+          "provider_test_name": "Lepidoglyphus Destructor",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 218,
+          "test_name": "House Dust \u2013 IFCI 1",
+          "provider_test_name": "House Dust , IFCI 1",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 217,
+          "test_name": "Dermatophagoides Microceras",
+          "provider_test_name": "Dermatophagoides Microceras",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 216,
+          "test_name": "Acarus Siro",
+          "provider_test_name": "Acarus Siro",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 215,
+          "test_name": "Blomia Tropicalis",
+          "provider_test_name": "Blomia Tropicalis",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 214,
+          "test_name": "Glycyphagus Domesticus",
+          "provider_test_name": "Glycyphagus Domesticus",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 213,
+          "test_name": "Dermatophagoides Farinae",
+          "provider_test_name": "Dermatophagoides Farinae",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 212,
+          "test_name": "Dermatophagoides Pteronyssinus",
+          "provider_test_name": "Dermatophagoides Pteronyssinus",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 211,
+          "test_name": "Hay Dust",
+          "provider_test_name": "Hay Dust",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 210,
+          "test_name": "Books Dust",
+          "provider_test_name": "Books Dust",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        }
+      ]
+    },
+    {
+      "group_name": "Allergy Insects",
+      "tests": [
+        {
+          "test_id": 223,
+          "test_name": "Vespula Germanica",
+          "provider_test_name": "Vespula Germanica (Common Wasp-Yellow Jacket)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 224,
+          "test_name": "Blatella Germanica",
+          "provider_test_name": "Blatella Germanica (Cockroach)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 225,
+          "test_name": "Heterocera Mix",
+          "provider_test_name": "Heterocera Mix(Moth)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 226,
+          "test_name": "Aedes Communis",
+          "provider_test_name": "Aedes Comunis (Common Mosquito)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 227,
+          "test_name": "Housefly Musca Domestica",
+          "provider_test_name": "Housefly Musca Domestica",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 228,
+          "test_name": "Apis Mellifera",
+          "provider_test_name": "Apis Mellifera ( Honey Bee)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        }
+      ]
+    },
+    {
+      "group_name": "Allergy Grass",
+      "tests": [
+        {
+          "test_id": 229,
+          "test_name": "Dactylis Glomerata",
+          "provider_test_name": "Dactylis Glomerata (Cocksfoot)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 230,
+          "test_name": "Phleum Pratense",
+          "provider_test_name": "Phleum Pratense (Timothy)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 231,
+          "test_name": "Cynodon Dactylon",
+          "provider_test_name": "Cynodon Dactylon /(Bermuda Grass)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 232,
+          "test_name": "Lolium Perenne",
+          "provider_test_name": "Lolium Perenne (Rye-Grass)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 233,
+          "test_name": "Agrostis Stolonifera",
+          "provider_test_name": "Agrostis Stolonifera (Bentgrass)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 234,
+          "test_name": "Sorghum Halepense",
+          "provider_test_name": "Sorghum Halepense (Johnson Grass)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 235,
+          "test_name": "Festuca Elatior",
+          "provider_test_name": "Festuca Elatior (Meadow Fescue)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 236,
+          "test_name": "Phragmites Communis",
+          "provider_test_name": "Phragmites Communis (Common Reed)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        }
+      ]
+    },
+    {
+      "group_name": "Allergy Moulds & Yeast",
+      "tests": [
+        {
+          "test_id": 237,
+          "test_name": "Penicillium Notatum",
+          "provider_test_name": "Penicillium Notatum",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 238,
+          "test_name": "Cladosporium Herbarum",
+          "provider_test_name": "Cladosporium Herbarum",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 239,
+          "test_name": "Aspergillus Fumigatus",
+          "provider_test_name": "Aspergillus Fumigatus",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 240,
+          "test_name": "Mucor Racemosus",
+          "provider_test_name": "Mucor Racemosus",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 241,
+          "test_name": "Candida Albicans",
+          "provider_test_name": "Candida Albicans",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 242,
+          "test_name": "Alternaria Alternata",
+          "provider_test_name": "Alternaria Alternata",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 243,
+          "test_name": "Curvularia Lunata",
+          "provider_test_name": "Curvularia Lunata",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 244,
+          "test_name": "Trichoderma Viride",
+          "provider_test_name": "Trichoderma Viride",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 245,
+          "test_name": "Phoma Betae",
+          "provider_test_name": "Phoma Betae",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 246,
+          "test_name": "Rhizopus Nigricans",
+          "provider_test_name": "Rhizopus Nigricans",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        }
+      ]
+    },
+    {
+      "group_name": "Allergy Weed & Tree",
+      "tests": [
+        {
+          "test_id": 247,
+          "test_name": "Amaranthus Retroflexus",
+          "provider_test_name": "Amaranthus Retroflexus (Common Pigweed)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 248,
+          "test_name": "Eucalyptus Spp",
+          "provider_test_name": "Eucalyptus Spp (Gum-Tree)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 249,
+          "test_name": "Xanthium Commune",
+          "provider_test_name": "Xanthium Commune (Cocklebur)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 250,
+          "test_name": "Morus Alba",
+          "provider_test_name": "Morus Alba (Red Mulberry)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 251,
+          "test_name": "Prosopis Juliflora",
+          "provider_test_name": "Prosopis Juliflora (Mesquite)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 252,
+          "test_name": "Nart V1 / Artemisia Vulgaris",
+          "provider_test_name": "nArt v1 Artemisia Vulgaris (Mugwort)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 253,
+          "test_name": "Acacia Spp",
+          "provider_test_name": "Acacia Spp (Acacia)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 254,
+          "test_name": "Oak Wood",
+          "provider_test_name": "Oak Wood",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 255,
+          "test_name": "Salix Caprea",
+          "provider_test_name": "Salix Caprea (Willow)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 256,
+          "test_name": "Chenopodium Album",
+          "provider_test_name": "Chenopodium Album (Goosefoot)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 257,
+          "test_name": "Brassica Napus",
+          "provider_test_name": "Brassica Napus (Rape)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        }
+      ]
+    },
+    {
+      "group_name": "Allergy Veg",
+      "tests": [
+        {
+          "test_id": 275,
+          "test_name": "Egg Plant / Aubergine",
+          "provider_test_name": "Egg Plant/Aubergine",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 276,
+          "test_name": "Onion",
+          "provider_test_name": "Onion",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 277,
+          "test_name": "Garlic",
+          "provider_test_name": "Garlic",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 278,
+          "test_name": "Cauliflower",
+          "provider_test_name": "Cauliflower",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 279,
+          "test_name": "Pumpkin",
+          "provider_test_name": "Pumpkin",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 280,
+          "test_name": "Red Radish",
+          "provider_test_name": "Red Radish",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 281,
+          "test_name": "Sweet Potato",
+          "provider_test_name": "Sweet Potato",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 282,
+          "test_name": "Spinach",
+          "provider_test_name": "Spinach",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 283,
+          "test_name": "Lettuce",
+          "provider_test_name": "Lettuce",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 284,
+          "test_name": "Cabbage",
+          "provider_test_name": "Cabbage",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 285,
+          "test_name": "Cucumber",
+          "provider_test_name": "Cucumber",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 286,
+          "test_name": "Carrot",
+          "provider_test_name": "Carrot",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 287,
+          "test_name": "French Bean",
+          "provider_test_name": "French Bean",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 288,
+          "test_name": "Broccoli",
+          "provider_test_name": "Broccoli",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 289,
+          "test_name": "Tomato",
+          "provider_test_name": "Tomato",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 290,
+          "test_name": "Beet",
+          "provider_test_name": "Beet",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 291,
+          "test_name": "Potato",
+          "provider_test_name": "Potato",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 292,
+          "test_name": "Date",
+          "provider_test_name": "Date",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 293,
+          "test_name": "Apricot",
+          "provider_test_name": "Apricot",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 294,
+          "test_name": "Cherry",
+          "provider_test_name": "Cherry",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 295,
+          "test_name": "Pineapple",
+          "provider_test_name": "Pineapple",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 296,
+          "test_name": "Plum",
+          "provider_test_name": "Plum",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 297,
+          "test_name": "Orange",
+          "provider_test_name": "Orange",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 298,
+          "test_name": "Grape",
+          "provider_test_name": "Grape",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 299,
+          "test_name": "Pomegranate",
+          "provider_test_name": "Pomegranate",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 300,
+          "test_name": "Guava",
+          "provider_test_name": "Guava",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 301,
+          "test_name": "Cranberry",
+          "provider_test_name": "Cranberry",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 302,
+          "test_name": "Fig",
+          "provider_test_name": "Fig",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 303,
+          "test_name": "Olive",
+          "provider_test_name": "Olive",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 304,
+          "test_name": "Watermelon",
+          "provider_test_name": "Watermelon",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 305,
+          "test_name": "Lychee",
+          "provider_test_name": "Lychee",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 306,
+          "test_name": "Papaya",
+          "provider_test_name": "Papaya",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 307,
+          "test_name": "Strawberry",
+          "provider_test_name": "Strawberry",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 308,
+          "test_name": "Mango",
+          "provider_test_name": "Mango",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 309,
+          "test_name": "Apple",
+          "provider_test_name": "Apple",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 310,
+          "test_name": "Banana",
+          "provider_test_name": "Banana",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 311,
+          "test_name": "Kiwi",
+          "provider_test_name": "Kiwi",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 312,
+          "test_name": "Melon",
+          "provider_test_name": "Melon",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 313,
+          "test_name": "Peach",
+          "provider_test_name": "Peach",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 314,
+          "test_name": "Rice",
+          "provider_test_name": "Rice",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        }
+      ]
+    },
+    {
+      "group_name": "Allergy Non-Veg",
+      "tests": [
+        {
+          "test_id": 258,
+          "test_name": "Mackerel",
+          "provider_test_name": "Mackerel",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 259,
+          "test_name": "Sardine",
+          "provider_test_name": "Sardine",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 260,
+          "test_name": "Carp Fish",
+          "provider_test_name": "Carp Fish",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 261,
+          "test_name": "Salmon",
+          "provider_test_name": "Salmon",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 262,
+          "test_name": "Fish (Cod)",
+          "provider_test_name": "Fish (Cod)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 263,
+          "test_name": "Mutton",
+          "provider_test_name": "Mutton",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 264,
+          "test_name": "Chicken Meat",
+          "provider_test_name": "Chicken Meat",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 265,
+          "test_name": "Turkey",
+          "provider_test_name": "Turkey",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 266,
+          "test_name": "Duck Meat",
+          "provider_test_name": "Duck Meat",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 267,
+          "test_name": "Beef",
+          "provider_test_name": "Beef",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 268,
+          "test_name": "Pork",
+          "provider_test_name": "Pork",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 269,
+          "test_name": "Crab",
+          "provider_test_name": "Crab",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 270,
+          "test_name": "Shrimp",
+          "provider_test_name": "Shrimp",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 271,
+          "test_name": "Lobster",
+          "provider_test_name": "Lobster",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 272,
+          "test_name": "Whole Egg (Hen)",
+          "provider_test_name": "Whole Egg (Hen)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 273,
+          "test_name": "Egg Yolk Elisa",
+          "provider_test_name": "Egg Yolk",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 274,
+          "test_name": "Egg White Elisa",
+          "provider_test_name": "Egg white",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        }
+      ]
+    },
+    {
+      "group_name": "Allergy Dairy",
+      "tests": [
+        {
+          "test_id": 315,
+          "test_name": "Cheese Cheddar Type",
+          "provider_test_name": "Cheese Cheddar Type",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 316,
+          "test_name": "Coconut Milk",
+          "provider_test_name": "Coconut Milk",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 317,
+          "test_name": "Chocolate",
+          "provider_test_name": "Chocolate",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 318,
+          "test_name": "Coffee",
+          "provider_test_name": "Coffee",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 319,
+          "test_name": "Tea",
+          "provider_test_name": "Tea",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 320,
+          "test_name": "Tofu (Bean Curd)",
+          "provider_test_name": "Tofu (Bean Curd)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 321,
+          "test_name": "Curd",
+          "provider_test_name": "Curd",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 322,
+          "test_name": "Cow Milk",
+          "provider_test_name": "Cow Milk",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 323,
+          "test_name": "Yogurt",
+          "provider_test_name": "Yogurt",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 324,
+          "test_name": "Yeast",
+          "provider_test_name": "Yeast",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 325,
+          "test_name": "Mushrooms",
+          "provider_test_name": "Mushrooms",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 326,
+          "test_name": "Casein (Milk Protein)",
+          "provider_test_name": "Casein",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        }
+      ]
+    },
+    {
+      "group_name": "Allergy Seeds/Nuts/Legumes",
+      "tests": [
+        {
+          "test_id": 327,
+          "test_name": "Raisin",
+          "provider_test_name": "Raisin",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 328,
+          "test_name": "Wheat Flour",
+          "provider_test_name": "Wheat Flour",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 329,
+          "test_name": "Pea",
+          "provider_test_name": "Pea",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 330,
+          "test_name": "Pumpkin Seed",
+          "provider_test_name": "Pumpkin Seed",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 331,
+          "test_name": "Barley",
+          "provider_test_name": "Barley",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 332,
+          "test_name": "Peanut",
+          "provider_test_name": "Peanut",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 333,
+          "test_name": "Oats",
+          "provider_test_name": "Oats",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 334,
+          "test_name": "Maize",
+          "provider_test_name": "Maize",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 335,
+          "test_name": "Soya Bean",
+          "provider_test_name": "Soya Bean",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 336,
+          "test_name": "Sunflower Seed",
+          "provider_test_name": "Sunflower Seed",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 337,
+          "test_name": "Hazelnut",
+          "provider_test_name": "Hazelnut",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 338,
+          "test_name": "Semolina",
+          "provider_test_name": "Semolina",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 339,
+          "test_name": "Walnut",
+          "provider_test_name": "Walnut",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 340,
+          "test_name": "Almond",
+          "provider_test_name": "Almond",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 341,
+          "test_name": "Cashew Nut",
+          "provider_test_name": "Cashew Nut",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 342,
+          "test_name": "Sesame Seed",
+          "provider_test_name": "Sesame Seed",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 343,
+          "test_name": "Poppy (Seed)",
+          "provider_test_name": "Poppy (Seed)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 344,
+          "test_name": "Pistachio Nut",
+          "provider_test_name": "Pistachio Nut",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 345,
+          "test_name": "Flaxseed",
+          "provider_test_name": "Flaxseed",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 346,
+          "test_name": "Lentil",
+          "provider_test_name": "Lentil",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 347,
+          "test_name": "Coconut",
+          "provider_test_name": "Coconut",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        }
+      ]
+    },
+    {
+      "group_name": "Allergy Spices",
+      "tests": [
+        {
+          "test_id": 348,
+          "test_name": "Cinnamon",
+          "provider_test_name": "Ciannamon",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 349,
+          "test_name": "Mint",
+          "provider_test_name": "Mint",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 350,
+          "test_name": "Mustard",
+          "provider_test_name": "Mustard",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 351,
+          "test_name": "Vanilla",
+          "provider_test_name": "Vanilla",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 352,
+          "test_name": "Coriander",
+          "provider_test_name": "Coriander",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 353,
+          "test_name": "Ginger",
+          "provider_test_name": "Ginger",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 354,
+          "test_name": "Anise",
+          "provider_test_name": "Anise",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 355,
+          "test_name": "Cardamon",
+          "provider_test_name": "Cardamon",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 356,
+          "test_name": "Saffron",
+          "provider_test_name": "Saffron",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 357,
+          "test_name": "Thyme",
+          "provider_test_name": "Thyme",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 358,
+          "test_name": "Basil",
+          "provider_test_name": "Basil",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 359,
+          "test_name": "Oregano",
+          "provider_test_name": "Oregano",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 361,
+          "test_name": "Fennel",
+          "provider_test_name": "Fennel",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 360,
+          "test_name": "Sweet Pepper",
+          "provider_test_name": "Sweet Pepper",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 362,
+          "test_name": "Cloves",
+          "provider_test_name": "Cloves",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 363,
+          "test_name": "Curry",
+          "provider_test_name": "Curry",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 364,
+          "test_name": "Black Pepper",
+          "provider_test_name": "Black pepper",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 365,
+          "test_name": "Nutmeg",
+          "provider_test_name": "Nutmeg",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 366,
+          "test_name": "Curcuma",
+          "provider_test_name": "Curcuma",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        }
+      ]
+    },
+    {
+      "group_name": "Allergy Occupational",
+      "tests": [
+        {
+          "test_id": 367,
+          "test_name": "Jute",
+          "provider_test_name": "Jute",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 368,
+          "test_name": "Sheep Wool (Treated)",
+          "provider_test_name": "Sheep Wool (Treated)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 369,
+          "test_name": "Silk (Bombyx Mori)",
+          "provider_test_name": "Silk (Bombyx Mori)",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 370,
+          "test_name": "Latex",
+          "provider_test_name": "Latex",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 371,
+          "test_name": "Henna",
+          "provider_test_name": "Henna",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 372,
+          "test_name": "Cotton Linters",
+          "provider_test_name": "Cotton Linters",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        }
+      ]
+    },
+    {
+      "group_name": "Allergy Parasites",
+      "tests": [
+        {
+          "test_id": 373,
+          "test_name": "Ascaris",
+          "provider_test_name": "Ascaris",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 374,
+          "test_name": "Toxocara Canis",
+          "provider_test_name": "Toxocara Canis",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        },
+        {
+          "test_id": 375,
+          "test_name": "Anisakis",
+          "provider_test_name": "Anisakis",
+          "unit": "IU/mL",
+          "value": 0.35,
+          "lower_range": 0.0,
+          "higher_range": 0.35
+        }
+      ]
+    },
+    {
+      "group_name": "Allergy IgE",
+      "tests": [
+        {
+          "test_id": 154,
+          "test_name": "IGE total",
+          "provider_test_name": "IMMUNOGLOBULIN E (IgE) TOTAL",
+          "unit": "IU/ml",
+          "value": 30.9,
+          "lower_range": 0.0,
+          "higher_range": 158.0
+        }
+      ]
+    }
+  ],
+  "blood_report_raw": {
+    "digital_data": [
+      {
+        "value": "30.9",
+        "unit": "IU/ml",
+        "min_range": "0",
+        "max_range": "158",
+        "parameter_id": "1304",
+        "test_name": "IMMUNOGLOBULIN E (IgE) TOTAL"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3663",
+        "test_name": "Penicilloyl V"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "<0.35",
+        "parameter_id": "3662",
+        "test_name": "Penicilloyl G"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3655",
+        "test_name": "Paracetamol"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3654",
+        "test_name": "Prilocaine"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3678",
+        "test_name": "Ampicillin, Has"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3693",
+        "test_name": "Thiamine (Vitamin B1)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3691",
+        "test_name": "Bromhexine"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3679",
+        "test_name": "Amoxicillin, Has"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3672",
+        "test_name": "Chloramphenicol"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3669",
+        "test_name": "Ciprofloxacin , Has"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3680",
+        "test_name": "Tetracycline, Has"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3694",
+        "test_name": "Cobalamin (Vitamin B12)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3670",
+        "test_name": "Oxacillin"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3701",
+        "test_name": "Pigeon Droppings"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3681",
+        "test_name": "Cephalosporin, Has"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/ML",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "9312",
+        "test_name": "Sulfamethoxazole"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3671",
+        "test_name": "Ofloxacin"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3682",
+        "test_name": "Gentamycin, Has"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3702",
+        "test_name": "Goose Feathers"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3697",
+        "test_name": "Cat Epithelium"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3673",
+        "test_name": "Metronidazole"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3703",
+        "test_name": "Budgerigar Dropping"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3698",
+        "test_name": "Dog Epithelium"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3660",
+        "test_name": "Diclofenac"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3714",
+        "test_name": "Cat Dander"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3661",
+        "test_name": "Ibuprofen"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3704",
+        "test_name": "Budgerigar Feathers"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3700",
+        "test_name": "Dog Dander"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3892",
+        "test_name": "Books Dust"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3715",
+        "test_name": "Canarian Feathers"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3695",
+        "test_name": "Ascorbic Acid (Vitamin C)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3656",
+        "test_name": "Aspirin, Has"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3705",
+        "test_name": "Budgerigar Serum Proteins"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3709",
+        "test_name": "Rabbit Epithelium"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3716",
+        "test_name": "Pigeon feathers"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3894",
+        "test_name": "Hay Dust"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3677",
+        "test_name": "Azithromycin"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3706",
+        "test_name": "Goat Epithelium"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3710",
+        "test_name": "Chicken Feathers"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3653",
+        "test_name": "Benzocaine , Has"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3728",
+        "test_name": "Vespula Germanica (Common Wasp-Yellow Jacket)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3717",
+        "test_name": "Chicken Droppings"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3718",
+        "test_name": "Dermatophagoides Pteronyssinus"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3707",
+        "test_name": "Sheep Epithelium"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3711",
+        "test_name": "Duck Feathers"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3729",
+        "test_name": "Blatella Germanica (Cockroach)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3699",
+        "test_name": "Cow Dander"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3724",
+        "test_name": "Glycyphagus Domesticus"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3719",
+        "test_name": "Dermatophagoides Farinae"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3708",
+        "test_name": "Pig Epithelium"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3735",
+        "test_name": "Dactylis Glomerata (Cocksfoot)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3730",
+        "test_name": "Heterocera Mix(Moth)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3721",
+        "test_name": "Acarus Siro"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3732",
+        "test_name": "Aedes Comunis (Common Mosquito)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3736",
+        "test_name": "Phleum Pratense (Timothy)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3712",
+        "test_name": "Epith.+Serum-Urine Prot. Mouse"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3726",
+        "test_name": "Blomia Tropicalis"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3722",
+        "test_name": "Lepidoglyphus Destructor"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3737",
+        "test_name": "Cynodon Dactylon /(Bermuda Grass)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3742",
+        "test_name": "Penicillium Notatum"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3713",
+        "test_name": "Turkey Feathers"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3750",
+        "test_name": "Trichoderma Viride"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3720",
+        "test_name": "Dermatophagoides Microceras"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3723",
+        "test_name": "Tyrophagus Putresentiae"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3743",
+        "test_name": "Cladosporium Herbarum"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3738",
+        "test_name": "Lolium Perenne (Rye-Grass)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3893",
+        "test_name": "House Dust , IFCI 1"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3751",
+        "test_name": "Rhizopus Nigricans"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3725",
+        "test_name": "Euroglyphus Maynei"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3744",
+        "test_name": "Aspergillus Fumigatus"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3739",
+        "test_name": "Agrostis Stolonifera (Bentgrass)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3755",
+        "test_name": "Amaranthus Retroflexus (Common Pigweed)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3891",
+        "test_name": "Tobacco Dust"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3731",
+        "test_name": "Housefly Musca Domestica"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3758",
+        "test_name": "Eucalyptus Spp (Gum-Tree)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3745",
+        "test_name": "Mucor Racemosus"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3756",
+        "test_name": "Xanthium Commune (Cocklebur)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3740",
+        "test_name": "Sorghum Halepense (Johnson Grass)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3727",
+        "test_name": "Apis Mellifera ( Honey Bee)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3759",
+        "test_name": "Morus Alba (Red Mulberry)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3746",
+        "test_name": "Candida Albicans"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3733",
+        "test_name": "Festuca Elatior (Meadow Fescue)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3849",
+        "test_name": "Sardine"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3757",
+        "test_name": "nArt v1 Artemisia Vulgaris (Mugwort)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3747",
+        "test_name": "Alternaria Alternata"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3760",
+        "test_name": "Prosopis Juliflora (Mesquite)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3734",
+        "test_name": "Phragmites Communis (Common Reed)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3834",
+        "test_name": "Mutton"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3851",
+        "test_name": "Mackerel"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3748",
+        "test_name": "Curvularia Lunata"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3761",
+        "test_name": "Acacia Spp (Acacia)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3847",
+        "test_name": "Carp Fish"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3749",
+        "test_name": "Phoma Betae"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3836",
+        "test_name": "Chicken Meat"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3786",
+        "test_name": "Pumpkin"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3762",
+        "test_name": "Oak Wood"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3844",
+        "test_name": "Crab"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3838",
+        "test_name": "Turkey"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3765",
+        "test_name": "Carrot"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3878",
+        "test_name": "Red Radish"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3763",
+        "test_name": "Salix Caprea (Willow)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3845",
+        "test_name": "Shrimp"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3835",
+        "test_name": "Duck Meat"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3792",
+        "test_name": "Broccoli"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3850",
+        "test_name": "Lobster"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3778",
+        "test_name": "Sweet Potato"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3753",
+        "test_name": "Chenopodium Album (Goosefoot)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3833",
+        "test_name": "Beef"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3800",
+        "test_name": "Beet"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3848",
+        "test_name": "Salmon"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3832",
+        "test_name": "Pork"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3780",
+        "test_name": "Lemon"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3754",
+        "test_name": "Brassica Napus (Rape)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3795",
+        "test_name": "Date"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3767",
+        "test_name": "Potato"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3843",
+        "test_name": "Fish (Cod)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3837",
+        "test_name": "Whole Egg (Hen)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3793",
+        "test_name": "Egg Plant/Aubergine"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3788",
+        "test_name": "Apricot"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3782",
+        "test_name": "Spinach"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3766",
+        "test_name": "Orange"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3770",
+        "test_name": "Onion"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "9313",
+        "test_name": "Egg Yolk"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3789",
+        "test_name": "Cherry"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3783",
+        "test_name": "Lettuce"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3799",
+        "test_name": "Pomegranate"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3769",
+        "test_name": "Garlic"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "9314",
+        "test_name": "Egg white"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3781",
+        "test_name": "Pineapple"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3803",
+        "test_name": "Cranberry"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3784",
+        "test_name": "Cabbage"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3820",
+        "test_name": "Millet"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3774",
+        "test_name": "Mango"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3804",
+        "test_name": "Olive"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3790",
+        "test_name": "Plum"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3841",
+        "test_name": "Curd"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3829",
+        "test_name": "Chick Pea"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3775",
+        "test_name": "Banana"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3805",
+        "test_name": "Lychee"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3791",
+        "test_name": "Grape"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3796",
+        "test_name": "Cauliflower"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3839",
+        "test_name": "Cow Milk"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3776",
+        "test_name": "Pear"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3768",
+        "test_name": "Strawberry"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3797",
+        "test_name": "Guava"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3779",
+        "test_name": "Raisin"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3777",
+        "test_name": "Peach"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3842",
+        "test_name": "Yogurt"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3771",
+        "test_name": "Apple"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3807",
+        "test_name": "Wheat Flour"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3801",
+        "test_name": "Fig"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3840",
+        "test_name": "Cheese Cheddar Type"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3814",
+        "test_name": "Pea"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3870",
+        "test_name": "Yeast"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3772",
+        "test_name": "Kiwi"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3802",
+        "test_name": "Watermelon"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3808",
+        "test_name": "Barley"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3822",
+        "test_name": "Pumpkin Seed"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3872",
+        "test_name": "Mushrooms"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3876",
+        "test_name": "Coconut Milk"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3773",
+        "test_name": "Melon"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3854",
+        "test_name": "Ciannamon"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3798",
+        "test_name": "Papaya"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3809",
+        "test_name": "Oats"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3871",
+        "test_name": "Chocolate"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3811",
+        "test_name": "Rice"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "217",
+        "test_name": "Casein"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3815",
+        "test_name": "Peanut"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3853",
+        "test_name": "Mint"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3813",
+        "test_name": "Mustard"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3817",
+        "test_name": "Hazelnut"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3816",
+        "test_name": "Soya Bean"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3873",
+        "test_name": "Coffee"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3810",
+        "test_name": "Maize"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3855",
+        "test_name": "Vanilla"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3866",
+        "test_name": "Coriander"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3888",
+        "test_name": "Jute"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3818",
+        "test_name": "Almond"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3874",
+        "test_name": "Tea"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3823",
+        "test_name": "Semolina"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3831",
+        "test_name": "Sunflower Seed"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3859",
+        "test_name": "Ginger"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3867",
+        "test_name": "Saffron"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3889",
+        "test_name": "Sheep Wool (Treated)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3826",
+        "test_name": "Poppy (Seed)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3875",
+        "test_name": "Tofu (Bean Curd)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3824",
+        "test_name": "Cashew Nut"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3828",
+        "test_name": "Walnut"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3890",
+        "test_name": "Silk (Bombyx Mori)"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3860",
+        "test_name": "Anise"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3868",
+        "test_name": "Oregano"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3821",
+        "test_name": "Flaxseed"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3825",
+        "test_name": "Pistachio Nut"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3812",
+        "test_name": "Sesame Seed"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3861",
+        "test_name": "Thyme"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3886",
+        "test_name": "Latex"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3857",
+        "test_name": "Cloves"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3827",
+        "test_name": "Lentil"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3856",
+        "test_name": "Cardamon"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3794",
+        "test_name": "Fennel"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3885",
+        "test_name": "Henna"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3862",
+        "test_name": "Black pepper"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3819",
+        "test_name": "Coconut"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3858",
+        "test_name": "Basil"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3863",
+        "test_name": "Curry"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3882",
+        "test_name": "Ascaris"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3864",
+        "test_name": "Nutmeg"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3785",
+        "test_name": "Sweet Pepper"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3883",
+        "test_name": "Toxocara Canis"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3865",
+        "test_name": "Curcuma"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3884",
+        "test_name": "Anisakis"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3877",
+        "test_name": "Cucumber"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3887",
+        "test_name": "Cotton Linters"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3830",
+        "test_name": "French Bean"
+      },
+      {
+        "value": "<0.35",
+        "unit": "IU/mL",
+        "min_range": "0",
+        "max_range": "0.35",
+        "parameter_id": "3764",
+        "test_name": "Tomato"
+      }
+    ]
+  }
+}

@@ -80,7 +80,16 @@ def _norm_token(value: str) -> str:
 
 _register(
     "pancreatic_cancer",
-    ("pancreatic cancer", "pancreatic", "pancreas cancer", "ca 19-9", "ca19-9", "ca199"),
+    (
+        "pancreatic cancer",
+        "pancreatic",
+        "pancreas cancer",
+        "ca 19-9",
+        "ca19-9",
+        "ca199",
+        "ca 19.9",
+        "ca-19.9",
+    ),
 )
 _register(
     "colorectal_cancer",
@@ -320,7 +329,10 @@ def _marker_from_entry(entry: dict[str, Any]) -> _MarkerHit | None:
     )
 
 
-def _collect(payload: AssessmentPayload) -> dict[str, _CancerBucket]:
+def _collect(
+    payload: AssessmentPayload,
+    blood_markers: list[dict[str, Any]] | None = None,
+) -> dict[str, _CancerBucket]:
     buckets: dict[str, _CancerBucket] = {}
     raw = _unwrap(payload.raw) if isinstance(payload.raw, dict) else {}
     diseases = raw.get("diseases")
@@ -352,7 +364,9 @@ def _collect(payload: AssessmentPayload) -> dict[str, _CancerBucket]:
         )
 
     seen_markers: set[tuple[str, str | None, str]] = set()
-    for entry in _iter_marker_entries(raw):
+    marker_entries = list(_iter_marker_entries(raw))
+    marker_entries.extend(blood_markers or [])
+    for entry in marker_entries:
         hit = _marker_from_entry(entry)
         if hit is None:
             continue
@@ -581,10 +595,11 @@ def build_cancer_sections(
     payload: AssessmentPayload,
     *,
     kb_store: KnowledgeBaseStore,
+    blood_markers: list[dict[str, Any]] | None = None,
 ) -> tuple[list[IndividualCancerInformation], DetailedCancerScreening]:
     """Return individual cancer pages, then the consolidated screening block."""
     gender = payload.gender or payload.sex
-    buckets = _collect(payload)
+    buckets = _collect(payload, blood_markers)
     codes = _ordered_codes(buckets, gender)
 
     information: list[IndividualCancerInformation] = []

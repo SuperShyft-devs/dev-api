@@ -1,0 +1,661 @@
+{
+  "kb": "allergy_kb",
+  "kb_version": "1.0.0-draft",
+  "source_group": "allergy_dairy",
+  "source_group_display_order": 10,
+  "patient_group_name": "Dairy and Related Foods",
+  "patient_group_explanation": "Milk products plus coffee, tea, chocolate, tofu, yeast and mushrooms.",
+  "group_caution_rule_ids": [
+    "C_SENS",
+    "C_CLASS",
+    "C_FOOD"
+  ],
+  "test_count": 12,
+  "clinical_review_status": "pending",
+  "allergens": [
+    {
+      "allergen_id": "cheese_cheddar_type",
+      "lab_test_name": "Cheese Cheddar Type",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 1,
+      "aliases": [
+        "Cheddar-Type Cheese"
+      ],
+      "common_name": "Cheddar-Type Cheese",
+      "scientific_name": null,
+      "canonical_category": "milk_and_dairy",
+      "allergen_type": "food",
+      "definition": "Cheddar-type cheese is a hard cheese made from cow's milk. It is used in sandwiches, pizzas, pasta, burgers, parathas and many cheese snacks at home.",
+      "exposure_sources": [
+        "Sandwiches and pizzas",
+        "Pasta and baked dishes",
+        "Cheese snacks",
+        "Burgers"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "A positive result shows IgE to cheddar-type cheese. Cheese is made from milk, so the result may reflect sensitization to milk proteins. It does not prove cheese or milk allergy. Do not avoid dairy without a doctor's advice.",
+      "card_summary": "A hard cow's-milk cheese used in sandwiches, pizzas, pasta and cheese snacks.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "This result may overlap with the milk and casein tests. A positive cheese result alone does not confirm a milk allergy.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "processed_food_extract"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "coconut_milk",
+      "lab_test_name": "Coconut Milk",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 2,
+      "aliases": [],
+      "common_name": "Coconut Milk",
+      "scientific_name": "Cocos nucifera",
+      "canonical_category": "coconut_products",
+      "allergen_type": "food",
+      "definition": "Coconut milk is a creamy liquid made from grated coconut flesh. It is used in curries, stews, desserts and drinks, especially in southern and coastal cooking.",
+      "exposure_sources": [
+        "South Indian and coastal curries",
+        "Stews and desserts",
+        "Drinks and smoothies",
+        "Packaged coconut milk"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to coconut milk. Coconut milk is not dairy milk, so this result does not relate to cow's milk allergy. If coconut has caused hives or swelling, tell your doctor before changing your diet.",
+      "card_summary": "A creamy liquid made from coconut flesh, used in curries and desserts.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs"
+      ],
+      "caution": "Coconut milk is plant-based and not related to cow's milk. A positive result does not mean you must avoid dairy.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "source_group_mismatch"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "chocolate",
+      "lab_test_name": "Chocolate",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 3,
+      "aliases": [],
+      "common_name": "Chocolate",
+      "scientific_name": "Theobroma cacao",
+      "canonical_category": "coffee_tea_cocoa",
+      "allergen_type": "food",
+      "definition": "Chocolate is made from cocoa beans and usually contains sugar, milk and other ingredients. It is eaten as bars, sweets, drinks, cakes and many desserts.",
+      "exposure_sources": [
+        "Chocolate bars and sweets",
+        "Cocoa drinks",
+        "Cakes and desserts",
+        "Ice creams"
+      ],
+      "typical_symptoms": [
+        "Itching",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips",
+        "Headache"
+      ],
+      "interpretation_insight": "A positive result shows IgE to chocolate. Chocolate products often contain milk, nuts and other ingredients that can cause reactions, so the cause may not be cocoa itself. Tell your doctor which products caused symptoms.",
+      "card_summary": "A sweet made from cocoa beans, often mixed with milk and other ingredients.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "beverage_symptom_review",
+        "food_ask_related_foods"
+      ],
+      "caution": "Chocolate products often contain milk, nuts or soy. A positive result cannot show which ingredient matters.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "processed_food_extract",
+        "source_group_mismatch"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "coffee",
+      "lab_test_name": "Coffee",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 4,
+      "aliases": [],
+      "common_name": "Coffee",
+      "scientific_name": "Coffea species",
+      "canonical_category": "coffee_tea_cocoa",
+      "allergen_type": "food",
+      "definition": "Coffee is a drink made from roasted coffee beans. It is also used in desserts, ice creams, cakes and flavourings, and is popular in South Indian homes.",
+      "exposure_sources": [
+        "Filter coffee and instant coffee",
+        "Desserts and ice creams",
+        "Café drinks",
+        "Coffee-flavoured products"
+      ],
+      "typical_symptoms": [
+        "Itching",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips",
+        "Palpitations"
+      ],
+      "interpretation_insight": "This result shows IgE to coffee. Symptoms after coffee, such as palpitations or stomach upset, are often due to caffeine and are not allergic. If coffee has caused hives or swelling, tell your doctor soon.",
+      "card_summary": "A drink made from roasted coffee beans, also used as a flavour.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "beverage_symptom_review"
+      ],
+      "caution": "Many reactions to coffee are not allergic. A blood test cannot tell the cause, so discuss symptoms with your doctor.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence",
+        "source_group_mismatch"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "tea",
+      "lab_test_name": "Tea",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 5,
+      "aliases": [],
+      "common_name": "Tea",
+      "scientific_name": "Camellia sinensis",
+      "canonical_category": "coffee_tea_cocoa",
+      "allergen_type": "food",
+      "definition": "Tea is a drink made from the leaves of the tea plant. It is drunk hot or cold and is a daily habit in most Indian homes.",
+      "exposure_sources": [
+        "Chai and black tea",
+        "Green tea",
+        "Iced tea and bottled drinks",
+        "Flavoured tea blends"
+      ],
+      "typical_symptoms": [
+        "Itching",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips",
+        "Headache"
+      ],
+      "interpretation_insight": "A positive result shows IgE to tea. Symptoms after tea can have other causes. If tea has caused hives or swelling, tell your doctor. Do not stop a daily drink you tolerate on this result alone.",
+      "card_summary": "A drink made from tea leaves, drunk daily in most Indian homes.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "beverage_symptom_review"
+      ],
+      "caution": "Many symptoms linked to tea have other causes. A blood result cannot tell which applies to you.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "limited_published_evidence",
+        "source_group_mismatch"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "limited_published_evidence",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "tofu_bean_curd",
+      "lab_test_name": "Tofu (Bean Curd)",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 6,
+      "aliases": [
+        "Tofu (Soya Paneer)"
+      ],
+      "common_name": "Tofu (Soya Paneer)",
+      "scientific_name": "Glycine max",
+      "canonical_category": "legumes_pulses",
+      "allergen_type": "food",
+      "definition": "Tofu is a soft curd made from soya milk. It is used in stir-fries, curries, salads, sandwiches and soups as a plant-based protein by many people.",
+      "exposure_sources": [
+        "Stir-fries and curries",
+        "Salads and sandwiches",
+        "Vegetarian dishes",
+        "Soya-based snacks"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "A positive result shows IgE to tofu, which is made from soya. Blood tests are less reliable at confirming soya allergy than for some other foods, so tell your doctor if tofu or soya ever caused symptoms.",
+      "card_summary": "A soft curd made from soya milk, used in stir-fries and curries.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "Tofu is made from soya, so this result may overlap with the soya bean test. Blood tests are less reliable for soya.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "source_group_mismatch"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "curd",
+      "lab_test_name": "Curd",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 7,
+      "aliases": [
+        "Curd (Dahi)"
+      ],
+      "common_name": "Curd (Dahi)",
+      "scientific_name": null,
+      "canonical_category": "milk_and_dairy",
+      "allergen_type": "food",
+      "definition": "Curd, or dahi, is milk set with live cultures. It is eaten plain, as raita, in lassi, and used in marinades and curries across India.",
+      "exposure_sources": [
+        "Plain curd and raita",
+        "Lassi and buttermilk",
+        "Marinades",
+        "Curries and gravies"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to curd. Curd is made from milk, so the result may reflect sensitization to milk proteins. It does not prove milk allergy. Do not avoid curd or milk unless your doctor advises it.",
+      "card_summary": "Milk set with live cultures, eaten as dahi, raita, chaas and lassi.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "This result may overlap with the cow's milk, yogurt and casein tests. One positive does not confirm milk allergy.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "processed_food_extract"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "cow_milk",
+      "lab_test_name": "Cow Milk",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 8,
+      "aliases": [
+        "Cow's Milk"
+      ],
+      "common_name": "Cow's Milk",
+      "scientific_name": "Bos taurus",
+      "canonical_category": "milk_and_dairy",
+      "allergen_type": "food",
+      "definition": "Cow's milk is a staple drink and food ingredient in India, used in tea, coffee, sweets, curd, paneer, kheer and many other everyday home dishes.",
+      "exposure_sources": [
+        "Milk and tea",
+        "Sweets and desserts",
+        "Curd, paneer and ghee products",
+        "Baked goods"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "A positive result shows IgE to cow's milk. This does not prove milk allergy. Milk allergy is different from lactose intolerance, which causes gas and loose stools without an immune reaction. If milk has caused hives or swelling, tell your doctor.",
+      "card_summary": "A staple drink and cooking ingredient used in tea, sweets and curd.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "Lactose intolerance is not an allergy and is not detected by this test. A doctor must interpret the result alongside your history.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "yogurt",
+      "lab_test_name": "Yogurt",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 9,
+      "aliases": [],
+      "common_name": "Yogurt",
+      "scientific_name": null,
+      "canonical_category": "milk_and_dairy",
+      "allergen_type": "food",
+      "definition": "Yogurt is milk fermented with live cultures. It is eaten plain, with fruit, in smoothies and as a base for dips, dressings, marinades and desserts.",
+      "exposure_sources": [
+        "Plain and flavoured yogurt",
+        "Smoothies and lassi",
+        "Dips and dressings",
+        "Desserts"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "This result shows IgE to yogurt. Because yogurt is made from milk, the result may reflect sensitization to milk proteins. It does not confirm allergy. Do not avoid yogurt or other dairy foods without medical advice.",
+      "card_summary": "Fermented milk eaten plain, with fruit, in smoothies and as a base.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "This result may overlap with the cow's milk and casein tests. Yogurt and curd results can behave similarly.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "processed_food_extract"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "yeast",
+      "lab_test_name": "Yeast",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 10,
+      "aliases": [
+        "Yeast (Baker's or Brewer's)"
+      ],
+      "common_name": "Yeast (Baker's or Brewer's)",
+      "scientific_name": "Saccharomyces cerevisiae (probable)",
+      "canonical_category": "edible_fungi_and_yeast_foods",
+      "allergen_type": "food",
+      "definition": "Yeast is a tiny fungus used to make bread, idli batters, beer and wine ferment. The test does not state which type of yeast was used.",
+      "exposure_sources": [
+        "Bread and baked goods",
+        "Fermented batters",
+        "Beer and wine",
+        "Yeast extracts and spreads"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth",
+        "Hives",
+        "Stomach upset",
+        "Skin rash",
+        "Swelling of lips"
+      ],
+      "interpretation_insight": "A positive result shows IgE to yeast. This test is listed with dairy in the laboratory catalogue, but yeast is a fungus. It is also relevant to bakery work. Do not avoid bread or fermented foods without medical advice.",
+      "card_summary": "A fungus used to make bread, fermented batters, beer, wine and other foods.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_ask_related_foods"
+      ],
+      "caution": "The yeast species used is not stated. A positive result does not confirm food allergy or infection.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "source_group_mismatch",
+        "species_unspecified"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "mushrooms",
+      "lab_test_name": "Mushrooms",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 11,
+      "aliases": [],
+      "common_name": "Mushrooms",
+      "scientific_name": "Agaricus bisporus (probable)",
+      "canonical_category": "edible_fungi_and_yeast_foods",
+      "allergen_type": "food",
+      "definition": "Mushrooms are edible fungi eaten in curries, stir-fries, soups, pizzas and sandwiches. The test does not state the type of mushroom that was used in it.",
+      "exposure_sources": [
+        "Curries and stir-fries",
+        "Soups",
+        "Pizzas and pasta",
+        "Gravies"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth",
+        "Hives",
+        "Stomach upset",
+        "Swelling of lips",
+        "Skin rash"
+      ],
+      "interpretation_insight": "This result shows IgE to mushrooms. Mushrooms are fungi, not vegetables, and can be related to mould sensitization. If mushrooms have caused hives, swelling or stomach upset, tell your doctor before you change your diet.",
+      "card_summary": "Edible fungi eaten in curries, soups, pizzas, sandwiches and many other stir-fries.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "The mushroom type used in the test is not stated. A positive result does not confirm mushroom allergy.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD",
+        "C_FOOD_LOWER_PERF"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [
+        "source_group_mismatch",
+        "species_unspecified"
+      ],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    },
+    {
+      "allergen_id": "casein_milk_protein",
+      "lab_test_name": "Casein (Milk Protein)",
+      "source_group": "allergy_dairy",
+      "source_group_display_order": 10,
+      "position_in_source_group": 12,
+      "aliases": [],
+      "common_name": "Casein (Milk Protein)",
+      "scientific_name": null,
+      "canonical_category": "milk_and_dairy",
+      "allergen_type": "food",
+      "definition": "Casein is the main protein in cow's milk. It is found in milk, curd, paneer, cheese and in many foods and sweets made with milk.",
+      "exposure_sources": [
+        "Milk and milk products",
+        "Paneer, cheese and curd",
+        "Baked goods",
+        "Protein powders"
+      ],
+      "typical_symptoms": [
+        "Itchy mouth or throat",
+        "Hives",
+        "Swelling of lips or face",
+        "Stomach pain or vomiting",
+        "Diarrhoea"
+      ],
+      "interpretation_insight": "A positive result shows IgE to casein. Doctors sometimes use casein tests to help judge milk allergy, but a positive result alone does not confirm it. Do not remove milk products from your diet without medical advice.",
+      "card_summary": "The main protein in cow's milk, found in dairy products and many foods.",
+      "recommendation_ids": [
+        "food_keep_eating_tolerated",
+        "food_review_past_reactions",
+        "food_supervised_challenge",
+        "food_no_home_challenge",
+        "gen_emergency_signs",
+        "food_ask_related_foods"
+      ],
+      "caution": "Casein results are used by doctors to help assess milk allergy, but they still need your history to interpret.",
+      "category_caution_rule_ids": [
+        "C_SENS",
+        "C_CLASS",
+        "C_FOOD"
+      ],
+      "cross_reactivity": null,
+      "review_flags": [],
+      "evidence_refs": [
+        "E01",
+        "E02"
+      ],
+      "evidence_status": "supported_by_retrieved_sources",
+      "clinical_review_status": "pending",
+      "content_version": "1.0.0-draft"
+    }
+  ]
+}

@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 from modules.bioai_report.report_engine import config
+from modules.bioai_report.report_engine.builders.allergy_builder import (
+    cancer_measurements_from_booking,
+    prepare_allergy,
+)
 from modules.bioai_report.report_engine.builders.cancer_builder import build_cancer_sections
 from modules.bioai_report.report_engine.builders.disease_builder import build_disease_sections
 from modules.bioai_report.report_engine.builders.patient_builder import build_patient
@@ -13,6 +18,8 @@ from modules.bioai_report.report_engine.knowledge_base.loader import KnowledgeBa
 from modules.bioai_report.report_engine.models.assessment import AssessmentPayload
 from modules.bioai_report.report_engine.models.report import BioReport, ReportMetadata
 from modules.bioai_report.report_engine.utils.assessment_normalizer import normalize_assessment
+
+logger = logging.getLogger(__name__)
 
 
 def _kb_version(kb_store: KnowledgeBaseStore, disease_ids: list[str]) -> str | None:
@@ -34,6 +41,13 @@ def build_bioreport(
     record_id: str | None = None,
     kb_store: KnowledgeBaseStore | None = None,
     generated_at: str | None = None,
+    allergy_booking: dict | None = None,
+    assessment_instance_id: int | None = None,
+    allergy_resolution_status: str = "resolved",
+    allergy_resolution_reason: str | None = None,
+    include_cancer: bool | None = None,
+    cancer_results_available: bool | None = None,
+    allergy_results_available: bool | None = None,
 ) -> BioReport:
     """Assemble a complete render-ready BioReport from an enriched assessment.
 
@@ -60,7 +74,30 @@ def build_bioreport(
 
     patient = build_patient(payload)
     disease_sections = build_disease_sections(payload.diseases, kb_store=store)
-    individual_cancer, detailed_cancer = build_cancer_sections(payload, kb_store=store)
+    if include_cancer is False:
+        individual_cancer, detailed_cancer = [], None
+    else:
+        blood_markers = cancer_measurements_from_booking(allergy_booking)
+        individual_cancer, detailed_cancer = build_cancer_sections(
+            payload,
+            kb_store=store,
+            blood_markers=blood_markers,
+        )
+    allergy = None
+    if allergy_booking is not None or allergy_resolution_status != "resolved":
+        try:
+            allergy = prepare_allergy(
+                allergy_booking,
+                assessment_instance_id=assessment_instance_id,
+                resolution_status=allergy_resolution_status,
+                resolution_reason=allergy_resolution_reason,
+            )
+        except Exception:
+            logger.exception(
+                "Allergy content skipped for assessment_instance_id=%s",
+                assessment_instance_id,
+            )
+            allergy = None
     executive_summary = build_executive_summary(
         patient=patient,
         disease_sections=disease_sections,
@@ -75,6 +112,14 @@ def build_bioreport(
         disease_sections=disease_sections,
         individual_cancer_information=individual_cancer,
         detailed_cancer_screening=detailed_cancer,
+        cancer_results_available=cancer_results_available,
+        allergy_results_available=allergy_results_available,
+        allergy_availability=None if allergy is None else allergy.availability,
+        allergy_overview=None if allergy is None or allergy.sections is None else allergy.sections.overview,
+        allergy_detailed_insights=(
+            None if allergy is None or allergy.sections is None else allergy.sections.detailed_insights
+        ),
+        allergy_breakdown=None if allergy is None or allergy.sections is None else allergy.sections.breakdown,
         report_metadata=ReportMetadata(
             record_id=resolved_record_id,
             engine_version=config.ENGINE_VERSION,
