@@ -36,6 +36,14 @@ def _mock_integration_sync_logs(monkeypatch):
         fake_finalize,
     )
 
+    async def fake_log_template_get(*, operation, **kwargs):
+        return await operation()
+
+    monkeypatch.setattr(
+        "modules.notifications.direct_dispatch.log_whatapi_get_message_templates",
+        fake_log_template_get,
+    )
+
 
 @pytest.mark.asyncio
 async def test_whatsapp_post_pending(monkeypatch):

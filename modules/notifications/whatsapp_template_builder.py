@@ -40,12 +40,14 @@ async def build_whatsapp_send_payload(
     *,
     member: dict[str, Any],
     participant_details: dict[str, Any] | None = None,
+    template_body: dict[str, Any] | None = None,
 ) -> tuple[str, list[dict[str, Any]], str]:
     template_name = (svc.template_name or "").strip()
     context = build_member_context(member, participant_details=participant_details)
     slot_values = resolve_slots(svc.template_variables, context)
 
-    template_body = await client.fetch_message_template(template_name=template_name)
+    if template_body is None:
+        template_body = await client.fetch_message_template(template_name=template_name)
     data = template_body.get("data")
     components_meta: list[dict[str, Any]] = []
     language_code = "en"

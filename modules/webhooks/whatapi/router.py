@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request, Response
@@ -11,9 +12,12 @@ from common.responses import success_response
 from core.config import settings
 from core.exceptions import AppError
 from db.session import get_db
+from modules.notifications.whatapi_sync_logging import log_whatapi_inbound_webhook
 from modules.notifications.whatapi_webhook_handler import WhatApiWebhookHandler
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
+
+_WHATAPI_INBOUND_PATH = "/webhooks/whatapi"
 
 
 def _first_challenge(
@@ -70,6 +74,25 @@ async def whatapi_webhook_verify(
         )
     if echo is not None:
         pass
+    await log_whatapi_inbound_webhook(
+        api_url=_WHATAPI_INBOUND_PATH,
+        request_payload={
+            "http_method": "GET",
+            "api_name": "whatapi_webhook_verify",
+            "url": _WHATAPI_INBOUND_PATH,
+            "direction": "inbound",
+            "query": {
+                "hub.mode": hub_mode,
+                "hub.challenge": hub_challenge,
+                "hub.verify_token": hub_verify_token,
+                "challenge": challenge,
+                "challange": challange,
+                "verify_token": verify_token,
+                "echo": echo,
+            },
+        },
+        handler_result={"challenge": challenge_value},
+    )
     return Response(content=challenge_value, media_type="text/plain")
 
 
@@ -78,18 +101,41 @@ async def whatapi_webhook_status(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
+    raw_text = (await request.body()).decode("utf-8", errors="replace")
     try:
-        body: Any = await request.json()
+        body: Any = json.loads(raw_text) if raw_text.strip() else {}
     except Exception:
         body = {}
 
-    handler = WhatApiWebhookHandler()
-    if isinstance(body, dict):
-        result = await handler.handle_status_payload(db, payload=body)
-    elif isinstance(body, list):
-        result = await handler.handle_status_payload(db, payload=body)
-    else:
-        result = {"updated": 0, "ignored": True}
+    inbound_request = {
+        "http_method": "POST",
+        "api_name": "whatapi_inbound_webhook",
+        "url": _WHATAPI_INBOUND_PATH,
+        "direction": "inbound",
+        "body": body if isinstance(body, (dict, list)) else {"raw": raw_text[:8000]},
+    }
 
-    await db.commit()
-    return success_response(result)
+    try:
+        handler = WhatApiWebhookHandler()
+        if isinstance(body, dict):
+            result = await handler.handle_status_payload(db, payload=body)
+        elif isinstance(body, list):
+            result = await handler.handle_status_payload(db, payload=body)
+        else:
+            result = {"updated": 0, "ignored": True}
+
+        await db.commit()
+        await log_whatapi_inbound_webhook(
+            api_url=_WHATAPI_INBOUND_PATH,
+            request_payload=inbound_request,
+            handler_result=result,
+        )
+        return success_response(result)
+    except Exception as exc:
+        await log_whatapi_inbound_webhook(
+            api_url=_WHATAPI_INBOUND_PATH,
+            request_payload=inbound_request,
+            handler_result={"updated": 0},
+            error_message=str(exc)[:2000],
+        )
+        raise

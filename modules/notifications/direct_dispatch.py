@@ -24,6 +24,7 @@ from modules.notifications.whatsapp_fallback_get import (
     build_whatsapp_fallback_get_url,
     send_whatsapp_fallback_get,
 )
+from modules.notifications.whatapi_sync_logging import log_whatapi_get_message_templates
 from modules.notifications.whatsapp_template_builder import build_whatsapp_send_payload
 from core.exceptions import AppError
 from modules.notifications.whatapi_client import (
@@ -201,11 +202,21 @@ class DirectNotificationDispatch:
 
             sent_via_post = False
             try:
+                template_body = await log_whatapi_get_message_templates(
+                    template_name=template_label,
+                    engagement_id=engagement_id,
+                    user_id=sync_log_user_id,
+                    notification_id=notification_id,
+                    operation=lambda name=template_label: self._client.fetch_message_template(
+                        template_name=name
+                    ),
+                )
                 template_name, components, language_code = await build_whatsapp_send_payload(
                     self._client,
                     svc,
                     member=member,
                     participant_details=participant_details,
+                    template_body=template_body,
                 )
                 send_result = await self._client.send_template_message(
                     to=normalize_whatsapp_phone(phone),

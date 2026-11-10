@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from modules.notifications.whatapi_client import WhatApiClient, get_whatapi_client
+from modules.notifications.whatapi_sync_logging import log_whatapi_get_message_templates
 
 _PLACEHOLDER = re.compile(r"\{\{(\d+)\}\}")
 
@@ -60,7 +61,14 @@ class WhatsappTemplateProxy:
         self._client = client or get_whatapi_client()
 
     async def lookup(self, *, template_name: str) -> dict[str, Any]:
-        raw = await self._client.fetch_message_template(template_name=template_name.strip())
+        name = template_name.strip()
+        raw = await log_whatapi_get_message_templates(
+            template_name=name,
+            engagement_id=None,
+            user_id=None,
+            notification_id=None,
+            operation=lambda: self._client.fetch_message_template(template_name=name),
+        )
         normalized = normalize_template_response(raw)
         if normalized is None:
             return {"found": False, "name": template_name.strip()}
