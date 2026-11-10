@@ -16,6 +16,12 @@ from modules.users.models import User
 TEST_NOTIFICATION_API_KEY = "test-notif-dispatch-key"
 
 
+@pytest.fixture(autouse=True)
+def _legacy_dispatch_uses_n8n_fallback(monkeypatch):
+    """Keep existing dispatch tests on n8n path until services are fully backfilled in tests."""
+    monkeypatch.setattr(settings, "NOTIFICATION_ALLOW_N8N_FALLBACK", True)
+
+
 def _auth_header(employee_id: int) -> dict[str, str]:
     from tests.helpers.auth import employee_auth_header
     return employee_auth_header(employee_id)

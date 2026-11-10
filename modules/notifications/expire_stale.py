@@ -10,7 +10,9 @@ from modules.notifications.repository import NotificationsRepository
 
 DEFAULT_PENDING_TIMEOUT_HOURS = 2
 
-_STALE_MESSAGE = "Callback timeout — workflow did not report completion"
+_STALE_MESSAGE = (
+    "Delivery timeout — WhatAPI webhook or n8n callback did not report completion"
+)
 
 
 async def expire_stale_notifications(

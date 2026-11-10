@@ -181,6 +181,9 @@ class Settings:
     NOTIFICATION_SERVICE_BASE_URL: str = os.getenv("NOTIFICATION_SERVICE_BASE_URL", "https://n8n.supershyft.com")
     NOTIFICATION_SERVICE_TIMEOUT_SECONDS: int = int(os.getenv("NOTIFICATION_SERVICE_TIMEOUT_SECONDS", "15"))
     NOTIFICATION_API_KEY: str = os.getenv("NOTIFICATION_API_KEY", "")
+    NOTIFICATION_ALLOW_N8N_FALLBACK: bool = os.getenv(
+        "NOTIFICATION_ALLOW_N8N_FALLBACK", "false"
+    ).lower() in {"1", "true", "yes"}
 
     # SMTP (direct email; not wired to dispatch in foundation step)
     SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "")

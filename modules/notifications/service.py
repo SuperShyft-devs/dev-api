@@ -28,6 +28,11 @@ from modules.notifications.schemas import (
     NotificationServiceUpdate,
     SessionDetails,
 )
+from modules.notifications.direct_dispatch import DirectNotificationDispatch, get_direct_dispatch
+from modules.notifications.dispatch_routing import (
+    should_use_n8n_webhook,
+    validate_direct_service_config,
+)
 from modules.notifications.report_prepare import prepare_user_report_urls
 from modules.reports.bio_ai_report_resolver import resolve_bio_ai_report_url
 from modules.reports.blood_booking_reports import (
@@ -128,9 +133,11 @@ class NotificationsService:
         repository: NotificationsRepository,
         *,
         metsights_service: MetsightsService | None = None,
+        direct_dispatch: DirectNotificationDispatch | None = None,
     ) -> None:
         self._repo = repository
         self._metsights_service = metsights_service or MetsightsService(client=MetsightsClient())
+        self._direct_dispatch = direct_dispatch or get_direct_dispatch()
 
     # ── Report preparation ──────────────────────────────────────────────
 
@@ -149,6 +156,141 @@ class NotificationsService:
             require_bioai=require_bio_ai_report_url,
             metsights_service=self._metsights_service,
         )
+
+    async def _dispatch_via_n8n_webhook(
+        self,
+        db: AsyncSession,
+        *,
+        svc: NotificationService,
+        notification: Notification,
+        members: list[dict],
+        engagement_id: int | None,
+        participant_details: dict | None,
+        sync_log_user_id: int | None,
+    ) -> dict:
+        webhook_url = (
+            settings.NOTIFICATION_SERVICE_BASE_URL.rstrip("/")
+            + "/"
+            + svc.webhook_path.lstrip("/")
+        )
+        webhook_payload: dict = {
+            "notification_id": notification.notification_id,
+            "members": members,
+        }
+        if engagement_id is not None:
+            webhook_payload["engagement_id"] = engagement_id
+        if participant_details:
+            webhook_payload["participant_details"] = participant_details
+
+        sync_log_id = await persist_integration_sync_log_isolated(
+            provider="n8n",
+            api_url=webhook_url,
+            engagement_id=engagement_id,
+            user_id=sync_log_user_id,
+            request_payload=webhook_payload,
+        )
+
+        webhook_failed = False
+        webhook_message = "Notification dispatch initiated"
+        try:
+            async with httpx.AsyncClient(
+                timeout=settings.NOTIFICATION_SERVICE_TIMEOUT_SECONDS
+            ) as client:
+                resp = await client.post(webhook_url, json=webhook_payload)
+                resp.raise_for_status()
+                try:
+                    resp_data = resp.json()
+                except Exception:
+                    resp_data = {"status_code": resp.status_code, "body": resp.text}
+                webhook_message = (
+                    resp_data.get("message", "Webhook called successfully")
+                    if isinstance(resp_data, dict)
+                    else "Webhook called successfully"
+                )
+                await finalize_integration_sync_log_isolated(
+                    sync_log_id=sync_log_id,
+                    status="success",
+                    response_payload=resp_data if isinstance(resp_data, dict) else {"body": resp_data},
+                )
+        except Exception as exc:
+            logger.error("Notification webhook call failed: %s", exc)
+            webhook_message = f"Webhook call failed: {exc}"
+            webhook_failed = True
+            await finalize_integration_sync_log_isolated(
+                sync_log_id=sync_log_id,
+                status="failed",
+                error_message=str(exc),
+            )
+
+        notification_status = "failed" if webhook_failed else notification.status
+        update_values: dict = {
+            "status": notification_status,
+            "message": webhook_message,
+            "dispatched_at": datetime.now(timezone.utc),
+        }
+        await self._repo.update_notification(
+            db,
+            notification_id=notification.notification_id,
+            values=update_values,
+        )
+        return {
+            "notification_id": notification.notification_id,
+            "status": notification_status,
+            "message": webhook_message,
+        }
+
+    async def _route_and_deliver(
+        self,
+        db: AsyncSession,
+        *,
+        svc: NotificationService,
+        notification: Notification,
+        members: list[dict],
+        engagement_id: int | None,
+        participant_details: dict | None,
+        sync_log_user_id: int | None,
+    ) -> dict:
+        if should_use_n8n_webhook(svc):
+            return await self._dispatch_via_n8n_webhook(
+                db,
+                svc=svc,
+                notification=notification,
+                members=members,
+                engagement_id=engagement_id,
+                participant_details=participant_details,
+                sync_log_user_id=sync_log_user_id,
+            )
+
+        validate_direct_service_config(svc)
+        result = await self._direct_dispatch.deliver_batch(
+            svc=svc,
+            notification_id=notification.notification_id,
+            members=members,
+            participant_details=participant_details,
+            engagement_id=engagement_id,
+            sync_log_user_id=sync_log_user_id,
+        )
+
+        update_values: dict = {
+            "status": result.status,
+            "message": result.message,
+            "dispatched_at": datetime.now(timezone.utc),
+            "queue_id": result.queue_id,
+        }
+        if result.completed_at is not None:
+            update_values["completed_at"] = result.completed_at
+
+        await self._repo.update_notification(
+            db,
+            notification_id=notification.notification_id,
+            values=update_values,
+        )
+        return {
+            "notification_id": notification.notification_id,
+            "status": result.status,
+            "message": result.message,
+            "queue_id": result.queue_id,
+        }
 
     # ── Dispatch ────────────────────────────────────────────────────────
 
@@ -394,70 +536,16 @@ class NotificationsService:
         )
         notification = await self._repo.create_notification(db, notification)
 
-        webhook_url = settings.NOTIFICATION_SERVICE_BASE_URL.rstrip("/") + "/" + svc.webhook_path.lstrip("/")
-        webhook_payload: dict = {
-            "notification_id": notification.notification_id,
-            "members": members,
-        }
-        if resolved_engagement_id is not None:
-            webhook_payload["engagement_id"] = resolved_engagement_id
-        if payload.participant_details:
-            webhook_payload["participant_details"] = payload.participant_details
-
         sync_log_user_id = payload.user_ids[0] if len(payload.user_ids) == 1 else None
-        sync_log_id = await persist_integration_sync_log_isolated(
-            provider="n8n",
-            api_url=webhook_url,
-            engagement_id=resolved_engagement_id,
-            user_id=sync_log_user_id,
-            request_payload=webhook_payload,
-        )
-
-        webhook_failed = False
-        try:
-            async with httpx.AsyncClient(timeout=settings.NOTIFICATION_SERVICE_TIMEOUT_SECONDS) as client:
-                resp = await client.post(webhook_url, json=webhook_payload)
-                resp.raise_for_status()
-                try:
-                    resp_data = resp.json()
-                except Exception:
-                    resp_data = {"status_code": resp.status_code, "body": resp.text}
-                webhook_message = (
-                    resp_data.get("message", "Webhook called successfully")
-                    if isinstance(resp_data, dict)
-                    else "Webhook called successfully"
-                )
-                await finalize_integration_sync_log_isolated(
-                    sync_log_id=sync_log_id,
-                    status="success",
-                    response_payload=resp_data if isinstance(resp_data, dict) else {"body": resp_data},
-                )
-        except Exception as exc:
-            logger.error("Notification webhook call failed: %s", exc)
-            webhook_message = f"Webhook call failed: {exc}"
-            webhook_failed = True
-            await finalize_integration_sync_log_isolated(
-                sync_log_id=sync_log_id,
-                status="failed",
-                error_message=str(exc),
-            )
-
-        notification_status = "failed" if webhook_failed else notification.status
-        await self._repo.update_notification(
+        return await self._route_and_deliver(
             db,
-            notification_id=notification.notification_id,
-            values={
-                "status": notification_status,
-                "message": webhook_message,
-                "dispatched_at": datetime.now(timezone.utc),
-            },
+            svc=svc,
+            notification=notification,
+            members=members,
+            engagement_id=resolved_engagement_id,
+            participant_details=payload.participant_details,
+            sync_log_user_id=sync_log_user_id,
         )
-
-        return {
-            "notification_id": notification.notification_id,
-            "status": notification_status,
-            "message": webhook_message,
-        }
 
     async def dispatch_to_contacts(
         self,
@@ -554,68 +642,15 @@ class NotificationsService:
         )
         notification = await self._repo.create_notification(db, notification)
 
-        webhook_url = settings.NOTIFICATION_SERVICE_BASE_URL.rstrip("/") + "/" + svc.webhook_path.lstrip("/")
-        webhook_payload: dict = {
-            "notification_id": notification.notification_id,
-            "members": members,
-        }
-        if engagement_id is not None:
-            webhook_payload["engagement_id"] = engagement_id
-        if participant_details:
-            webhook_payload["participant_details"] = participant_details
-
-        sync_log_id = await persist_integration_sync_log_isolated(
-            provider="n8n",
-            api_url=webhook_url,
-            engagement_id=engagement_id,
-            user_id=None,
-            request_payload=webhook_payload,
-        )
-
-        webhook_failed = False
-        try:
-            async with httpx.AsyncClient(timeout=settings.NOTIFICATION_SERVICE_TIMEOUT_SECONDS) as client:
-                resp = await client.post(webhook_url, json=webhook_payload)
-                resp.raise_for_status()
-                try:
-                    resp_data = resp.json()
-                except Exception:
-                    resp_data = {"status_code": resp.status_code, "body": resp.text}
-                webhook_message = (
-                    resp_data.get("message", "Webhook called successfully")
-                    if isinstance(resp_data, dict)
-                    else "Webhook called successfully"
-                )
-                await finalize_integration_sync_log_isolated(
-                    sync_log_id=sync_log_id,
-                    status="success",
-                    response_payload=resp_data if isinstance(resp_data, dict) else {"body": resp_data},
-                )
-        except Exception as exc:
-            logger.error("Notification webhook call failed: %s", exc)
-            webhook_message = f"Webhook call failed: {exc}"
-            webhook_failed = True
-            await finalize_integration_sync_log_isolated(
-                sync_log_id=sync_log_id,
-                status="failed",
-                error_message=str(exc),
-            )
-
-        notification_status = "failed" if webhook_failed else notification.status
-        await self._repo.update_notification(
+        return await self._route_and_deliver(
             db,
-            notification_id=notification.notification_id,
-            values={
-                "status": notification_status,
-                "message": webhook_message,
-                "dispatched_at": datetime.now(timezone.utc),
-            },
+            svc=svc,
+            notification=notification,
+            members=members,
+            engagement_id=engagement_id,
+            participant_details=participant_details,
+            sync_log_user_id=None,
         )
-        return {
-            "notification_id": notification.notification_id,
-            "status": notification_status,
-            "message": webhook_message,
-        }
 
     # ── Callback ────────────────────────────────────────────────────────
 
@@ -661,6 +696,7 @@ class NotificationsService:
             "engagement_id": n.engagement_id,
             "assessment_instance_id": n.assessment_instance_id,
             "message": n.message,
+            "queue_id": n.queue_id,
             "triggered_by_user_id": n.triggered_by_user_id,
             "dispatched_at": n.dispatched_at.isoformat() if n.dispatched_at else None,
             "completed_at": n.completed_at.isoformat() if n.completed_at else None,

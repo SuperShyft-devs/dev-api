@@ -33,6 +33,12 @@ DEFAULT_RETRY_SERVICE_KEYS: tuple[str, ...] = (
 
 _WEBHOOK_FAILURE_SNIPPET = "webhook call failed"
 _EMAIL_FAILURE_SNIPPET = "email sending failed"
+_WHATAPI_FAILURE_SNIPPETS = (
+    "whatsapp delivery failed",
+    "whatapi",
+    "smtp delivery failed",
+    "whatapi_fallback",
+)
 
 
 @dataclass(frozen=True)
@@ -222,6 +228,8 @@ def is_dispatch_failure(result: dict[str, Any]) -> bool:
     if _WEBHOOK_FAILURE_SNIPPET in message:
         return True
     if _EMAIL_FAILURE_SNIPPET in message:
+        return True
+    if any(snippet in message for snippet in _WHATAPI_FAILURE_SNIPPETS):
         return True
     return False
 
