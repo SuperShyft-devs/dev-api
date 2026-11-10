@@ -185,18 +185,18 @@ class NotificationBindingWizardService:
         engagement_type_id: int | None,
     ):
         rt = recipient_type.strip()
-        rows = await self._bindings_repo.list_for_event(
-            db,
-            event_code=event_code,
-            engagement_type_id=engagement_type_id,
-        )
-        for row in rows:
+        code = event_code.strip()
+        rows = await self._bindings_repo.list_all(db, event_code=code)
+
+        def _matches_scope(row) -> bool:
             if row.recipient_type != rt:
-                continue
+                return False
             if engagement_type_id is None:
-                if row.engagement_type_id is None:
-                    return row
-            elif row.engagement_type_id == engagement_type_id:
+                return row.engagement_type_id is None
+            return row.engagement_type_id == engagement_type_id
+
+        for row in rows:
+            if _matches_scope(row):
                 return row
         return None
 
