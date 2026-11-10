@@ -59,7 +59,7 @@ EVENTS: tuple[EventDefinition, ...] = (
     EventDefinition(
         code="users.registered",
         name="User registered",
-        status="add",
+        status="current",
         variable_groups=("user",),
         default_recipients=("user",),
         trigger_notes="POST /users, new user on onboard flows",

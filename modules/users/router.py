@@ -825,6 +825,12 @@ async def employee_create_user(
     )
     await db.commit()
 
+    if created:
+        from modules.notifications.user_registration_notify import notify_user_registered
+
+        await notify_user_registered(db, user=user)
+        await db.commit()
+
     return success_response({"user_id": user.user_id, "created": created})
 
 
