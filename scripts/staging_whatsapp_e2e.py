@@ -10,6 +10,7 @@ from sqlalchemy import select
 
 from db.session import AsyncSessionLocal
 from modules.notifications.models import Notification, NotificationService
+from modules.notifications.repository import NotificationsRepository
 from modules.notifications.service import NotificationsService
 
 PHONE = "8762830757"
@@ -38,7 +39,7 @@ def _sample_session() -> dict:
 
 
 async def main() -> None:
-    service = NotificationsService()
+    service = NotificationsService(NotificationsRepository())
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(NotificationService).where(
