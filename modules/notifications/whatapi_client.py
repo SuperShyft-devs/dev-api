@@ -22,19 +22,19 @@ def _whatapi_base() -> str:
     return base
 
 
-def _whatapi_api_key() -> str:
-    key = (settings.WHATAPI_API_KEY or settings.WHATAPI_ACCESS_TOKEN or "").strip()
-    if not key:
-        raise AppError(
-            status_code=500,
-            error_code="CONFIG_ERROR",
-            message="WHATAPI_API_KEY or WHATAPI_ACCESS_TOKEN is not configured",
-        )
-    return key
-
-
 def _auth_headers() -> dict[str, str]:
-    return {"API-KEY": _whatapi_api_key()}
+    """WhatAPI Meta routes accept Bearer access tokens; API-KEY is for other key types."""
+    access = (settings.WHATAPI_ACCESS_TOKEN or "").strip()
+    if access:
+        return {"Authorization": f"Bearer {access}"}
+    api_key = (settings.WHATAPI_API_KEY or "").strip()
+    if api_key:
+        return {"API-KEY": api_key}
+    raise AppError(
+        status_code=500,
+        error_code="CONFIG_ERROR",
+        message="WHATAPI_ACCESS_TOKEN or WHATAPI_API_KEY is not configured",
+    )
 
 
 def _meta_path(*parts: str) -> str:
@@ -68,6 +68,9 @@ def send_messages_request_url() -> str:
 
 
 def whatapi_auth_descriptor() -> dict[str, str]:
+    access = (settings.WHATAPI_ACCESS_TOKEN or "").strip()
+    if access:
+        return {"header": "Authorization", "scheme": "Bearer", "value": "(redacted)"}
     return {"header": "API-KEY", "value": "(redacted)"}
 
 

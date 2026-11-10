@@ -39,7 +39,8 @@ def test_parse_http_error_body_json():
 async def test_fetch_message_template_http_401_propagates_body(monkeypatch):
     monkeypatch.setattr(settings, "WHATAPI_DOMAIN", "https://crmapi1.whatapi.in")
     monkeypatch.setattr(settings, "WHATAPI_VERSION", "v19.0")
-    monkeypatch.setattr(settings, "WHATAPI_API_KEY", "bad-key")
+    monkeypatch.setattr(settings, "WHATAPI_API_KEY", "")
+    monkeypatch.setattr(settings, "WHATAPI_ACCESS_TOKEN", "bad-key")
     monkeypatch.setattr(settings, "WHATAPI_WABA_ID", "waba-123")
 
     url = "https://crmapi1.whatapi.in/api/meta/v19.0/waba-123/message_templates?name=otp"
@@ -85,7 +86,8 @@ async def test_fetch_message_template_http_401_propagates_body(monkeypatch):
 async def test_fetch_message_template_success(monkeypatch):
     monkeypatch.setattr(settings, "WHATAPI_DOMAIN", "https://crmapi1.whatapi.in")
     monkeypatch.setattr(settings, "WHATAPI_VERSION", "v19.0")
-    monkeypatch.setattr(settings, "WHATAPI_API_KEY", "test-token")
+    monkeypatch.setattr(settings, "WHATAPI_API_KEY", "")
+    monkeypatch.setattr(settings, "WHATAPI_ACCESS_TOKEN", "test-token")
     monkeypatch.setattr(settings, "WHATAPI_WABA_ID", "waba-123")
 
     captured: dict = {}
@@ -121,14 +123,15 @@ async def test_fetch_message_template_success(monkeypatch):
     assert body["data"][0]["name"] == "camp17"
     assert "waba-123" in captured["url"]
     assert "name=camp17" in captured["url"]
-    assert captured["headers"] == {"API-KEY": "test-token"}
+    assert captured["headers"] == {"Authorization": "Bearer test-token"}
 
 
 @pytest.mark.asyncio
 async def test_send_template_message_parses_queue_id(monkeypatch):
     monkeypatch.setattr(settings, "WHATAPI_DOMAIN", "https://crmapi1.whatapi.in")
     monkeypatch.setattr(settings, "WHATAPI_VERSION", "v19.0")
-    monkeypatch.setattr(settings, "WHATAPI_API_KEY", "test-token")
+    monkeypatch.setattr(settings, "WHATAPI_API_KEY", "")
+    monkeypatch.setattr(settings, "WHATAPI_ACCESS_TOKEN", "test-token")
     monkeypatch.setattr(settings, "WHATAPI_PHONE_NUMBER_ID", "phone-999")
 
     class FakeResponse:
