@@ -34,6 +34,25 @@ class NotificationBindingsRepository:
         )
         return result.scalar_one_or_none()
 
+    async def find_unique_binding(
+        self,
+        db: AsyncSession,
+        *,
+        event_code: str,
+        recipient_type: str,
+        engagement_type_id: int | None,
+    ) -> NotificationEventBinding | None:
+        q = select(NotificationEventBinding).where(
+            NotificationEventBinding.event_code == event_code,
+            NotificationEventBinding.recipient_type == recipient_type,
+        )
+        if engagement_type_id is None:
+            q = q.where(NotificationEventBinding.engagement_type_id.is_(None))
+        else:
+            q = q.where(NotificationEventBinding.engagement_type_id == engagement_type_id)
+        result = await db.execute(q)
+        return result.scalar_one_or_none()
+
     async def create(
         self,
         db: AsyncSession,

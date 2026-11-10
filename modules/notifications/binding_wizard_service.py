@@ -10,6 +10,7 @@ from core.exceptions import AppError
 from modules.engagement_notifications.repository import EngagementNotificationsRepository
 from modules.engagement_notifications.service_config import (
     NotificationServiceConfigItem,
+    normalize_notification_services,
     serialize_for_db,
 )
 from modules.notifications.binding_schemas import (
@@ -167,15 +168,41 @@ class NotificationBindingWizardService:
                 message=f"Unknown event_code '{payload.event_code}'",
             )
         recipient_config = self._validate_recipient(payload, ev)
+        recipient_type = payload.recipient_type.strip()
         svc = await self._ensure_service(db, event_code=payload.event_code, spec=payload.service)
+        new_svc = NotificationServiceConfigItem(service_key=svc.service_key)
+        existing = await self._bindings_repo.find_unique_binding(
+            db,
+            event_code=payload.event_code,
+            recipient_type=recipient_type,
+            engagement_type_id=payload.engagement_type_id,
+        )
+        if existing is not None:
+            merged = normalize_notification_services(existing.notification_services)
+            if any(item.service_key == new_svc.service_key for item in merged):
+                raise AppError(
+                    status_code=409,
+                    error_code="CONFLICT",
+                    message=(
+                        f"Binding for {payload.event_code} / {recipient_type} already uses "
+                        f"service '{new_svc.service_key}'. Edit that binding to change its content."
+                    ),
+                )
+            merged.append(new_svc)
+            row = await self._bindings_repo.update(
+                db,
+                existing,
+                notification_services=serialize_for_db(merged),
+                recipient_config=recipient_config if recipient_config is not None else None,
+            )
+            return self._bindings_service._to_response(row)
+
         row = await self._bindings_repo.create(
             db,
             event_code=payload.event_code,
             event_name=ev.name,
-            recipient_type=payload.recipient_type.strip(),
-            notification_services=serialize_for_db(
-                [NotificationServiceConfigItem(service_key=svc.service_key)]
-            ),
+            recipient_type=recipient_type,
+            notification_services=serialize_for_db([new_svc]),
             engagement_type_id=payload.engagement_type_id,
             recipient_config=recipient_config,
         )
