@@ -32,6 +32,28 @@ async def test_user_recipient_user_ids_key(test_db_session):
 
 
 @pytest.mark.asyncio
+async def test_user_recipient_resolves_phone_from_context(test_db_session, monkeypatch):
+    from modules.users.models import User
+
+    class _FakeUsers:
+        async def get_user_by_phone(self, db, phone):
+            assert phone == "8762830757"
+            return User(user_id=42, phone=phone, email=None)
+
+        async def get_user_by_email(self, db, email):
+            return None
+
+    resolver = RecipientResolver(users_repository=_FakeUsers())
+    target = await resolver.resolve(
+        test_db_session,
+        recipient_type="user",
+        context={"phone": "8762830757"},
+        recipient_config={"user_context_key": "phone"},
+    )
+    assert target.user_ids == [42]
+
+
+@pytest.mark.asyncio
 async def test_user_recipient_falls_back_without_config(test_db_session):
     resolver = RecipientResolver()
     target = await resolver.resolve(

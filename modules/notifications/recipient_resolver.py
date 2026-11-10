@@ -10,6 +10,7 @@ from modules.employee.department_codes import department_for_recipient_type
 from modules.employee.notify_contacts import employees_to_notify_contacts
 from modules.employee.repository import EmployeeRepository
 from modules.engagements.repository import EngagementsRepository
+from modules.users.repository import UsersRepository
 
 
 @dataclass
@@ -23,9 +24,11 @@ class RecipientResolver:
         self,
         engagements_repository: EngagementsRepository | None = None,
         employee_repository: EmployeeRepository | None = None,
+        users_repository: UsersRepository | None = None,
     ) -> None:
         self._engagements = engagements_repository or EngagementsRepository()
         self._employees = employee_repository or EmployeeRepository()
+        self._users = users_repository or UsersRepository()
 
     async def resolve(
         self,
@@ -45,6 +48,12 @@ class RecipientResolver:
                 uids = context.get("user_ids")
                 if isinstance(uids, list) and uids:
                     return DispatchTarget(user_ids=[int(x) for x in uids])
+            elif preferred in ("phone", "email"):
+                lookup = await self._user_id_from_contact(
+                    db, preferred, context.get(preferred)
+                )
+                if lookup is not None:
+                    return DispatchTarget(user_ids=[lookup])
             elif preferred:
                 uid = context.get(preferred)
                 if uid is not None:
@@ -119,3 +128,22 @@ class RecipientResolver:
             return DispatchTarget()
 
         return DispatchTarget()
+
+    async def _user_id_from_contact(
+        self,
+        db: AsyncSession,
+        kind: str,
+        raw: object,
+    ) -> int | None:
+        if raw is None:
+            return None
+        value = str(raw).strip()
+        if not value:
+            return None
+        if kind == "phone":
+            user = await self._users.get_user_by_phone(db, value)
+        elif kind == "email":
+            user = await self._users.get_user_by_email(db, value.strip().lower())
+        else:
+            return None
+        return int(user.user_id) if user is not None else None

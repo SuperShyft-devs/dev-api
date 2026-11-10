@@ -46,7 +46,12 @@ async def send_otp(
     # Await delivery so WhatsApp/email failures surface on send-otp instead of
     # leaving a session that always 401s on verify-otp.
     if delivery is not None:
-        await auth_service.deliver_otp_via_notifications(db, delivery=delivery)
+        await auth_service.deliver_otp_via_notifications(
+            db,
+            delivery=delivery,
+            request_phone=str(payload.phone) if payload.phone else None,
+            request_email=str(payload.email) if payload.email else None,
+        )
         await db.commit()
 
     return success_response(
@@ -75,7 +80,12 @@ async def resend_otp(
 
     if deliveries:
         for delivery in deliveries:
-            await auth_service.deliver_otp_via_notifications(db, delivery=delivery)
+            await auth_service.deliver_otp_via_notifications(
+                db,
+                delivery=delivery,
+                request_phone=str(payload.phone) if payload.phone else None,
+                request_email=str(payload.email) if payload.email else None,
+            )
         await db.commit()
 
     return success_response(build_otp_delivery_response(session_id, deliveries))
