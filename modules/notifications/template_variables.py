@@ -15,7 +15,10 @@ def _get_nested(context: dict[str, Any], path: str) -> str:
     if path == "external_link":
         return str(context.get("external_link") or "")
     if path == "otp":
-        return str(context.get("otp") or "")
+        raw = context.get("otp")
+        if isinstance(raw, dict):
+            return str(raw.get("otp") or "").strip()
+        return str(raw or "").strip()
 
     parts = path.split(".")
     node: Any = context
@@ -50,9 +53,7 @@ def _resolve_member_ref(ref: str, context: dict[str, Any]) -> str:
             "otp": "otp",
         }
         path = aliases.get(field, field)
-        if "." in path:
-            return _get_nested(context, path)
-        return str(context.get(path) or "").strip()
+        return _get_nested(context, path)
     return _get_nested(context, key)
 
 

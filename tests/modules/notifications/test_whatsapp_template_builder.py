@@ -15,8 +15,8 @@ from modules.notifications.whatsapp_template_builder import build_whatsapp_send_
 
 
 def test_resolve_slots_otp():
-    context = {"otp": "654321", "user": {"first_name": "A"}}
-    tv = {"slots": [{"index": 1, "source": "otp"}]}
+    context = {"otp": {"otp": "654321"}, "user": {"first_name": "A"}}
+    tv = {"slots": [{"index": 1, "source": "otp.otp"}]}
     assert resolve_slots(tv, context) == ["654321"]
 
 
@@ -25,7 +25,7 @@ def test_legacy_csv_otp():
 
 
 def test_resolve_slots_legacy_component_list():
-    context = {"otp": "654321", "user": {"first_name": "Pratheek"}}
+    context = {"otp": {"otp": "654321"}, "user": {"first_name": "Pratheek"}}
     tv = [
         {
             "component": "body",
@@ -66,7 +66,12 @@ async def test_build_whatsapp_send_payload_uses_meta_canonical_template_name():
         channel="whatsapp",
         webhook_path="/test",
         template_name="otpmsg",
-        template_variables={"slots": [{"index": 1, "source": "user.first_name"}]},
+        template_variables={
+            "slots": [
+                {"index": 1, "source": "user.first_name"},
+                {"index": 2, "source": "otp.otp"},
+            ]
+        },
     )
     member = {"first_name": "A", "otp": "123456"}
 

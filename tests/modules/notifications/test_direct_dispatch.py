@@ -86,6 +86,28 @@ async def test_whatsapp_post_pending(monkeypatch):
     assert result.queue_id == "q-test-001"
 
 
+def test_build_member_context_otp_nested_for_catalog_variables():
+    from modules.notifications.context_builder import build_member_context
+    from modules.notifications.template_variables import interpolate_email_template, resolve_slots
+
+    context = build_member_context(
+        {"first_name": "Pratheek", "email": "p@example.com", "otp": "482913"},
+    )
+    assert context["otp"] == {"otp": "482913"}
+    html = interpolate_email_template(
+        "<p>Code: {{otp.otp}} and legacy {{otp}}</p>",
+        context,
+    )
+    assert "482913" in html
+    assert "{{" not in html
+
+    slots = resolve_slots(
+        {"slots": [{"index": 1, "source": "otp.otp"}, {"index": 2, "source": "user.first_name"}]},
+        context,
+    )
+    assert slots == ["482913", "Pratheek"]
+
+
 def test_interpolate_email_support_placeholders():
     from modules.notifications.context_builder import build_member_context
     from modules.notifications.template_variables import interpolate_email_template

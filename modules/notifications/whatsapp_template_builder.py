@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from core.exceptions import AppError
 from modules.notifications.context_builder import build_member_context
 from modules.notifications.models import NotificationService
 from modules.notifications.template_variables import (
@@ -65,10 +66,18 @@ async def build_whatsapp_send_payload(
             language_code = language.strip()
 
     expected = _count_body_params(components_meta)
-    if expected > 0 and len(slot_values) > expected:
-        slot_values = slot_values[:expected]
-    elif expected > len(slot_values):
-        slot_values = slot_values + [""] * (expected - len(slot_values))
+    if expected > 0:
+        if len(slot_values) > expected:
+            slot_values = slot_values[:expected]
+        if expected > len(slot_values):
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=(
+                    f"WhatsApp template '{canonical_name}' expects {expected} body parameter(s) "
+                    f"but notification service has {len(slot_values)} slot(s) configured"
+                ),
+            )
 
     components: list[dict[str, Any]] = []
     header_link = resolve_header_link(svc.template_variables, context)
@@ -86,11 +95,19 @@ async def build_whatsapp_send_payload(
         )
 
     if slot_values:
-        components.append(
-            {
-                "type": "body",
-                "parameters": [{"type": "text", "text": value} for value in slot_values],
-            }
-        )
+        body_params: list[dict[str, str]] = []
+        for index, value in enumerate(slot_values, start=1):
+            text = str(value or "").strip()
+            if not text:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message=(
+                        f"WhatsApp template body slot {index} is empty for template "
+                        f"'{canonical_name}' — check service template_variables mapping"
+                    ),
+                )
+            body_params.append({"type": "text", "text": text})
+        components.append({"type": "body", "parameters": body_params})
 
     return canonical_name, components, language_code

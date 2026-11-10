@@ -30,6 +30,7 @@ def build_member_context(
     member_name = f"{member_first} {member_last}".strip() or member_first or "Team member"
 
     gift_url = str(pd.get("gift_url") or "").strip()
+    otp_value = str(member.get("otp") or "").strip()
 
     pd_user = pd.get("user") if isinstance(pd.get("user"), dict) else {}
     if pd_user:
@@ -72,7 +73,8 @@ def build_member_context(
             "gift_card_url": gift_url,
             "gift_message": str(pd.get("gift_message") or "").strip(),
         },
-        "otp": str(member.get("otp") or "").strip(),
+        # Catalog variables use otp.otp; keep a string alias for legacy {{otp}} templates.
+        "otp": {"otp": otp_value},
         "participant_details": pd,
         "external_link": str(member.get("external_link") or "").strip(),
     }
