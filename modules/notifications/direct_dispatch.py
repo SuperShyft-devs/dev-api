@@ -20,9 +20,18 @@ from modules.notifications.template_variables import (
     resolve_header_link,
     resolve_slots,
 )
-from modules.notifications.whatsapp_fallback_get import send_whatsapp_fallback_get
+from modules.notifications.whatsapp_fallback_get import (
+    build_whatsapp_fallback_get_url,
+    send_whatsapp_fallback_get,
+)
 from modules.notifications.whatsapp_template_builder import build_whatsapp_send_payload
-from modules.notifications.whatapi_client import WhatApiClient, get_whatapi_client
+from modules.notifications.whatapi_client import (
+    WhatApiClient,
+    get_whatapi_client,
+    message_templates_request_url,
+    send_messages_request_url,
+    whatapi_auth_descriptor,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -165,15 +174,33 @@ class DirectNotificationDispatch:
             legacy_csv = build_legacy_message_csv(svc.template_name or "", slot_values)
             header_link = resolve_header_link(svc.template_variables, context)
 
+            template_label = (svc.template_name or "").strip()
+            fetch_url = message_templates_request_url(template_name=template_label)
+            send_url = send_messages_request_url()
             sync_log_id = await persist_integration_sync_log_isolated(
                 provider="whatapi",
-                api_url=f"whatsapp://{phone}",
+                api_url=fetch_url,
                 engagement_id=engagement_id,
                 user_id=sync_log_user_id,
                 request_payload={
                     "notification_id": notification_id,
                     "phone": phone,
-                    "template_name": svc.template_name,
+                    "template_name": template_label,
+                    "phase": "whatapi_meta",
+                    "calls": [
+                        {
+                            "http_method": "GET",
+                            "url": fetch_url,
+                            "auth": whatapi_auth_descriptor(),
+                            "purpose": "fetch_message_template",
+                        },
+                        {
+                            "http_method": "POST",
+                            "url": send_url,
+                            "auth": whatapi_auth_descriptor(),
+                            "purpose": "send_template_message",
+                        },
+                    ],
                 },
             )
 
@@ -197,7 +224,19 @@ class DirectNotificationDispatch:
                 await finalize_integration_sync_log_isolated(
                     sync_log_id=sync_log_id,
                     status="success",
-                    response_payload=send_result,
+                    api_endpoint_url=send_url,
+                    response_payload={
+                        **send_result,
+                        "http_method": "POST",
+                        "url": send_url,
+                        "template_fetch_url": fetch_url,
+                        "send_body": {
+                            "to": normalize_whatsapp_phone(phone),
+                            "template_name": template_name,
+                            "language_code": language_code,
+                            "components": components,
+                        },
+                    },
                 )
             except Exception as exc:
                 logger.warning("WhatAPI POST failed, trying GET fallback: %s", exc)
@@ -207,23 +246,44 @@ class DirectNotificationDispatch:
                     error_message=str(exc),
                 )
 
+                fb_phone = normalize_whatsapp_phone(phone)
+                fb_media = (
+                    header_link if header_link and "blood" in (header_link or "").lower() else None
+                )
+                fb_pdf = (
+                    header_link if header_link and "blood" not in (header_link or "").lower() else None
+                )
+                fb_url = build_whatsapp_fallback_get_url(
+                    phone=fb_phone,
+                    message_csv=legacy_csv,
+                    medialink=fb_media,
+                    pdflink=fb_pdf,
+                )
                 fb_log_id = await persist_integration_sync_log_isolated(
                     provider="whatapi_fallback",
-                    api_url="whatapi_fallback_get",
+                    api_url=fb_url,
                     engagement_id=engagement_id,
                     user_id=sync_log_user_id,
                     request_payload={
                         "notification_id": notification_id,
-                        "phone": phone,
+                        "phone": fb_phone,
                         "message": legacy_csv,
+                        "http_method": "GET",
+                        "url": fb_url,
+                        "query": {
+                            "number": fb_phone,
+                            "message": legacy_csv,
+                            **({"medialink": fb_media} if fb_media else {}),
+                            **({"pdflink": fb_pdf} if fb_pdf else {}),
+                        },
                     },
                 )
                 try:
                     fb_result = await send_whatsapp_fallback_get(
-                        phone=normalize_whatsapp_phone(phone),
+                        phone=fb_phone,
                         message_csv=legacy_csv,
-                        medialink=header_link if header_link and "blood" in (header_link or "").lower() else None,
-                        pdflink=header_link if header_link and "blood" not in (header_link or "").lower() else None,
+                        medialink=fb_media,
+                        pdflink=fb_pdf,
                     )
                     used_fallback = True
                     if not fb_result.get("accepted"):

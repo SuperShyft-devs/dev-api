@@ -34,9 +34,8 @@ async def test_fetch_message_template_success(monkeypatch):
         async def __aexit__(self, *args):
             return None
 
-        async def get(self, url, params=None, headers=None):
+        async def get(self, url, headers=None):
             captured["url"] = url
-            captured["params"] = params
             captured["headers"] = headers
             return FakeResponse()
 
@@ -48,7 +47,7 @@ async def test_fetch_message_template_success(monkeypatch):
     body = await client.fetch_message_template(template_name="camp17")
     assert body["data"][0]["name"] == "camp17"
     assert "waba-123" in captured["url"]
-    assert captured["params"] == {"name": "camp17"}
+    assert "name=camp17" in captured["url"]
     assert captured["headers"] == {"API-KEY": "test-token"}
 
 

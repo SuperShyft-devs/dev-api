@@ -36,10 +36,52 @@ def resolve_slot(slot: dict[str, Any], context: dict[str, Any]) -> str:
     return _get_nested(context, source)
 
 
-def resolve_slots(
-    template_variables: dict[str, Any] | None,
+def _resolve_member_ref(ref: str, context: dict[str, Any]) -> str:
+    """Map n8n-era `member.*` refs onto dispatch context."""
+    key = ref.strip()
+    if key.startswith("member."):
+        field = key.removeprefix("member.")
+        aliases = {
+            "first_name": "user.first_name",
+            "last_name": "user.last_name",
+            "phone": "user.phone",
+            "email": "user.email",
+            "otp": "otp",
+        }
+        path = aliases.get(field, field)
+        if "." in path:
+            return _get_nested(context, path)
+        return str(context.get(path) or "").strip()
+    return _get_nested(context, key)
+
+
+def _resolve_legacy_component_slots(
+    template_variables: list[Any],
     context: dict[str, Any],
 ) -> list[str]:
+    """Legacy DB rows store Meta-style component lists with parameter refs."""
+    values: list[str] = []
+    for item in template_variables:
+        if not isinstance(item, dict):
+            continue
+        params = item.get("parameters") or []
+        if not isinstance(params, list):
+            continue
+        for param in params:
+            if not isinstance(param, dict):
+                continue
+            ref = str(param.get("ref") or param.get("source") or "").strip()
+            if ref:
+                values.append(_resolve_member_ref(ref, context))
+    return values
+
+
+def resolve_slots(
+    template_variables: dict[str, Any] | list[Any] | None,
+    context: dict[str, Any],
+) -> list[str]:
+    if isinstance(template_variables, list):
+        return _resolve_legacy_component_slots(template_variables, context)
     if not isinstance(template_variables, dict):
         return []
     slots = template_variables.get("slots") or []

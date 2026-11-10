@@ -33,12 +33,15 @@ class AuditRepository:
         status: str,
         response_payload: dict | None = None,
         error_message: str | None = None,
+        api_endpoint_url: str | None = None,
     ) -> None:
         values: dict = {"status": status}
         if response_payload is not None:
             values["response_payload"] = response_payload
         if error_message is not None:
             values["error_message"] = error_message
+        if api_endpoint_url is not None:
+            values["api_endpoint_url"] = api_endpoint_url
         await db.execute(
             sql_update(IntegrationSyncLog)
             .where(IntegrationSyncLog.sync_log_id == sync_log_id)

@@ -12,6 +12,14 @@ from modules.notifications.models import NotificationService
 
 
 @pytest.fixture(autouse=True)
+def _whatapi_log_urls(monkeypatch):
+    monkeypatch.setattr(settings, "WHATAPI_DOMAIN", "https://crmapi1.whatapi.in")
+    monkeypatch.setattr(settings, "WHATAPI_VERSION", "v19.0")
+    monkeypatch.setattr(settings, "WHATAPI_WABA_ID", "waba-123")
+    monkeypatch.setattr(settings, "WHATAPI_PHONE_NUMBER_ID", "phone-999")
+
+
+@pytest.fixture(autouse=True)
 def _mock_integration_sync_logs(monkeypatch):
     async def fake_persist(**kwargs):
         return 1

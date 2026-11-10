@@ -10,6 +10,27 @@ import httpx
 from core.config import settings
 
 
+def build_whatsapp_fallback_get_url(
+    *,
+    phone: str,
+    message_csv: str,
+    medialink: str | None = None,
+    pdflink: str | None = None,
+) -> str:
+    base_url = (settings.WHATAPI_FALLBACK_WEBHOOK_URL or "").strip()
+    if not base_url:
+        raise RuntimeError("WHATAPI_FALLBACK_WEBHOOK_URL is not configured")
+    params: dict[str, str] = {
+        "number": phone,
+        "message": message_csv,
+    }
+    if medialink:
+        params["medialink"] = medialink
+    if pdflink:
+        params["pdflink"] = pdflink
+    return f"{base_url}?{urlencode(params)}"
+
+
 async def send_whatsapp_fallback_get(
     *,
     phone: str,
@@ -21,20 +42,21 @@ async def send_whatsapp_fallback_get(
     if not base_url:
         raise RuntimeError("WHATAPI_FALLBACK_WEBHOOK_URL is not configured")
 
-    params: dict[str, str] = {
-        "number": phone,
-        "message": message_csv,
-    }
-    if medialink:
-        params["medialink"] = medialink
-    if pdflink:
-        params["pdflink"] = pdflink
-
-    url = f"{base_url}?{urlencode(params)}"
+    url = build_whatsapp_fallback_get_url(
+        phone=phone,
+        message_csv=message_csv,
+        medialink=medialink,
+        pdflink=pdflink,
+    )
     timeout = settings.WHATAPI_FALLBACK_TIMEOUT_SECONDS
     async with httpx.AsyncClient(timeout=timeout) as client:
-        response = await client.get(url)
-        response.raise_for_status()
+        try:
+            response = await client.get(url)
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise RuntimeError(f"GET {url} → HTTP {exc.response.status_code}") from exc
+        except httpx.HTTPError as exc:
+            raise RuntimeError(f"GET {url} request failed") from exc
         try:
             body = response.json()
         except Exception:
