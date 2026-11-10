@@ -8,7 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
 from modules.engagement_notifications.repository import EngagementNotificationsRepository
-from modules.engagement_notifications.service_config import serialize_for_db
+from modules.engagement_notifications.service_config import (
+    NotificationServiceConfigItem,
+    serialize_for_db,
+)
 from modules.notifications.binding_schemas import (
     EngagementNotificationWizardPayload,
     NotificationBindingResponse,
@@ -164,7 +167,9 @@ class NotificationBindingWizardService:
             event_code=payload.event_code,
             event_name=ev.name,
             recipient_type=payload.recipient_type.strip(),
-            notification_services=serialize_for_db([{"service_key": svc.service_key}]),
+            notification_services=serialize_for_db(
+                [NotificationServiceConfigItem(service_key=svc.service_key)]
+            ),
             engagement_type_id=payload.engagement_type_id,
             recipient_config=recipient_config,
         )
@@ -190,7 +195,9 @@ class NotificationBindingWizardService:
             row,
             event_name=ev.name,
             recipient_type=payload.recipient_type.strip(),
-            notification_services=serialize_for_db([{"service_key": svc.service_key}]),
+            notification_services=serialize_for_db(
+                [NotificationServiceConfigItem(service_key=svc.service_key)]
+            ),
             recipient_config=recipient_config,
         )
         if payload.engagement_type_id is not None:
@@ -212,7 +219,7 @@ class NotificationBindingWizardService:
                 message=f"Unknown event_code '{payload.event_code}'",
             )
         svc = await self._ensure_service(db, event_code=payload.event_code, spec=payload.service)
-        configs = serialize_for_db([{"service_key": svc.service_key}])
+        configs = serialize_for_db([NotificationServiceConfigItem(service_key=svc.service_key)])
         existing = await self._en_repo.get_for_engagement_and_event_code(
             db, engagement_id=engagement_id, event_code=payload.event_code
         )
