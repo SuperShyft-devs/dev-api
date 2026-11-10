@@ -304,7 +304,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         name="Support ticket created",
         status="current",
         variable_groups=("user", "support"),
-        default_recipients=("employees",),
+        default_recipients=("departments.ops",),
         trigger_notes="POST /support/tickets",
     ),
     EventDefinition(
@@ -320,7 +320,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         name="Auto booking failed",
         status="add",
         variable_groups=("user", "engagement", "booking", "error"),
-        default_recipients=("assistants", "admin"),
+        default_recipients=("assistants", "departments.ops"),
         trigger_notes="Vendor auto-book fails",
     ),
     EventDefinition(
@@ -328,7 +328,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         name="System error",
         status="add",
         variable_groups=("error", "user", "engagement"),
-        default_recipients=("admin",),
+        default_recipients=("departments.ops",),
         trigger_notes="Unexpected runtime failure",
     ),
     EventDefinition(
@@ -336,7 +336,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         name="CPU threshold alert",
         status="current",
         variable_groups=("server",),
-        default_recipients=("admin",),
+        default_recipients=("departments.ops",),
         trigger_notes="Server health CPU alert",
     ),
 )

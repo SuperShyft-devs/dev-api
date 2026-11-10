@@ -17,6 +17,8 @@ from modules.employee.models import (
     EmployeeAuthOtpSession,
     EmployeeAuthToken,
     EmployeeCategoryPermission,
+    EmployeeDepartment,
+    EmployeeDepartmentName,
     EmployeeTaskPermission,
     PermissionCategory,
 )
@@ -298,3 +300,85 @@ class EmployeeRepository:
             .where(EmployeeAuthToken.token_id == token_id)
             .values(refresh_token_hash=refresh_token_hash, issued_at=datetime.now(timezone.utc))
         )
+
+    async def list_department_names_for_employee(
+        self, db: AsyncSession, *, employee_id: int
+    ) -> list[str]:
+        result = await db.execute(
+            select(EmployeeDepartment.department).where(EmployeeDepartment.employee_id == employee_id)
+        )
+        return sorted(
+            {
+                row.value if isinstance(row, EmployeeDepartmentName) else str(row)
+                for row in result.scalars().all()
+            }
+        )
+
+    async def map_department_names_by_employee_ids(
+        self, db: AsyncSession, *, employee_ids: list[int]
+    ) -> dict[int, list[str]]:
+        if not employee_ids:
+            return {}
+        result = await db.execute(
+            select(EmployeeDepartment.employee_id, EmployeeDepartment.department).where(
+                EmployeeDepartment.employee_id.in_(employee_ids)
+            )
+        )
+        out: dict[int, set[str]] = {}
+        for eid, dept in result.all():
+            key = int(eid)
+            val = dept.value if isinstance(dept, EmployeeDepartmentName) else str(dept)
+            out.setdefault(key, set()).add(val)
+        return {k: sorted(v) for k, v in out.items()}
+
+    async def set_employee_departments(
+        self,
+        db: AsyncSession,
+        *,
+        employee_id: int,
+        departments: list[EmployeeDepartmentName],
+    ) -> list[str]:
+        unique = list(dict.fromkeys(departments))
+        await db.execute(delete(EmployeeDepartment).where(EmployeeDepartment.employee_id == employee_id))
+        for dept in unique:
+            db.add(EmployeeDepartment(employee_id=employee_id, department=dept))
+        await db.flush()
+        return [d.value for d in unique]
+
+    async def list_active_employee_ids_by_department(
+        self,
+        db: AsyncSession,
+        *,
+        department: EmployeeDepartmentName | None,
+    ) -> list[int]:
+        q = (
+            select(Employee.employee_id)
+            .where(Employee.status == "active")
+            .distinct()
+        )
+        if department is not None:
+            q = q.join(
+                EmployeeDepartment,
+                EmployeeDepartment.employee_id == Employee.employee_id,
+            ).where(EmployeeDepartment.department == department)
+        else:
+            q = q.join(
+                EmployeeDepartment,
+                EmployeeDepartment.employee_id == Employee.employee_id,
+            )
+        result = await db.execute(q.order_by(Employee.employee_id.asc()))
+        return [int(x) for x in result.scalars().all()]
+
+    async def list_active_employees_for_department(
+        self,
+        db: AsyncSession,
+        *,
+        department: EmployeeDepartmentName | None,
+    ) -> list[Employee]:
+        ids = await self.list_active_employee_ids_by_department(db, department=department)
+        if not ids:
+            return []
+        result = await db.execute(
+            select(Employee).where(Employee.employee_id.in_(ids)).order_by(Employee.employee_id.asc())
+        )
+        return list(result.scalars().all())

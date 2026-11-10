@@ -81,8 +81,10 @@ KNOWN_RECIPIENT_TYPES: frozenset[str] = frozenset(
         "assistants.phlebo",
         "assistants.expert",
         "assistants.staff",
-        "employees",
-        "admin",
+        "departments",
+        "departments.ops",
+        "departments.tech",
+        "departments.design",
         "custom",
     }
 )
@@ -95,7 +97,9 @@ RECIPIENT_PAYLOAD_HINTS: dict[str, str] = {
     "assistants.phlebo": "engagement_id → phlebo assistants",
     "assistants.expert": "engagement_id → expert assistants",
     "assistants.staff": "engagement_id → staff assistants",
-    "employees": "employee_contacts or default support staff",
-    "admin": "admin_user_ids, admin_contacts",
+    "departments": "active employees with any department assignment",
+    "departments.ops": "active employees in ops department",
+    "departments.tech": "active employees in tech department",
+    "departments.design": "active employees in design department",
     "custom": "phones and emails configured on this binding",
 }

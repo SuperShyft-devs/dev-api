@@ -166,13 +166,15 @@ async def test_create_engagement_creates_row(async_client, test_db_session):
     await _seed_organization(test_db_session, organization_id=1, name="Test Organization 1")
     await _seed_assessment_package(test_db_session, package_id=1, package_code="PKG1")
     await _seed_diagnostic_package(test_db_session, diagnostic_package_id=1)
+    from tests.helpers.employee_departments import seed_employee_departments
+
+    await seed_employee_departments(test_db_session, employee_id=10, departments=["ops"])
     await test_db_session.execute(text("DELETE FROM platform_settings"))
     await test_db_session.execute(
         text(
             "INSERT INTO platform_settings "
-            "(settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id, "
-            "default_onboarding_assistant_employee_ids) "
-            "VALUES (1, 1, 1, '10')"
+            "(settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id) "
+            "VALUES (1, 1, 1)"
         )
     )
     await test_db_session.commit()

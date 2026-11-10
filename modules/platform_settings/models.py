@@ -64,7 +64,6 @@ class PlatformSettings(Base):
     b2c_default_create_profile_on_metsights = Column(Boolean, nullable=False, default=True, server_default="true")
     b2c_default_enroll_for_fitprint_full = Column(Boolean, nullable=False, default=False, server_default="false")
     b2c_onboarding_by_engagement_type = Column(JSONB, nullable=True)
-    default_onboarding_assistant_employee_ids = Column(String(500), nullable=True)
     default_support_query_notification = Column(String(500), nullable=True)
     geocoding_provider = Column(
         _geocoding_provider,

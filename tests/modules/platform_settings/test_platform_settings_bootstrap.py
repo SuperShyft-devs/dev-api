@@ -17,7 +17,6 @@ async def test_platform_settings_bootstrap(async_client, test_db_session):
     assert response.status_code == 200
     data = response.json()["data"]
     assert "b2c_onboarding" in data
-    assert "default_onboarding_assistants" in data
     assert "support_query_notification" in data
     assert "geocoding_provider" in data
     assert "engagement_types" in data

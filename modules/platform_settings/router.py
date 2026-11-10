@@ -14,8 +14,6 @@ from modules.platform_settings.dependencies import get_platform_settings_service
 from modules.platform_settings.schemas import (
     B2cOnboardingDefaultsRead,
     B2cOnboardingDefaultsUpdate,
-    DefaultOnboardingAssistantsRead,
-    DefaultOnboardingAssistantsUpdate,
     EngagementsSyncImportPageRequest,
     GeocodingProviderSettingsRead,
     GeocodingProviderSettingsUpdate,
@@ -88,37 +86,6 @@ async def patch_b2c_onboarding_defaults(
 
 # Engagement notification defaults are served by modules.engagement_notifications.router
 # at GET/PUT /platform-settings/engagement-notification-defaults (per engagement_type_id).
-
-
-@router.get("/default-onboarding-assistants")
-async def get_default_onboarding_assistants(
-    db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
-    service: PlatformSettingsService = Depends(get_platform_settings_service),
-):
-    _ = employee
-    data = await service.get_default_onboarding_assistants(db)
-    return success_response(data.model_dump())
-
-
-@router.patch("/default-onboarding-assistants")
-async def patch_default_onboarding_assistants(
-    payload: DefaultOnboardingAssistantsUpdate,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    employee: EmployeeContext = Depends(get_current_employee),
-    service: PlatformSettingsService = Depends(get_platform_settings_service),
-):
-    data: DefaultOnboardingAssistantsRead = await service.update_default_onboarding_assistants(
-        db,
-        employee=employee,
-        payload=payload,
-        ip_address=_client_ip(request),
-        user_agent=request.headers.get("User-Agent", "unknown"),
-        endpoint=str(request.url.path),
-    )
-    await db.commit()
-    return success_response(data.model_dump())
 
 
 @router.get("/support-query-notification")

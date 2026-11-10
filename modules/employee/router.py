@@ -28,6 +28,7 @@ from modules.employee.dependencies import (
 )
 from modules.employee.schemas import (
     EmployeeCreateRequest,
+    EmployeeDepartmentsUpdate,
     EmployeeLogoutRequest,
     EmployeeRefreshTokenRequest,
     EmployeeSendOtpRequest,
@@ -277,6 +278,10 @@ async def list_employees(
         sort_dir=sort_dir,
     )
 
+    dept_map = await employee_service.map_department_names_for_employee_ids(
+        db,
+        employee_ids=[row.employee_id for row in employees],
+    )
     data = [
         {
             "employee_id": row.employee_id,
@@ -286,6 +291,7 @@ async def list_employees(
             "role": row.role,
             "status": row.status,
             "permissions_version": row.permissions_version,
+            "departments": dept_map.get(row.employee_id, []),
         }
         for row in employees
     ]
@@ -459,8 +465,47 @@ async def get_employee(
     row = await employee_service.get_employee_details(
         db, employee=employee, employee_id=employee_id
     )
+    departments = await employee_service.get_employee_department_names(
+        db, employee=employee, employee_id=employee_id
+    )
+    payload = _employee_to_dict(row)
+    payload["departments"] = departments
+    return success_response(payload)
 
-    return success_response(_employee_to_dict(row))
+
+@router.get("/{employee_id}/departments")
+async def get_employee_departments(
+    employee_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    employee_service: EmployeeService = Depends(get_employee_management_service),
+):
+    names = await employee_service.get_employee_department_names(
+        db, employee=employee, employee_id=employee_id
+    )
+    return success_response({"employee_id": employee_id, "departments": names})
+
+
+@router.put("/{employee_id}/departments")
+async def update_employee_departments(
+    employee_id: int,
+    payload: EmployeeDepartmentsUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    employee_service: EmployeeService = Depends(get_employee_management_service),
+):
+    names = await employee_service.replace_employee_departments(
+        db,
+        employee=employee,
+        employee_id=employee_id,
+        payload=payload,
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("User-Agent", "unknown"),
+        endpoint=str(request.url.path),
+    )
+    await db.commit()
+    return success_response({"employee_id": employee_id, "departments": names})
 
 
 @router.put("/{employee_id}")

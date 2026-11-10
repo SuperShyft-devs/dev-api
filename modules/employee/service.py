@@ -17,6 +17,7 @@ from modules.audit.service import AuditService
 from modules.employee.models import (
     Employee,
     EmployeeCategoryPermission,
+    EmployeeDepartmentName,
     EmployeeRole,
     EmployeeTaskPermission,
 )
@@ -34,6 +35,7 @@ from modules.employee.repository import EmployeeRepository
 from modules.employee.schemas import (
     CategoryGrantRequest,
     EmployeeCreateRequest,
+    EmployeeDepartmentsUpdate,
     EmployeeUpdateRequest,
 )
 from modules.partners.repository import PartnersRepository
@@ -803,3 +805,74 @@ class EmployeeService:
             session_id=None,
         )
         return target
+
+    def _ensure_full_admin_for_departments(self, employee: EmployeeContext) -> None:
+        if employee.role != EmployeeRole.admin:
+            raise full_admin_only()
+
+    async def map_department_names_for_employee_ids(
+        self, db: AsyncSession, *, employee_ids: list[int]
+    ) -> dict[int, list[str]]:
+        return await self._repository.map_department_names_by_employee_ids(
+            db, employee_ids=employee_ids
+        )
+
+    async def get_employee_department_names(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        employee_id: int,
+    ) -> list[str]:
+        self._ensure_admin(employee, action=PermissionAction.view)
+        row = await self._repository.get_by_id(db, employee_id)
+        if row is None:
+            raise AppError(
+                status_code=404,
+                error_code="EMPLOYEE_NOT_FOUND",
+                message="Employee does not exist",
+            )
+        return await self._repository.list_department_names_for_employee(db, employee_id=employee_id)
+
+    async def replace_employee_departments(
+        self,
+        db: AsyncSession,
+        *,
+        employee: EmployeeContext,
+        employee_id: int,
+        payload: EmployeeDepartmentsUpdate,
+        ip_address: str,
+        user_agent: str,
+        endpoint: str,
+    ) -> list[str]:
+        self._ensure_full_admin_for_departments(employee)
+        row = await self._repository.get_by_id(db, employee_id)
+        if row is None:
+            raise AppError(
+                status_code=404,
+                error_code="EMPLOYEE_NOT_FOUND",
+                message="Employee does not exist",
+            )
+        parsed: list[EmployeeDepartmentName] = []
+        for raw in payload.departments:
+            try:
+                parsed.append(EmployeeDepartmentName(str(raw).strip().lower()))
+            except ValueError as exc:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message=f"Unknown department '{raw}'",
+                ) from exc
+        names = await self._repository.set_employee_departments(
+            db, employee_id=employee_id, departments=parsed
+        )
+        await self._require_audit_service().log_event(
+            db,
+            action=f"EMPLOYEE_SET_DEPARTMENTS target={employee_id} departments={','.join(names)}",
+            endpoint=endpoint,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user_id=None,
+            session_id=None,
+        )
+        return names

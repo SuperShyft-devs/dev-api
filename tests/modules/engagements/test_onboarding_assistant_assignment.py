@@ -10,6 +10,7 @@ from sqlalchemy import text
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.service import EngagementsService
 from tests.helpers.auth import seed_employee, seed_partner
+from tests.helpers.employee_departments import seed_employee_departments
 
 
 async def _seed_packages_and_engagement(
@@ -254,8 +255,8 @@ async def test_get_nonexistent_assignment_returns_none(test_db_session):
 
 
 @pytest.mark.asyncio
-async def test_b2c_engagement_assigns_no_assistants_when_defaults_empty(test_db_session):
-    """B2C engagements assign nothing when platform defaults are empty."""
+async def test_b2c_engagement_assigns_no_assistants_when_no_ops_employees(test_db_session):
+    """B2C engagements assign nothing when no active ops department members exist."""
     await test_db_session.execute(
         text(
             "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
@@ -273,9 +274,8 @@ async def test_b2c_engagement_assigns_no_assistants_when_defaults_empty(test_db_
     await test_db_session.execute(
         text(
             "INSERT INTO platform_settings "
-            "(settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id, "
-            "default_onboarding_assistant_employee_ids) "
-            "VALUES (1, 1, 1, NULL)"
+            "(settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id) "
+            "VALUES (1, 1, 1)"
         )
     )
     await test_db_session.commit()
@@ -299,8 +299,8 @@ async def test_b2c_engagement_assigns_no_assistants_when_defaults_empty(test_db_
 
 
 @pytest.mark.asyncio
-async def test_b2c_engagement_assigns_default_assistants_from_platform_settings(test_db_session):
-    """B2C engagements auto-assign staff employees configured in platform settings."""
+async def test_b2c_engagement_assigns_default_assistants_from_ops_department(test_db_session):
+    """B2C engagements auto-assign active employees in the ops department."""
     await test_db_session.execute(
         text(
             "INSERT INTO assessment_packages (package_id, package_code, display_name, status) "
@@ -330,13 +330,14 @@ async def test_b2c_engagement_assigns_default_assistants_from_platform_settings(
         phone="5011000000",
         commit=False,
     )
+    await seed_employee_departments(test_db_session, employee_id=110, departments=["ops"], commit=False)
+    await seed_employee_departments(test_db_session, employee_id=111, departments=["ops"], commit=False)
     await test_db_session.execute(text("DELETE FROM platform_settings"))
     await test_db_session.execute(
         text(
             "INSERT INTO platform_settings "
-            "(settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id, "
-            "default_onboarding_assistant_employee_ids) "
-            "VALUES (1, 1, 1, '110,111')"
+            "(settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id) "
+            "VALUES (1, 1, 1)"
         )
     )
     await test_db_session.commit()

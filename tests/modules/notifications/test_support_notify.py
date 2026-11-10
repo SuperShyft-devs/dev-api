@@ -1,4 +1,4 @@
-"""Unit tests for support-query notifications to default onboarding assistants."""
+"""Unit tests for support-query notifications to ops department staff."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from modules.notifications.support_notify import notify_default_onboarding_assis
 from modules.platform_settings.repository import PlatformSettingsRepository
 from modules.support.models import SupportTicket
 from modules.users.models import User
+from tests.helpers.employee_departments import seed_employee_departments
 
 
 async def _seed_notification_service(
@@ -77,14 +78,20 @@ async def test_support_notify_dispatches_to_default_assistants(test_db_session, 
             status="active",
         )
     )
+    await test_db_session.flush()
+    await seed_employee_departments(test_db_session, employee_id=9402, departments=["ops"], commit=False)
+
+    await test_db_session.execute(
+        text("DELETE FROM notification_events WHERE event_code = 'support.ticket_created'")
+    )
 
     await test_db_session.execute(text("DELETE FROM platform_settings"))
     await test_db_session.execute(
         text(
             "INSERT INTO platform_settings "
             "(settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id, "
-            "default_onboarding_assistant_employee_ids, default_support_query_notification) "
-            "VALUES (1, 1, 1, '9402', :sk)"
+            "default_support_query_notification) "
+            "VALUES (1, 1, 1, :sk)"
         ),
         {"sk": service_key},
     )
@@ -140,8 +147,8 @@ async def test_support_notify_noop_when_no_service_keys(test_db_session, monkeyp
         text(
             "INSERT INTO platform_settings "
             "(settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id, "
-            "default_onboarding_assistant_employee_ids, default_support_query_notification) "
-            "VALUES (1, 1, 1, '1', NULL)"
+            "default_support_query_notification) "
+            "VALUES (1, 1, 1, NULL)"
         )
     )
     await test_db_session.commit()
@@ -187,8 +194,8 @@ async def test_support_notify_noop_when_no_assistants(test_db_session, monkeypat
         text(
             "INSERT INTO platform_settings "
             "(settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id, "
-            "default_onboarding_assistant_employee_ids, default_support_query_notification) "
-            "VALUES (1, 1, 1, NULL, :sk)"
+            "default_support_query_notification) "
+            "VALUES (1, 1, 1, :sk)"
         ),
         {"sk": service_key},
     )
@@ -214,7 +221,7 @@ async def test_support_notify_noop_when_no_assistants(test_db_session, monkeypat
             VALUES (
                 'support.ticket_created',
                 'Support ticket created',
-                'employees',
+                'departments.ops',
                 CAST(:services AS json),
                 NULL
             )

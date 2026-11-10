@@ -70,6 +70,10 @@ class EmployeeStatusUpdateRequest(BaseModel):
     status: StatusStr
 
 
+class EmployeeDepartmentsUpdate(BaseModel):
+    departments: list[Literal["tech", "design", "ops"]] = Field(default_factory=list)
+
+
 class EmployeeListItem(BaseModel):
     employee_id: int
     name: str
@@ -77,6 +81,7 @@ class EmployeeListItem(BaseModel):
     email: str | None = None
     role: Optional[EmployeeRole] = None
     status: Optional[str] = None
+    departments: list[str] = Field(default_factory=list)
 
 
 class EmployeeDetailsResponse(EmployeeListItem):

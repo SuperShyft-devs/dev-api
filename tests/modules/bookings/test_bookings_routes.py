@@ -122,11 +122,7 @@ async def _seed_notification_service(test_db_session, *, service_key: str) -> No
     await test_db_session.commit()
 
 
-async def _seed_book_finalize_platform_defaults(
-    test_db_session,
-    *,
-    assistant_employee_ids: str | None = None,
-) -> None:
+async def _seed_book_finalize_platform_defaults(test_db_session) -> None:
     """Platform notification defaults + optional default OA employee ids for /book finalize."""
     for key in (
         "booking-alert-whatsapp",
@@ -147,16 +143,15 @@ async def _seed_book_finalize_platform_defaults(
             "default_onboarding_notification, default_pretest_guidelines_notification, "
             "default_questionnaire_reminder_1, default_questionnaire_reminder_2, "
             "default_blood_report_notification, default_bioai_report_notification, "
-            "default_notify_users_for_consultation, default_onboarding_assistant_employee_ids"
+            "default_notify_users_for_consultation"
             ") VALUES ("
             "1, 1, 1, "
             "'booking-alert-whatsapp', 'pretest-alert-whatsapp', "
             "'qr1-alert-whatsapp', 'qr2-alert-whatsapp', "
             "'blood-report-alert-whatsapp', 'bioai-report-alert-whatsapp', "
-            "'consultation-alert-whatsapp', :oa_ids"
+            "'consultation-alert-whatsapp'"
             ")"
         ),
-        {"oa_ids": assistant_employee_ids},
     )
     await test_db_session.commit()
 
@@ -1401,7 +1396,10 @@ async def test_book_bio_ai_applies_defaults_assigns_assistants_and_notifies(
             "VALUES (940110, 940030, 'onboarding_assistant', 1)"
         )
     )
-    await _seed_book_finalize_platform_defaults(test_db_session, assistant_employee_ids="940110")
+    from tests.helpers.employee_departments import seed_employee_departments
+
+    await seed_employee_departments(test_db_session, employee_id=940110, departments=["ops"], commit=False)
+    await _seed_book_finalize_platform_defaults(test_db_session)
 
     u = User(
         user_id=940023,

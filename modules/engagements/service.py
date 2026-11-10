@@ -1822,10 +1822,10 @@ class EngagementsService:
         payment_type: EngagementPaymentType | None = None,
         auto_booking: bool = False,
     ) -> Engagement:
-        """Create a B2C engagement and auto-assign default onboarding assistants from platform settings.
+        """Create a B2C engagement and auto-assign default onboarding assistants from ops department.
 
         B2C engagements are created automatically during public user onboarding.
-        Default assistants come from platform_settings.default_onboarding_assistant_employee_ids.
+        Default assistants are active employees tagged with the ops department.
 
         When location fields are incomplete and an address (or address parts) is
         available, missing fields are filled via the configured geocoding provider
@@ -2268,7 +2268,11 @@ class EngagementsService:
         )
 
     async def _resolve_default_onboarding_assistant_employee_ids(self, db: AsyncSession) -> list[int]:
-        return await self._platform_settings_repository.resolve_default_onboarding_assistant_employee_ids(db)
+        from modules.employee.models import EmployeeDepartmentName
+
+        return await self._employee_repository.list_active_employee_ids_by_department(
+            db, department=EmployeeDepartmentName.ops
+        )
 
     async def _assign_default_onboarding_assistants(
         self,
@@ -2289,10 +2293,6 @@ class EngagementsService:
                 continue
             if (emp.status or "").lower() != "active":
                 logger.warning("Skipping default onboarding assistant %s: employee not active", employee_id)
-                continue
-            role = emp.role if isinstance(emp.role, EmployeeRole) else EmployeeRole(str(emp.role))
-            if role not in ONBOARDING_ASSISTANT_ASSIGNEE_EMPLOYEE_ROLES:
-                logger.warning("Skipping default onboarding assistant %s: invalid role", employee_id)
                 continue
 
             existing = await self._repository.get_onboarding_assistant_assignment(

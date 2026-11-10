@@ -23,9 +23,26 @@ class EmployeeRole(str, enum.Enum):
     expert = "expert"
 
 
+class EmployeeDepartmentName(str, enum.Enum):
+    """PostgreSQL enum `employee_department_enum`."""
+
+    tech = "tech"
+    design = "design"
+    ops = "ops"
+
+
 _employee_role = SAEnum(
     EmployeeRole,
     name="employee_role",
+    native_enum=True,
+    values_callable=lambda obj: [e.value for e in obj],
+    validate_strings=True,
+    create_type=False,
+)
+
+_employee_department = SAEnum(
+    EmployeeDepartmentName,
+    name="employee_department_enum",
     native_enum=True,
     values_callable=lambda obj: [e.value for e in obj],
     validate_strings=True,
@@ -56,6 +73,23 @@ class Employee(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+
+class EmployeeDepartment(Base):
+    """Many-to-many: employee ↔ department (tech, design, ops)."""
+
+    __tablename__ = "employee_department"
+    __table_args__ = (
+        Index("ix_employee_department_department", "department"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    employee_id = Column(
+        Integer,
+        ForeignKey("employee.employee_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    department = Column(_employee_department, nullable=False)
 
 
 class EmployeeAuthOtpSession(Base):

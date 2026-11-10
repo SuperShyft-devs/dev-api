@@ -71,24 +71,6 @@ class EngagementsSyncStatsRead(BaseModel):
     b2c_engagements_total: int
 
 
-class DefaultOnboardingAssistantItem(BaseModel):
-    employee_id: int
-    user_id: int
-    role: str
-    status: str
-    first_name: str | None = None
-    last_name: str | None = None
-
-
-class DefaultOnboardingAssistantsRead(BaseModel):
-    employee_ids: list[int]
-    assistants: list[DefaultOnboardingAssistantItem]
-
-
-class DefaultOnboardingAssistantsUpdate(BaseModel):
-    employee_ids: list[int] = Field(default_factory=list)
-
-
 class SupportQueryNotificationRead(BaseModel):
     default_support_query_notification: str | None = None
 

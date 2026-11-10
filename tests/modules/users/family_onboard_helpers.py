@@ -112,23 +112,18 @@ async def seed_family_onboard_onboarding_notification_setup(
         email="family.oa@test.example",
         commit=False,
     )
-    await test_db_session.execute(
-        text(
-            "UPDATE platform_settings SET default_onboarding_assistant_employee_ids = :ids "
-            "WHERE settings_id = 1"
-        ),
-        {"ids": str(employee_id)},
+    from tests.helpers.employee_departments import seed_employee_departments
+
+    await seed_employee_departments(
+        test_db_session, employee_id=employee_id, departments=["ops"], commit=False
     )
     await test_db_session.execute(
         text(
             "INSERT INTO platform_settings "
-            "(settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id, "
-            "default_onboarding_assistant_employee_ids) "
-            "VALUES (1, 1, 6, :ids) "
-            "ON CONFLICT (settings_id) DO UPDATE SET "
-            "default_onboarding_assistant_employee_ids = EXCLUDED.default_onboarding_assistant_employee_ids"
-        ),
-        {"ids": str(employee_id)},
+            "(settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id) "
+            "VALUES (1, 1, 6) "
+            "ON CONFLICT (settings_id) DO NOTHING"
+        )
     )
     await test_db_session.commit()
 

@@ -27,15 +27,16 @@ def _assert_valid_camp_code(camp_code: str | None) -> None:
 
 
 async def _seed_platform_settings(test_db_session, *, employee_id: int) -> None:
+    from tests.helpers.employee_departments import seed_employee_departments
+
+    await seed_employee_departments(test_db_session, employee_id=employee_id, departments=["ops"], commit=False)
     await test_db_session.execute(text("DELETE FROM platform_settings"))
     await test_db_session.execute(
         text(
             "INSERT INTO platform_settings "
-            "(settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id, "
-            "default_onboarding_assistant_employee_ids) "
-            "VALUES (1, 1, 1, :ids)"
-        ),
-        {"ids": str(employee_id)},
+            "(settings_id, b2c_default_assessment_package_id, b2c_default_diagnostic_package_id) "
+            "VALUES (1, 1, 1)"
+        )
     )
     await test_db_session.commit()
 

@@ -87,7 +87,13 @@ class NotificationBindingWizardService:
                     message="Custom recipient requires at least one phone or email",
                 )
             return {"phones": list(cfg.phones), "emails": list(cfg.emails)}
-        if rt not in ev.default_recipients and rt not in ("assistants", "employees", "admin"):
+        if rt not in ev.default_recipients and rt not in (
+            "assistants",
+            "departments",
+            "departments.ops",
+            "departments.tech",
+            "departments.design",
+        ):
             pass
         return None
 
