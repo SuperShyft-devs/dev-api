@@ -125,9 +125,11 @@ async def test_support_notify_dispatches_to_default_assistants(test_db_session, 
     assert kwargs["service_key"] == service_key
     assert kwargs["contacts"][0]["phone"] == "0000009402"
     assert kwargs["contacts"][0]["email"] == "oa@example.com"
-    assert kwargs["participant_details"]["query_text"] == "Need help with my report"
-    assert kwargs["participant_details"]["ticket_id"] == str(ticket.ticket_id)
-    assert kwargs["participant_details"]["name"] == "Pat User"
+    pd = kwargs["participant_details"]
+    assert pd["support"]["query_text"] == "Need help with my report"
+    assert pd["support"]["ticket_id"] == str(ticket.ticket_id)
+    assert pd["user"]["name"] == "Pat User"
+    assert pd["user"]["phone"] == "94010000001"
 
 
 @pytest.mark.asyncio

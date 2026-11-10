@@ -7,6 +7,7 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.notifications.engine import get_notification_engine
+from modules.notifications.participant_user_context import user_notification_context
 from modules.platform_settings.repository import PlatformSettingsRepository
 from modules.support.models import SupportTicket
 
@@ -21,18 +22,15 @@ def participant_details_from_support_ticket(
     user,
     *,
     ticket: SupportTicket,
-) -> dict[str, str]:
-    first_name = getattr(user, "first_name", None) or ""
-    last_name = getattr(user, "last_name", None) or ""
-    name = f"{first_name} {last_name}".strip()
+) -> dict[str, object]:
+    participant_user_id = str(ticket.user_id or getattr(user, "user_id", "") or "")
     return {
-        "name": name,
-        "email": str(getattr(user, "email", None) or ""),
-        "phone": str(getattr(user, "phone", None) or ""),
-        "contact_input": str(ticket.contact_input or ""),
-        "query_text": str(ticket.query_text or ""),
-        "ticket_id": str(ticket.ticket_id),
-        "participant_user_id": str(ticket.user_id or getattr(user, "user_id", "") or ""),
+        "user": user_notification_context(user),
+        "support": {
+            "ticket_id": str(ticket.ticket_id),
+            "query_text": str(ticket.query_text or ""),
+        },
+        "participant_user_id": participant_user_id,
     }
 
 

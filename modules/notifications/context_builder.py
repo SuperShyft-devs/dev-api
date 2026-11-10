@@ -25,17 +25,34 @@ def build_member_context(
     if not isinstance(pd, dict):
         pd = {}
 
-    first_name = str(member.get("first_name") or "Participant").strip() or "Participant"
+    member_first = str(member.get("first_name") or "").strip()
+    member_last = str(member.get("last_name") or "").strip()
+    member_name = f"{member_first} {member_last}".strip() or member_first or "Team member"
 
     gift_url = str(pd.get("gift_url") or "").strip()
 
-    context: dict[str, Any] = {
-        "user": {
-            "first_name": first_name,
-            "last_name": str(member.get("last_name") or "").strip(),
+    pd_user = pd.get("user") if isinstance(pd.get("user"), dict) else {}
+    if pd_user:
+        user_block = {k: str(v or "").strip() for k, v in pd_user.items()}
+    else:
+        legacy_first = member_first or "Participant"
+        user_block = {
+            "first_name": legacy_first,
+            "last_name": member_last,
+            "name": member_name if member_name != "Team member" else legacy_first,
             "phone": normalize_whatsapp_phone(member.get("phone")),
             "email": str(member.get("email") or "").strip(),
+        }
+
+    context: dict[str, Any] = {
+        "staff": {
+            "name": member_name,
+            "first_name": member_first,
+            "last_name": member_last,
+            "phone": str(member.get("phone") or "").strip(),
+            "email": str(member.get("email") or "").strip(),
         },
+        "user": user_block,
         "session": {
             "date": str(session.get("date") or "").strip(),
             "time": str(session.get("slot") or session.get("time") or "").strip(),
@@ -49,7 +66,7 @@ def build_member_context(
         "gift": {
             "booker_name": str(pd.get("booker_name") or "").strip(),
             "booker_phone": str(pd.get("booker_phone") or "").strip(),
-            "recipient_name": str(pd.get("recipient_name") or first_name).strip(),
+            "recipient_name": str(pd.get("recipient_name") or user_block.get("first_name") or "").strip(),
             "relationship": str(pd.get("relationship") or "").strip(),
             "gift_url": gift_url,
             "gift_card_url": gift_url,
@@ -60,13 +77,13 @@ def build_member_context(
         "external_link": str(member.get("external_link") or "").strip(),
     }
 
-    if pd:
+    support_pd = pd.get("support") if isinstance(pd.get("support"), dict) else pd
+    if isinstance(support_pd, dict) and (
+        support_pd.get("ticket_id") or support_pd.get("query_text")
+    ):
         context["support"] = {
-            "ticket_id": str(pd.get("ticket_id") or "").strip(),
-            "query_text": str(pd.get("query_text") or "").strip(),
-            "contact_input": str(
-                pd.get("contact_input") or pd.get("phone") or ""
-            ).strip(),
+            "ticket_id": str(support_pd.get("ticket_id") or "").strip(),
+            "query_text": str(support_pd.get("query_text") or "").strip(),
         }
 
     for key in ("engagement", "consultation", "booking"):

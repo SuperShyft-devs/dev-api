@@ -4,6 +4,7 @@ from __future__ import annotations
 
 VARIABLE_GROUP_FIELDS: dict[str, tuple[str, ...]] = {
     "user": (
+        "user.name",
         "user.first_name",
         "user.last_name",
         "user.phone",
@@ -12,6 +13,13 @@ VARIABLE_GROUP_FIELDS: dict[str, tuple[str, ...]] = {
         "user.gender",
         "user.address",
         "user.pincode",
+    ),
+    "staff": (
+        "staff.name",
+        "staff.first_name",
+        "staff.last_name",
+        "staff.phone",
+        "staff.email",
     ),
     "engagement": (
         "engagement.engagement_id",
@@ -47,7 +55,7 @@ VARIABLE_GROUP_FIELDS: dict[str, tuple[str, ...]] = {
         "gift.gift_card_url",
         "gift.gift_message",
     ),
-    "support": ("support.ticket_id", "support.query_text", "support.contact_input"),
+    "support": ("support.ticket_id", "support.query_text"),
     "phlebo": ("phlebo.phlebo_name", "phlebo.phlebo_phone"),
     "error": ("error.error_message", "error.api_path"),
     "server": (

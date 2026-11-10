@@ -91,19 +91,27 @@ def test_interpolate_email_support_placeholders():
     from modules.notifications.template_variables import interpolate_email_template
 
     context = build_member_context(
-        {"first_name": "Ops", "email": "ops@example.com"},
+        {"first_name": "Pratheek", "email": "ops@example.com"},
         participant_details={
-            "contact_input": "8762830777",
-            "query_text": "Need help with report",
-            "ticket_id": "129",
+            "user": {
+                "first_name": "Asha",
+                "last_name": "User",
+                "name": "Asha User",
+                "phone": "8762830777",
+            },
+            "support": {
+                "query_text": "Need help with report",
+                "ticket_id": "129",
+            },
         },
     )
     html = (
-        "Hi {{user.first_name}}, phone {{support.contact_input}}, "
+        "Hi {{staff.name}}, customer {{user.name}}, phone {{user.phone}}, "
         "query {{support.query_text}}, otp {{otp}}"
     )
     out = interpolate_email_template(html, {**context, "otp": "999"})
-    assert "Ops" in out
+    assert "Pratheek" in out
+    assert "Asha User" in out
     assert "8762830777" in out
     assert "Need help with report" in out
     assert "{{" not in out
