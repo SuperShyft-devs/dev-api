@@ -8,10 +8,43 @@ from core.exceptions import AppError
 from modules.notifications.context_builder import build_member_context
 from modules.notifications.models import NotificationService
 from modules.notifications.template_variables import (
+    _get_nested,
     resolve_header_link,
     resolve_slots,
 )
 from modules.notifications.whatapi_client import WhatApiClient
+
+_OTP_WHATSAPP_SERVICE_KEYS = frozenset({"whatapi-otp", "send-otp-whatsapp"})
+
+
+def _is_otp_whatsapp_service(svc: NotificationService) -> bool:
+    return bool(svc.require_otp) or (svc.service_key or "").strip() in _OTP_WHATSAPP_SERVICE_KEYS
+
+
+def infer_otp_whatsapp_slot_values(expected: int, context: dict[str, Any]) -> list[str]:
+    """Default slot fill when DB template_variables is missing for OTP services."""
+    if expected <= 0:
+        return []
+    otp = _get_nested(context, "otp.otp")
+    if expected == 1:
+        return [otp]
+    if expected == 2:
+        name = (
+            _get_nested(context, "user.first_name")
+            or _get_nested(context, "user.name")
+            or _get_nested(context, "staff.name")
+            or "there"
+        )
+        return [name, otp]
+    name = (
+        _get_nested(context, "user.first_name")
+        or _get_nested(context, "user.name")
+        or _get_nested(context, "staff.name")
+        or "there"
+    )
+    leading = [name] * max(0, expected - 1)
+    leading.append(otp)
+    return leading[:expected]
 
 
 def _count_body_params(components: list[dict[str, Any]]) -> int:
@@ -88,14 +121,17 @@ async def build_whatsapp_send_payload(
         if len(slot_values) > expected:
             slot_values = slot_values[:expected]
         if expected > len(slot_values):
-            raise AppError(
-                status_code=400,
-                error_code="INVALID_INPUT",
-                message=(
-                    f"WhatsApp template '{canonical_name}' expects {expected} body parameter(s) "
-                    f"but notification service has {len(slot_values)} slot(s) configured"
-                ),
-            )
+            if not slot_values and _is_otp_whatsapp_service(svc):
+                slot_values = infer_otp_whatsapp_slot_values(expected, context)
+            if expected > len(slot_values):
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message=(
+                        f"WhatsApp template '{canonical_name}' expects {expected} body parameter(s) "
+                        f"but notification service has {len(slot_values)} slot(s) configured"
+                    ),
+                )
 
     components: list[dict[str, Any]] = []
     header_link = resolve_header_link(svc.template_variables, context)

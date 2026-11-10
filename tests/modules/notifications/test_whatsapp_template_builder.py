@@ -42,6 +42,39 @@ def test_resolve_slots_legacy_component_list():
 
 
 @pytest.mark.asyncio
+async def test_build_whatsapp_send_payload_infers_otp_slots_when_unconfigured():
+    client = MagicMock()
+    client.fetch_message_template = AsyncMock(
+        return_value={
+            "data": [
+                {
+                    "name": "otpmsg__",
+                    "language": "en",
+                    "components": [{"type": "BODY", "text": "Hi {{1}}, code {{2}}"}],
+                }
+            ]
+        }
+    )
+    svc = NotificationService(
+        service_key="whatapi-otp",
+        display_name="OTP",
+        channel="whatsapp",
+        webhook_path="/test",
+        template_name="otpmsg",
+        template_variables=None,
+        require_otp=True,
+    )
+    member = {"first_name": "Pratheek", "phone": "8762830757", "otp": "482913"}
+
+    name, components, _ = await build_whatsapp_send_payload(client, svc, member=member)
+
+    assert name == "otpmsg__"
+    body = next(c for c in components if c.get("type") == "body")
+    texts = [p["text"] for p in body["parameters"]]
+    assert texts == ["Pratheek", "482913"]
+
+
+@pytest.mark.asyncio
 async def test_build_whatsapp_send_payload_prefers_english_language():
     client = MagicMock()
     client.fetch_message_template = AsyncMock(
