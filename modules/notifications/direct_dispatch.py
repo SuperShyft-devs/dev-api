@@ -99,7 +99,12 @@ class DirectNotificationDispatch:
             context = build_member_context(
                 member, participant_details=participant_details
             )
-            to_email = str(context["user"].get("email") or "").strip()
+            # Staff contact is the SMTP recipient for ops/staff dispatches; user.* is often the participant.
+            to_email = str(
+                (context.get("staff") or {}).get("email")
+                or (context.get("user") or {}).get("email")
+                or ""
+            ).strip()
             if not to_email:
                 failures.append("missing recipient email")
                 continue

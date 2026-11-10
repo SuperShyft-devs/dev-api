@@ -118,6 +118,41 @@ def test_interpolate_email_support_placeholders():
 
 
 @pytest.mark.asyncio
+async def test_email_uses_staff_address_when_participant_user_present(monkeypatch):
+    svc = NotificationService(
+        service_key="support-email",
+        display_name="Support",
+        channel="email",
+        email_subject="Alert",
+        email_body="Hi",
+        is_active=True,
+    )
+    captured: dict = {}
+
+    async def fake_send_email(**kwargs):
+        captured.update(kwargs)
+        return {"status": "sent"}
+
+    monkeypatch.setattr(
+        "modules.notifications.direct_dispatch.send_email",
+        fake_send_email,
+    )
+
+    dispatch = DirectNotificationDispatch()
+    result = await dispatch.deliver_batch(
+        svc=svc,
+        notification_id=99,
+        members=[{"first_name": "Pratheek", "email": "staff@example.com"}],
+        participant_details={
+            "user": {"first_name": "Asha", "email": "customer@example.com"},
+            "support": {"query_text": "help"},
+        },
+    )
+    assert result.status == "sent"
+    assert captured["to"] == "staff@example.com"
+
+
+@pytest.mark.asyncio
 async def test_email_sent_immediately(monkeypatch):
     svc = NotificationService(
         service_key="email-otp",
