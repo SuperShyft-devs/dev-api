@@ -65,7 +65,18 @@ class NotificationEngine:
         assessment_instance_id = context.get("assessment_instance_id")
         external_link = context.get("external_link")
 
+        scoped_service_key = str(context.get("service_key") or "").strip() or None
+        otp_notify_all = context.get("otp_notify_all_channels") is True
+
         for binding in bindings:
+            binding_keys = extract_service_keys(binding.notification_services)
+            if (
+                scoped_service_key
+                and not otp_notify_all
+                and binding_keys
+                and scoped_service_key not in binding_keys
+            ):
+                continue
             emit_context = dict(context)
             if binding.recipient_type == "custom" and binding.recipient_config:
                 contacts: list[dict] = []
@@ -88,7 +99,13 @@ class NotificationEngine:
             if not target.user_ids and not target.contacts:
                 continue
 
-            for service_key in extract_service_keys(binding.notification_services):
+            for service_key in binding_keys:
+                if (
+                    scoped_service_key
+                    and not otp_notify_all
+                    and service_key != scoped_service_key
+                ):
+                    continue
                 try:
                     svc = await self._notifications_repository.get_service_by_key(
                         db, service_key=service_key

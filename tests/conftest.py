@@ -252,6 +252,9 @@ class CapturingNotificationsService:
     """Notifications service mock that captures OTP dispatch calls for tests."""
 
     def __init__(self):
+        from modules.notifications.repository import NotificationsRepository
+
+        self._repo = NotificationsRepository()
         self.last_dispatch: dict | None = None
         self.last_otp: str | None = None
         self.dispatches: list[dict] = []
@@ -282,6 +285,28 @@ class CapturingNotificationsService:
             "message": "Webhook called successfully",
         }
 
+    async def dispatch_to_contacts(
+        self,
+        db: AsyncSession,
+        *,
+        service_key: str,
+        contacts: list[dict],
+        otp: str | None = None,
+        **kwargs: object,
+    ) -> dict:
+        captured = {
+            "service_key": service_key,
+            "contacts": list(contacts),
+            "otp": otp,
+        }
+        self.last_dispatch = captured
+        self.dispatches.append(captured)
+        self.last_otp = otp
+        return {
+            "notification_id": 1,
+            "status": "pending",
+            "message": "Webhook called successfully",
+        }
 
 async def _ensure_required_tables(connection) -> None:
     """Recreate all tables for tests (legacy path only).
@@ -342,9 +367,81 @@ def capturing_notifications_service() -> CapturingNotificationsService:
     return CapturingNotificationsService()
 
 
+async def _ensure_otp_notification_services(session: AsyncSession) -> None:
+    from sqlalchemy import select
+
+    from modules.notifications.models import NotificationService
+
+    for sk, channel, extra in (
+        (
+            "whatapi-otp",
+            "whatsapp",
+            {
+                "display_name": "WhatsApp OTP",
+                "template_name": "otpmsg",
+                "require_otp": True,
+            },
+        ),
+        (
+            "email-otp",
+            "email",
+            {
+                "display_name": "Email OTP",
+                "email_subject": "Your OTP",
+                "email_body": "Your code is {{otp.otp}}",
+                "require_otp": True,
+            },
+        ),
+    ):
+        exists = (
+            await session.execute(
+                select(NotificationService.notification_service_id).where(
+                    NotificationService.service_key == sk
+                )
+            )
+        ).scalar_one_or_none()
+        if exists is None:
+            session.add(
+                NotificationService(
+                    service_key=sk,
+                    display_name=extra["display_name"],
+                    channel=channel,
+                    webhook_path="",
+                    is_active=True,
+                    require_otp=extra.get("require_otp", False),
+                    template_name=extra.get("template_name"),
+                    email_subject=extra.get("email_subject"),
+                    email_body=extra.get("email_body"),
+                )
+            )
+    await session.commit()
+
+
+def _wire_capturing_notification_engine(
+    capturing_notifications_service: CapturingNotificationsService,
+) -> None:
+    import modules.notifications.engine as notification_engine_mod
+    from modules.notifications.engine import NotificationEngine, reset_notification_engine
+
+    reset_notification_engine()
+    notification_engine_mod._engine = NotificationEngine(
+        notifications_service=capturing_notifications_service,
+        notifications_repository=capturing_notifications_service._repo,
+    )
+
+
+@pytest_asyncio.fixture(autouse=True, loop_scope="session")
+async def _seed_otp_notification_services_for_tests(
+    test_db_session: AsyncSession,
+) -> None:
+    await _ensure_otp_notification_services(test_db_session)
+
+
 @pytest.fixture
 def auth_service(capturing_notifications_service: CapturingNotificationsService):
     """Real AuthService wired with a capturing notifications service."""
+
+    _wire_capturing_notification_engine(capturing_notifications_service)
 
     from modules.audit.repository import AuditRepository
     from modules.audit.service import AuditService
@@ -426,6 +523,13 @@ async def fastapi_app(
 
     app.dependency_overrides[get_db] = _get_test_db
     app.dependency_overrides[get_auth_service] = lambda: auth_service
+
+    from modules.notifications.dependencies import get_notifications_service
+
+    app.dependency_overrides[get_notifications_service] = lambda: capturing_notifications_service
+
+    await _ensure_otp_notification_services(test_db_session)
+    _wire_capturing_notification_engine(capturing_notifications_service)
 
     app.state.capturing_notifications_service = capturing_notifications_service
 

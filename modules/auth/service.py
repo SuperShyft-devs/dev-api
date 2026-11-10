@@ -436,19 +436,28 @@ class AuthService:
         db: AsyncSession,
         *,
         delivery: OtpDelivery,
+        request_phone: str | None = None,
+        request_email: str | None = None,
+        notify_all_channels: bool = False,
     ) -> None:
-        """Send OTP via notification engine."""
-        from modules.notifications.engine import get_notification_engine
+        """Send OTP via notification engine (auth.otp_sent bindings → WhatsApp + email)."""
+        from modules.notifications.otp_notification_emit import emit_auth_otp_sent
 
-        await get_notification_engine().emit(
+        phone = (request_phone or "").strip() or None
+        email = (request_email or "").strip() or None
+        if delivery.channel == "phone" and not phone:
+            phone = (delivery.destination or "").strip() or None
+        if delivery.channel == "email" and not email:
+            email = (delivery.destination or "").strip() or None
+
+        await emit_auth_otp_sent(
             db,
-            event_code="auth.otp_sent",
-            context={
-                "user_id": delivery.user_id,
-                "otp": delivery.otp,
-                "service_key": delivery.service_key,
-                "fallback_service_keys": [delivery.service_key],
-            },
+            otp=delivery.otp,
+            service_key=delivery.service_key,
+            phone=phone,
+            email=email,
+            user_id=delivery.user_id,
+            notify_all_channels=notify_all_channels,
         )
 
     async def issue_tokens_for_user(

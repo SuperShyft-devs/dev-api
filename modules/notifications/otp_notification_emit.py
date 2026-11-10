@@ -16,12 +16,14 @@ async def emit_auth_otp_sent(
     email: str | None = None,
     user_id: int | None = None,
     staff: dict | None = None,
+    notify_all_channels: bool = False,
 ) -> list[int]:
     """Dispatch OTP using catalog bindings for auth.otp_sent."""
     context: dict[str, object] = {
         "otp": otp,
         "service_key": service_key,
         "fallback_service_keys": [service_key],
+        "otp_notify_all_channels": bool(notify_all_channels),
     }
     if user_id is not None:
         context["user_id"] = int(user_id)
