@@ -295,6 +295,18 @@ async def list_notification_bindings(
     return success_response([row.model_dump() for row in rows])
 
 
+@router.get("/bindings/{binding_id}")
+async def get_notification_binding(
+    binding_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: NotificationBindingsService = Depends(_bindings_service),
+):
+    _ = employee
+    row = await service.get_binding(db, binding_id)
+    return success_response(row.model_dump())
+
+
 @router.post("/bindings", status_code=201)
 async def create_notification_binding(
     payload: NotificationBindingCreate,

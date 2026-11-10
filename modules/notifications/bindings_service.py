@@ -50,6 +50,12 @@ class NotificationBindingsService:
         rows = await self._repo.list_all(db, event_code=event_code)
         return [self._to_response(r) for r in rows]
 
+    async def get_binding(self, db: AsyncSession, binding_id: int) -> NotificationBindingResponse:
+        row = await self._repo.get_by_id(db, binding_id)
+        if row is None:
+            raise AppError(status_code=404, error_code="NOT_FOUND", message="Binding not found")
+        return self._to_response(row)
+
     async def create_binding(
         self,
         db: AsyncSession,
