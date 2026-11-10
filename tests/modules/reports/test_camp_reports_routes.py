@@ -2426,7 +2426,7 @@ async def _seed_camp_participants_enriched(test_db_session, *, organization_id: 
         AssessmentPackage,
         AssessmentPackageCategory,
     )
-    from modules.engagements.models import AutoNotificationEvent, Engagement, EngagementNotification
+    from modules.engagements.models import Engagement, EngagementNotification
     from modules.notifications.models import Notification
     from modules.questionnaire.models import QuestionnaireCategory
     from modules.reports.models import IndividualHealthReport
@@ -2590,49 +2590,18 @@ async def _seed_camp_participants_enriched(test_db_session, *, organization_id: 
         {"blood_sk": blood_service, "bio_sk": bio_service},
     )
 
-    blood_event = (
-        await test_db_session.execute(
-            select(AutoNotificationEvent).where(AutoNotificationEvent.event_code == "blood_report_ready")
-        )
-    ).scalar_one_or_none()
-    if blood_event is None:
-        blood_event = AutoNotificationEvent(
-            id=organization_id + 500,
-            engagement_type_ids=[1],
-            event_code="blood_report_ready",
-            display_name="Blood Report Ready",
-        )
-        test_db_session.add(blood_event)
-        await test_db_session.flush()
-
-    bio_event = (
-        await test_db_session.execute(
-            select(AutoNotificationEvent).where(AutoNotificationEvent.event_code == "bioai_report_ready")
-        )
-    ).scalar_one_or_none()
-    if bio_event is None:
-        bio_event = AutoNotificationEvent(
-            id=organization_id + 501,
-            engagement_type_ids=[1],
-            event_code="bioai_report_ready",
-            display_name="Bio AI Report Ready",
-        )
-        test_db_session.add(bio_event)
-        await test_db_session.flush()
-
     test_db_session.add_all(
         [
             EngagementNotification(
                 id=organization_id + 600,
                 engagement_id=engagement_id,
-                notification_event_id=blood_event.id,
-                # Production stores JSON objects after migration 0118.
+                event_code="reports.blood_ready",
                 notification_services=[{"service_key": blood_service, "external_link": None}],
             ),
             EngagementNotification(
                 id=organization_id + 601,
                 engagement_id=engagement_id,
-                notification_event_id=bio_event.id,
+                event_code="reports.bioai_ready",
                 notification_services=[{"service_key": bio_service, "external_link": None}],
             ),
         ]

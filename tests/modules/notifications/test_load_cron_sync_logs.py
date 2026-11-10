@@ -96,32 +96,14 @@ async def _seed_bioai_participant(
     await test_db_session.flush()
 
     if bioai_notification:
-        evt_row = (
-            await test_db_session.execute(
-                text(
-                    "SELECT id FROM auto_notification_events "
-                    "WHERE event_code = 'bioai_report_ready'"
-                )
-            )
-        ).one_or_none()
-        if evt_row is not None:
-            services_json = json.dumps(
-                [{"service_key": bioai_notification, "external_link": None}]
-            )
-            await test_db_session.execute(
-                text(
-                    "INSERT INTO engagement_notifications "
-                    "(engagement_id, notification_event_id, notification_services) "
-                    "VALUES (:eid, :evt, CAST(:services AS jsonb)) "
-                    "ON CONFLICT (engagement_id, notification_event_id) DO UPDATE "
-                    "SET notification_services = EXCLUDED.notification_services"
-                ),
-                {
-                    "eid": engagement_id,
-                    "evt": int(evt_row[0]),
-                    "services": services_json,
-                },
-            )
+        from tests.modules.notifications.notification_event_seed import upsert_engagement_notification
+
+        await upsert_engagement_notification(
+            test_db_session,
+            engagement_id=engagement_id,
+            event_code="reports.bioai_ready",
+            service_keys=[bioai_notification],
+        )
     test_db_session.add(
         EngagementParticipant(
             engagement_id=engagement_id,

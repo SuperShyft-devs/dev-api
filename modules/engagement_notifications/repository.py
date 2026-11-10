@@ -11,17 +11,17 @@ from modules.engagement_notifications.service_config import (
     prepare_notification_items_for_storage,
     serialize_for_db,
 )
-from modules.engagements.models import (
-    AutoNotificationEvent,
-    EngagementNotification,
-    EngagementNotificationDefault,
-)
+from modules.engagements.models import EngagementNotification
+from modules.notifications.bindings_repository import NotificationBindingsRepository
+from modules.notifications.events_catalog import get_event, map_legacy_event_code
+from modules.notifications.models import NotificationEventBinding
 
 
 class EngagementNotificationsRepository:
-    """Database queries for engagement_notifications and engagement_notification_defaults."""
+    """Database queries for engagement_notifications and type-level defaults."""
 
-    # --- engagement_notifications ---
+    def __init__(self) -> None:
+        self._bindings_repo = NotificationBindingsRepository()
 
     async def list_for_engagement(
         self,
@@ -31,7 +31,7 @@ class EngagementNotificationsRepository:
         query = (
             select(EngagementNotification)
             .where(EngagementNotification.engagement_id == engagement_id)
-            .order_by(EngagementNotification.notification_event_id.asc())
+            .order_by(EngagementNotification.event_code.asc())
         )
         result = await db.execute(query)
         return list(result.scalars().all())
@@ -43,11 +43,11 @@ class EngagementNotificationsRepository:
         engagement_id: int,
         event_code: str,
     ) -> EngagementNotification | None:
+        normalized = map_legacy_event_code(event_code)
         query = (
             select(EngagementNotification)
-            .join(AutoNotificationEvent, AutoNotificationEvent.id == EngagementNotification.notification_event_id)
             .where(EngagementNotification.engagement_id == engagement_id)
-            .where(AutoNotificationEvent.event_code == event_code)
+            .where(EngagementNotification.event_code == normalized)
         )
         result = await db.execute(query)
         return result.scalar_one_or_none()
@@ -85,7 +85,7 @@ class EngagementNotificationsRepository:
         for item in prepared:
             obj = EngagementNotification(
                 engagement_id=engagement_id,
-                notification_event_id=item["notification_event_id"],
+                event_code=item["event_code"],
                 notification_services=item["notification_services"],
             )
             db.add(obj)
@@ -100,57 +100,52 @@ class EngagementNotificationsRepository:
         engagement_id: int,
         engagement_type_id: int,
     ) -> list[EngagementNotification]:
-        """Auto-populate engagement_notifications from defaults for the given type."""
+        """Auto-populate engagement_notifications from type-level bindings."""
         defaults = await self.list_defaults_for_type(db, engagement_type_id)
         items = []
         for d in defaults:
             configs = normalize_notification_services(d.notification_services)
             if configs:
                 items.append({
-                    "notification_event_id": d.notification_event_id,
+                    "event_code": d.event_code,
                     "notification_services": serialize_for_db(configs),
                 })
         if not items:
             return []
         return await self.upsert_for_engagement(db, engagement_id, items)
 
-    # --- engagement_notification_defaults ---
-
     async def list_defaults_for_type(
         self,
         db: AsyncSession,
         engagement_type_id: int,
-    ) -> list[EngagementNotificationDefault]:
-        query = (
-            select(EngagementNotificationDefault)
-            .where(EngagementNotificationDefault.engagement_type_id == engagement_type_id)
-            .order_by(EngagementNotificationDefault.notification_event_id.asc())
-        )
-        result = await db.execute(query)
-        return list(result.scalars().all())
+    ) -> list[NotificationEventBinding]:
+        return await self._bindings_repo.list_all(db, engagement_type_id=engagement_type_id)
 
     async def upsert_defaults(
         self,
         db: AsyncSession,
         engagement_type_id: int,
         defaults: list[dict],
-    ) -> list[EngagementNotificationDefault]:
+    ) -> list[NotificationEventBinding]:
         """Bulk upsert notification defaults for an engagement type."""
         prepared = await prepare_notification_items_for_storage(db, defaults)
 
-        await db.execute(
-            delete(EngagementNotificationDefault).where(
-                EngagementNotificationDefault.engagement_type_id == engagement_type_id
-            )
-        )
-        result = []
+        existing = await self._bindings_repo.list_all(db, engagement_type_id=engagement_type_id)
+        for row in existing:
+            await self._bindings_repo.delete(db, row.id)
+
+        result: list[NotificationEventBinding] = []
         for item in prepared:
-            obj = EngagementNotificationDefault(
-                engagement_type_id=engagement_type_id,
-                notification_event_id=item["notification_event_id"],
+            ev = get_event(item["event_code"])
+            event_name = ev.name if ev else item["event_code"]
+            recipient = ev.default_recipients[0] if ev and ev.default_recipients else "user"
+            obj = await self._bindings_repo.create(
+                db,
+                event_code=item["event_code"],
+                event_name=event_name,
+                recipient_type=recipient,
                 notification_services=item["notification_services"],
+                engagement_type_id=engagement_type_id,
             )
-            db.add(obj)
             result.append(obj)
-        await db.flush()
         return result

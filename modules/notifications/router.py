@@ -28,6 +28,8 @@ from modules.notifications.schemas import (
     NotificationServiceUpdate,
     PrepareReportsRequest,
 )
+from modules.notifications.bindings_service import NotificationBindingsService
+from modules.notifications.binding_schemas import NotificationBindingCreate, NotificationBindingUpdate
 from modules.notifications.service import NotificationsService
 from modules.users.dependencies import get_participant_journey_service
 from modules.users.participant_journey_service import ParticipantJourneyService
@@ -260,3 +262,68 @@ async def delete_notification(
     result = await svc.delete_notification(db, notification_id=notification_id)
     await db.commit()
     return success_response(result)
+
+
+def _bindings_service() -> NotificationBindingsService:
+    return NotificationBindingsService()
+
+
+@router.get("/catalog/events")
+async def list_catalog_events(
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: NotificationBindingsService = Depends(_bindings_service),
+):
+    _ = employee
+    return success_response([item.model_dump() for item in service.list_catalog_events()])
+
+
+@router.get("/bindings")
+async def list_notification_bindings(
+    event_code: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: NotificationBindingsService = Depends(_bindings_service),
+):
+    _ = employee
+    rows = await service.list_bindings(db, event_code=event_code)
+    return success_response([row.model_dump() for row in rows])
+
+
+@router.post("/bindings", status_code=201)
+async def create_notification_binding(
+    payload: NotificationBindingCreate,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: NotificationBindingsService = Depends(_bindings_service),
+):
+    _ = employee
+    row = await service.create_binding(db, payload)
+    await db.commit()
+    return success_response(row.model_dump())
+
+
+@router.put("/bindings/{binding_id}")
+async def update_notification_binding(
+    binding_id: int,
+    payload: NotificationBindingUpdate,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: NotificationBindingsService = Depends(_bindings_service),
+):
+    _ = employee
+    row = await service.update_binding(db, binding_id, payload)
+    await db.commit()
+    return success_response(row.model_dump())
+
+
+@router.delete("/bindings/{binding_id}")
+async def delete_notification_binding(
+    binding_id: int,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: NotificationBindingsService = Depends(_bindings_service),
+):
+    _ = employee
+    await service.delete_binding(db, binding_id)
+    await db.commit()
+    return success_response({"deleted": True})

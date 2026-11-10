@@ -220,12 +220,14 @@ class ServerHealthService:
             return "skipped_no_recipients"
 
         try:
-            result = await notifications_service.dispatch(
+            from modules.notifications.engine import get_notification_engine
+
+            ids = await get_notification_engine().emit(
                 db,
-                payload=DispatchRequest(
-                    service_key=settings.CPU_ALERT_SERVICE_KEY,
-                    user_ids=user_ids,
-                    participant_details={
+                event_code="system.cpu_threshold",
+                context={
+                    "admin_user_ids": user_ids,
+                    "participant_details": {
                         "hostname": payload.hostname,
                         "cpu_usage": f"{payload.cpu_usage:.0f}",
                         "memory_usage": f"{payload.memory_usage:.0f}",
@@ -233,8 +235,10 @@ class ServerHealthService:
                         "load_1m": f"{payload.load_1m}",
                         "cores": str(payload.cores),
                     },
-                ),
+                    "fallback_service_keys": [settings.CPU_ALERT_SERVICE_KEY],
+                },
             )
+            result = {"status": "dispatched" if ids else "skipped", "notification_id": ids[0] if ids else None}
         except Exception as exc:
             logger.warning(
                 "CPU alert dispatch failed (hostname=%s cpu=%.1f): %s",

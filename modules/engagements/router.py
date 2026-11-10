@@ -191,27 +191,19 @@ async def _engagement_notifications_payload(
     engagement_id: int,
 ) -> list[dict]:
     from modules.engagement_notifications.repository import EngagementNotificationsRepository
-    from modules.notification_events.repository import NotificationEventsRepository
+    from modules.notifications.events_catalog import get_event
 
     repo = EngagementNotificationsRepository()
-    events_repo = NotificationEventsRepository()
     rows = await repo.list_for_engagement(db, engagement_id)
-    events_by_id = {}
-    for row in rows:
-        if row.notification_event_id not in events_by_id:
-            event = await events_repo.get_by_id(db, row.notification_event_id)
-            if event:
-                events_by_id[row.notification_event_id] = event
 
     data = []
     for row in rows:
-        event = events_by_id.get(row.notification_event_id)
+        catalog = get_event(row.event_code)
         data.append(
             EngagementNotificationOutput(
-                notification_event_id=row.notification_event_id,
+                event_code=row.event_code,
                 notification_services=configs_to_api(row.notification_services),
-                event_code=event.event_code if event else None,
-                event_display_name=event.display_name if event else None,
+                event_display_name=catalog.name if catalog else row.event_code,
             ).model_dump()
         )
     return data

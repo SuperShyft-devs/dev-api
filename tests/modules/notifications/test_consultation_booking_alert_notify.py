@@ -62,37 +62,13 @@ async def _seed_event_and_binding(test_db_session, engagement_id: int) -> None:
             "ON CONFLICT (code) DO UPDATE SET is_active = true"
         )
     )
-    type_row = (
-        await test_db_session.execute(
-            text("SELECT id FROM engagement_types WHERE code = 'consultation'")
-        )
-    ).one()
-    type_id = int(type_row[0])
-    await test_db_session.execute(
-        text(
-            "INSERT INTO auto_notification_events (event_code, display_name, engagement_type_ids, description) "
-            "VALUES ('consultation_booking_alert', 'Consultation Booking Alert', :type_ids, 'Test event') "
-            "ON CONFLICT (event_code) DO UPDATE SET display_name = EXCLUDED.display_name"
-        ),
-        {"type_ids": [type_id]},
-    )
-    evt_row = (
-        await test_db_session.execute(
-            text("SELECT id FROM auto_notification_events WHERE event_code = 'consultation_booking_alert'")
-        )
-    ).one()
-    evt_id = int(evt_row[0])
-    await test_db_session.execute(
-        text(
-            "INSERT INTO engagement_notifications (engagement_id, notification_event_id, notification_services) "
-            "VALUES (:eid, :evt, CAST(:services AS jsonb)) "
-            "ON CONFLICT (engagement_id, notification_event_id) DO UPDATE SET notification_services = EXCLUDED.notification_services"
-        ),
-        {
-            "eid": engagement_id,
-            "evt": evt_id,
-            "services": f'[{{"service_key": "{SERVICE_KEY}", "external_link": null}}]',
-        },
+    from tests.modules.notifications.notification_event_seed import upsert_engagement_notification
+
+    await upsert_engagement_notification(
+        test_db_session,
+        engagement_id=engagement_id,
+        event_code="assistants.consultation_booked",
+        service_keys=[SERVICE_KEY],
     )
     await test_db_session.commit()
 

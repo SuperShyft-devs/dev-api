@@ -2305,30 +2305,7 @@ async def test_create_engagement_allows_same_service_on_questionnaire_reminders(
     await _seed_notification_service(test_db_session, service_key="shared-qr-service")
     type_id = await _engagement_type_id(test_db_session, "bio_ai")
 
-    for event_code, display_name in (
-        ("questionnaire_reminder_before", "Questionnaire Reminder Before"),
-        ("questionnaire_reminder_after", "Questionnaire Reminder After"),
-    ):
-        await test_db_session.execute(
-            text(
-                "INSERT INTO auto_notification_events (event_code, display_name, engagement_type_ids, description) "
-                "VALUES (:code, :dn, :type_ids, 'Test questionnaire reminder event') "
-                "ON CONFLICT (event_code) DO UPDATE SET display_name = EXCLUDED.display_name"
-            ),
-            {"code": event_code, "dn": display_name, "type_ids": [type_id]},
-        )
     await test_db_session.commit()
-
-    before_event_id = (
-        await test_db_session.execute(
-            text("SELECT id FROM auto_notification_events WHERE event_code = 'questionnaire_reminder_before'")
-        )
-    ).scalar_one()
-    after_event_id = (
-        await test_db_session.execute(
-            text("SELECT id FROM auto_notification_events WHERE event_code = 'questionnaire_reminder_after'")
-        )
-    ).scalar_one()
 
     payload = {
         "engagement_name": "Shared Reminder Camp",
@@ -2342,11 +2319,11 @@ async def test_create_engagement_allows_same_service_on_questionnaire_reminders(
         "end_date": "2026-02-02",
         "notifications": [
             {
-                "notification_event_id": before_event_id,
+                "event_code": "reminders.questionnaire_before",
                 "notification_services": [{"service_key": "shared-qr-service", "external_link": None}],
             },
             {
-                "notification_event_id": after_event_id,
+                "event_code": "reminders.questionnaire_after",
                 "notification_services": [{"service_key": "shared-qr-service", "external_link": None}],
             },
         ],
@@ -2359,9 +2336,9 @@ async def test_create_engagement_allows_same_service_on_questionnaire_reminders(
     rows = (
         await test_db_session.execute(
             text(
-                "SELECT notification_event_id, notification_services "
+                "SELECT event_code, notification_services "
                 "FROM engagement_notifications WHERE engagement_id = :eid "
-                "ORDER BY notification_event_id"
+                "ORDER BY event_code"
             ),
             {"eid": engagement_id},
         )

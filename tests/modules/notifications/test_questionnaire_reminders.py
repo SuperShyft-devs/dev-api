@@ -49,37 +49,7 @@ async def _seed_dependencies(test_db_session) -> None:
             "ON CONFLICT (code) DO UPDATE SET is_active = true"
         )
     )
-    type_id = int(
-        (
-            await test_db_session.execute(
-                text("SELECT id FROM engagement_types WHERE code = 'bio_ai'")
-            )
-        ).scalar_one()
-    )
-    for event_code, display_name in (
-        ("questionnaire_reminder_before", "Questionnaire Reminder Before"),
-        ("questionnaire_reminder_after", "Questionnaire Reminder After"),
-    ):
-        await test_db_session.execute(
-            text(
-                "INSERT INTO auto_notification_events (event_code, display_name, engagement_type_ids, description) "
-                "VALUES (:code, :dn, :type_ids, 'Test questionnaire reminder event') "
-                "ON CONFLICT (event_code) DO UPDATE SET display_name = EXCLUDED.display_name"
-            ),
-            {"code": event_code, "dn": display_name, "type_ids": [type_id]},
-        )
     await test_db_session.commit()
-
-
-async def _event_id(test_db_session, event_code: str) -> int:
-    return int(
-        (
-            await test_db_session.execute(
-                text("SELECT id FROM auto_notification_events WHERE event_code = :code"),
-                {"code": event_code},
-            )
-        ).scalar_one()
-    )
 
 
 async def _bind_questionnaire_services(
@@ -88,17 +58,14 @@ async def _bind_questionnaire_services(
     engagement_id: int,
     service_key: str = QR_SERVICE_KEY,
 ) -> None:
-    services_json = json.dumps([{"service_key": service_key, "external_link": None}])
-    for event_code in ("questionnaire_reminder_before", "questionnaire_reminder_after"):
-        evt_id = await _event_id(test_db_session, event_code)
-        await test_db_session.execute(
-            text(
-                "INSERT INTO engagement_notifications (engagement_id, notification_event_id, notification_services) "
-                "VALUES (:eid, :evt, CAST(:services AS jsonb)) "
-                "ON CONFLICT (engagement_id, notification_event_id) DO UPDATE "
-                "SET notification_services = EXCLUDED.notification_services"
-            ),
-            {"eid": engagement_id, "evt": evt_id, "services": services_json},
+    from tests.modules.notifications.notification_event_seed import upsert_engagement_notification
+
+    for event_code in ("reminders.questionnaire_before", "reminders.questionnaire_after"):
+        await upsert_engagement_notification(
+            test_db_session,
+            engagement_id=engagement_id,
+            event_code=event_code,
+            service_keys=[service_key],
         )
 
 

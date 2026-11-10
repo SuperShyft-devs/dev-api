@@ -513,7 +513,7 @@ async def _get_eligible_participants(
      package_code, assessment_type_code, blood_parameters_full_report,
      blood_parameters_verified_at)
     """
-    from modules.engagements.models import AutoNotificationEvent, EngagementNotification
+    from modules.engagements.models import EngagementNotification
 
     curr_pbb = current_blood_booking_subquery()
 
@@ -522,8 +522,7 @@ async def _get_eligible_participants(
             EngagementNotification.engagement_id,
             EngagementNotification.notification_services,
         )
-        .join(AutoNotificationEvent, AutoNotificationEvent.id == EngagementNotification.notification_event_id)
-        .where(AutoNotificationEvent.event_code == "blood_report_ready")
+        .where(EngagementNotification.event_code == "reports.blood_ready")
         .subquery("en_blood")
     )
 

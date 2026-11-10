@@ -63,31 +63,7 @@ async def _seed_dependencies(test_db_session) -> None:
             "ON CONFLICT (code) DO UPDATE SET is_active = true"
         )
     )
-    type_row = (
-        await test_db_session.execute(
-            text("SELECT id FROM engagement_types WHERE code = 'bio_ai_with_consultation'")
-        )
-    ).one()
-    type_id = int(type_row[0])
-    await test_db_session.execute(
-        text(
-            "INSERT INTO auto_notification_events (event_code, display_name, engagement_type_ids, description) "
-            "VALUES ('consultation_remainder', 'Consultation Remainder', :type_ids, 'Test remainder event') "
-            "ON CONFLICT (event_code) DO UPDATE SET display_name = EXCLUDED.display_name"
-        ),
-        {"type_ids": [type_id]},
-    )
     await test_db_session.commit()
-
-
-async def _event_id(test_db_session, event_code: str) -> int:
-    row = (
-        await test_db_session.execute(
-            text("SELECT id FROM auto_notification_events WHERE event_code = :code"),
-            {"code": event_code},
-        )
-    ).one()
-    return int(row[0])
 
 
 async def _insert_engagement(
@@ -115,16 +91,13 @@ async def _insert_engagement(
         )
     )
     if service_keys:
-        evt_id = await _event_id(test_db_session, "consultation_remainder")
-        services_json = json.dumps(
-            [{"service_key": k.strip(), "external_link": None} for k in service_keys.split(",") if k.strip()]
-        )
-        await test_db_session.execute(
-            text(
-                "INSERT INTO engagement_notifications (engagement_id, notification_event_id, notification_services) "
-                "VALUES (:engagement_id, :event_id, CAST(:services AS jsonb))"
-            ),
-            {"engagement_id": engagement_id, "event_id": evt_id, "services": services_json},
+        from tests.modules.notifications.notification_event_seed import upsert_engagement_notification
+
+        await upsert_engagement_notification(
+            test_db_session,
+            engagement_id=engagement_id,
+            event_code="consultations.reminder",
+            service_keys=service_keys,
         )
 
 

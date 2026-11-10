@@ -820,7 +820,7 @@ class EngagementsService:
         if payload.notifications is not None:
             items = [
                 {
-                    "notification_event_id": n.notification_event_id,
+                    "event_code": n.event_code,
                     "notification_services": serialize_for_db(n.notification_services),
                 }
                 for n in payload.notifications
@@ -1678,7 +1678,7 @@ class EngagementsService:
             en_repo = EngagementNotificationsRepository()
             items = [
                 {
-                    "notification_event_id": n.notification_event_id,
+                    "event_code": n.event_code,
                     "notification_services": serialize_for_db(n.notification_services),
                 }
                 for n in payload.notifications

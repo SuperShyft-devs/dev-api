@@ -29,6 +29,12 @@ def get_notifications_service() -> NotificationsService:
     )
 
 
+def get_notification_engine():
+    from modules.notifications.engine import get_notification_engine as _get_engine
+
+    return _get_engine()
+
+
 async def authenticate_notification_endpoint(
     request: Request,
     db: AsyncSession = Depends(get_db),

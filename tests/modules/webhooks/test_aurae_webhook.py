@@ -367,22 +367,8 @@ async def test_empty_payload_returns_422(async_client, test_db_session, monkeypa
 async def _seed_report_ready_event_and_service(
     test_db_session, *, engagement_id: int, service_key: str = "vifc_report_test"
 ):
-    """Create a report_ready auto_notification_event and link it to the engagement."""
-    from modules.engagements.models import AutoNotificationEvent, EngagementNotification
-
-    event = (
-        await test_db_session.execute(
-            select(AutoNotificationEvent).where(AutoNotificationEvent.event_code == "report_ready")
-        )
-    ).scalar_one_or_none()
-    if event is None:
-        event = AutoNotificationEvent(
-            event_code="report_ready",
-            display_name="Report Ready",
-            engagement_type_ids=[],
-        )
-        test_db_session.add(event)
-        await test_db_session.flush()
+    """Link reports.face_scan_ready services to the engagement."""
+    from modules.engagements.models import EngagementNotification
 
     await test_db_session.execute(
         text(
@@ -398,8 +384,8 @@ async def _seed_report_ready_event_and_service(
     test_db_session.add(
         EngagementNotification(
             engagement_id=engagement_id,
-            notification_event_id=event.id,
-            notification_services=[service_key],
+            event_code="reports.face_scan_ready",
+            notification_services=[{"service_key": service_key}],
         )
     )
     await test_db_session.commit()

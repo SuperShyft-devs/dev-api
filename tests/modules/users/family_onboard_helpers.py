@@ -89,30 +89,19 @@ async def seed_family_onboard_onboarding_notification_setup(
         )
     ).one()
     type_id = int(type_row[0])
-    await test_db_session.execute(
-        text(
-            "INSERT INTO auto_notification_events (event_code, display_name, engagement_type_ids, description) "
-            "VALUES ('onboarding', 'Onboarding Notification', :type_ids, 'Test onboarding event') "
-            "ON CONFLICT (event_code) DO UPDATE SET display_name = EXCLUDED.display_name"
-        ),
-        {"type_ids": [type_id]},
-    )
-    event_row = (
-        await test_db_session.execute(
-            text("SELECT id FROM auto_notification_events WHERE event_code = 'onboarding'")
-        )
-    ).one()
-    event_id = int(event_row[0])
     services_json = json.dumps([{"service_key": service_key, "external_link": None}])
     await test_db_session.execute(
         text(
-            "INSERT INTO engagement_notification_defaults "
-            "(engagement_type_id, notification_event_id, notification_services) "
-            "VALUES (:type_id, :event_id, CAST(:services AS jsonb)) "
-            "ON CONFLICT (engagement_type_id, notification_event_id) DO UPDATE "
-            "SET notification_services = EXCLUDED.notification_services"
+            """
+            INSERT INTO notification_events (
+                event_code, event_name, recipient_type, notification_services, engagement_type_id
+            )
+            VALUES ('users.onboarded', 'User onboarded', 'assistants', CAST(:services AS json), :type_id)
+            ON CONFLICT ON CONSTRAINT uq_notification_events_binding DO UPDATE
+            SET notification_services = EXCLUDED.notification_services
+            """
         ),
-        {"type_id": type_id, "event_id": event_id, "services": services_json},
+        {"type_id": type_id, "services": services_json},
     )
     await seed_employee(
         test_db_session,

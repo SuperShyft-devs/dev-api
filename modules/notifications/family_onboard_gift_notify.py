@@ -242,43 +242,36 @@ async def notify_family_onboard_gift(
     booker_id = int(booker.user_id)
     recipient_id = int(recipient.user_id)
 
-    await _dispatch_one(
+    from modules.notifications.engine import get_notification_engine
+
+    engine = get_notification_engine()
+    await engine.emit(
         db,
-        notifications_service=notifications_service,
-        notifications_repository=repo,
-        service_key=SENDER_WHATSAPP_KEY,
-        user_id=booker_id,
+        event_code="family.gift_sent",
         engagement_id=eid,
-        participant_details=base_details,
+        recipient_types=["booker"],
+        context={
+            "booker_user_id": booker_id,
+            "user_id": booker_id,
+            "participant_details": base_details,
+            "fallback_service_keys": [SENDER_WHATSAPP_KEY, SENDER_EMAIL_KEY],
+        },
     )
-    await _dispatch_one(
-        db,
-        notifications_service=notifications_service,
-        notifications_repository=repo,
-        service_key=SENDER_EMAIL_KEY,
-        user_id=booker_id,
-        engagement_id=eid,
-        participant_details=base_details,
-    )
-    await _dispatch_one(
-        db,
-        notifications_service=notifications_service,
-        notifications_repository=repo,
-        service_key=RECEIVER_WHATSAPP_KEY,
-        user_id=recipient_id,
-        engagement_id=eid,
-        participant_details=receiver_wa_details,
-    )
+    receiver_keys = [RECEIVER_WHATSAPP_KEY]
     if not _should_skip_receiver_email(recipient, booker):
-        await _dispatch_one(
-            db,
-            notifications_service=notifications_service,
-            notifications_repository=repo,
-            service_key=RECEIVER_EMAIL_KEY,
-            user_id=recipient_id,
-            engagement_id=eid,
-            participant_details=base_details,
-        )
+        receiver_keys.append(RECEIVER_EMAIL_KEY)
+    await engine.emit(
+        db,
+        event_code="family.gift_received",
+        engagement_id=eid,
+        recipient_types=["members"],
+        context={
+            "user_id": recipient_id,
+            "user_ids": [recipient_id],
+            "participant_details": receiver_wa_details,
+            "fallback_service_keys": receiver_keys,
+        },
+    )
 
 
 __all__ = [

@@ -58,24 +58,7 @@ async def _seed_dependencies(test_db_session) -> None:
         )
     ).one()
     type_id = int(type_row[0])
-    await test_db_session.execute(
-        text(
-            "INSERT INTO auto_notification_events (event_code, display_name, engagement_type_ids, description) "
-            "VALUES ('booking_guide', 'Booking Guide', :type_ids, 'Test booking guide event') "
-            "ON CONFLICT (event_code) DO UPDATE SET display_name = EXCLUDED.display_name"
-        ),
-        {"type_ids": [type_id]},
-    )
     await test_db_session.commit()
-
-
-async def _booking_guide_event_id(test_db_session) -> int:
-    row = (
-        await test_db_session.execute(
-            text("SELECT id FROM auto_notification_events WHERE event_code = 'booking_guide'")
-        )
-    ).one()
-    return int(row[0])
 
 
 async def _bind_booking_guide_services(
@@ -84,18 +67,13 @@ async def _bind_booking_guide_services(
     engagement_id: int,
     service_keys: str = DEFAULT_BOOKING_GUIDE_KEYS,
 ) -> None:
-    evt_id = await _booking_guide_event_id(test_db_session)
-    services_json = json.dumps(
-        [{"service_key": key.strip(), "external_link": None} for key in service_keys.split(",") if key.strip()]
-    )
-    await test_db_session.execute(
-        text(
-            "INSERT INTO engagement_notifications (engagement_id, notification_event_id, notification_services) "
-            "VALUES (:eid, :evt, CAST(:services AS jsonb)) "
-            "ON CONFLICT (engagement_id, notification_event_id) DO UPDATE "
-            "SET notification_services = EXCLUDED.notification_services"
-        ),
-        {"eid": engagement_id, "evt": evt_id, "services": services_json},
+    from tests.modules.notifications.notification_event_seed import upsert_engagement_notification
+
+    await upsert_engagement_notification(
+        test_db_session,
+        engagement_id=engagement_id,
+        event_code="reminders.booking_guide",
+        service_keys=service_keys,
     )
 
 

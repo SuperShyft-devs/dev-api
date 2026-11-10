@@ -17,7 +17,6 @@ from db.column_types import STATUS_ENGAGEMENT
 from modules.engagements.blood_booking_enums import BloodBookingRelation, BloodBookingStatus
 from modules.engagements.blood_bookings_repository import BloodBookingsRepository, current_blood_booking_subquery
 from modules.engagements.models import (
-    AutoNotificationEvent,
     Engagement,
     EngagementNotification,
     EngagementParticipant,
@@ -1632,14 +1631,10 @@ class EngagementsRepository:
                 EngagementNotification,
                 EngagementNotification.engagement_id == Engagement.engagement_id,
             )
-            .join(
-                AutoNotificationEvent,
-                AutoNotificationEvent.id == EngagementNotification.notification_event_id,
-            )
             .where(self._scheduled_or_running_engagement_status_filter())
             .where(EngagementParticipant.paid.is_(True))
             .where(curr_pbb.c.collection_date == collection_date)
-            .where(AutoNotificationEvent.event_code == "pretest_guidelines")
+            .where(EngagementNotification.event_code == "reminders.pretest")
             .distinct()
             .order_by(
                 EngagementParticipant.engagement_id.asc(),
@@ -1678,16 +1673,12 @@ class EngagementsRepository:
                 EngagementNotification,
                 EngagementNotification.engagement_id == Engagement.engagement_id,
             )
-            .join(
-                AutoNotificationEvent,
-                AutoNotificationEvent.id == EngagementNotification.notification_event_id,
-            )
             .outerjoin(
                 EngagementSlotInfo,
                 EngagementSlotInfo.slot_detail_id == Engagement.slot_detail_id,
             )
             .where(self._scheduled_or_running_engagement_status_filter())
-            .where(AutoNotificationEvent.event_code == "booking_guide")
+            .where(EngagementNotification.event_code == "reminders.booking_guide")
             .distinct()
             .order_by(Engagement.engagement_id.asc())
         )
@@ -1739,27 +1730,25 @@ class EngagementsRepository:
     ) -> list[tuple[int, int, date, list[NotificationServiceConfigItem], list[NotificationServiceConfigItem]]]:
         """Return (user_id, engagement_id, engagement_date, reminder_before_services, reminder_after_services)
         for scheduled or running engagements with participants whose engagement_date is in *target_dates*."""
-        from modules.engagements.models import AutoNotificationEvent, EngagementNotification
+        from modules.engagements.models import EngagementNotification
 
-        en_before = select(
-            EngagementNotification.engagement_id,
-            EngagementNotification.notification_services,
-        ).join(
-            AutoNotificationEvent,
-            AutoNotificationEvent.id == EngagementNotification.notification_event_id,
-        ).where(
-            AutoNotificationEvent.event_code == "questionnaire_reminder_before"
-        ).subquery("en_before")
+        en_before = (
+            select(
+                EngagementNotification.engagement_id,
+                EngagementNotification.notification_services,
+            )
+            .where(EngagementNotification.event_code == "reminders.questionnaire_before")
+            .subquery("en_before")
+        )
 
-        en_after = select(
-            EngagementNotification.engagement_id,
-            EngagementNotification.notification_services,
-        ).join(
-            AutoNotificationEvent,
-            AutoNotificationEvent.id == EngagementNotification.notification_event_id,
-        ).where(
-            AutoNotificationEvent.event_code == "questionnaire_reminder_after"
-        ).subquery("en_after")
+        en_after = (
+            select(
+                EngagementNotification.engagement_id,
+                EngagementNotification.notification_services,
+            )
+            .where(EngagementNotification.event_code == "reminders.questionnaire_after")
+            .subquery("en_after")
+        )
 
         curr_pbb = current_blood_booking_subquery()
         query = (
@@ -1832,14 +1821,13 @@ class EngagementsRepository:
             FROM engagement_participants ep
             JOIN engagements e ON e.engagement_id = ep.engagement_id
             JOIN engagement_notifications en ON en.engagement_id = e.engagement_id
-            JOIN auto_notification_events ane ON ane.id = en.notification_event_id
             JOIN engagement_types et ON et.id = e.engagement_type
             JOIN individual_health_report ihr
               ON ihr.user_id = ep.user_id
              AND ihr.engagement_id = ep.engagement_id
             WHERE e.status IN (CAST(:status_scheduled AS smallint), CAST(:status_running AS smallint))
               AND ep.paid IS TRUE
-              AND ane.event_code = 'consultation_ready'
+              AND en.event_code = 'consultations.ready_to_book'
               AND et.code IN ('bio_ai_with_consultation', 'blood_test_with_consultation')
               AND EXISTS (
                     SELECT 1
@@ -1921,13 +1909,12 @@ class EngagementsRepository:
             FROM engagement_participants ep
             JOIN engagements e ON e.engagement_id = ep.engagement_id
             JOIN engagement_notifications en ON en.engagement_id = e.engagement_id
-            JOIN auto_notification_events ane ON ane.id = en.notification_event_id
             JOIN LATERAL unnest(COALESCE(ep.consultation_booking_ids, ARRAY[]::integer[])) AS u(booking_id) ON true
             JOIN consultation_bookings cb ON cb.consultation_id = u.booking_id
             LEFT JOIN engagement_slot_info esi ON esi.slot_detail_id = e.slot_detail_id
             WHERE e.status IN (CAST(:status_scheduled AS smallint), CAST(:status_running AS smallint))
               AND ep.paid IS TRUE
-              AND ane.event_code = 'consultation_remainder'
+              AND en.event_code = 'consultations.reminder'
               AND cb.consultation_date = :consultation_date
               AND cb.want IS TRUE
             ORDER BY ep.engagement_id ASC, ep.user_id ASC, cb.expert_type ASC

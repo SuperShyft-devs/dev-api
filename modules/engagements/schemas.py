@@ -250,7 +250,7 @@ class SlotCapacityUpdateRequest(BaseModel):
 class EngagementNotificationInput(BaseModel):
     """A single notification event config for create/update."""
 
-    notification_event_id: PositiveIntId
+    event_code: str = Field(min_length=1)
     notification_services: list[NotificationServiceConfigItem] = Field(default_factory=list)
 
     @field_validator("notification_services", mode="before")
@@ -412,8 +412,7 @@ class ResolveHealthiansZoneResponse(BaseModel):
 
 
 class EngagementNotificationOutput(BaseModel):
-    notification_event_id: int
-    event_code: str | None = None
+    event_code: str
     event_display_name: str | None = None
     notification_services: list[NotificationServiceConfigItem] = Field(default_factory=list)
 

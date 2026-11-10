@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
+from modules.notifications.events_catalog import get_event, map_legacy_event_code
 from modules.notifications.models import NotificationService
 
 
@@ -117,14 +118,38 @@ async def validate_notification_service_configs(
     return configs
 
 
+def _normalize_event_code(item: dict) -> str | None:
+    if item.get("event_code"):
+        code = str(item["event_code"]).strip()
+        return map_legacy_event_code(code) if code else None
+    legacy_id = item.get("notification_event_id")
+    if legacy_id is not None:
+        return None
+    return None
+
+
 async def prepare_notification_items_for_storage(
     db: AsyncSession,
     notifications: list[dict],
 ) -> list[dict]:
     prepared: list[dict] = []
     for item in notifications:
-        event_id = item["notification_event_id"]
-        event_label = f"Event {event_id}"
+        event_code = _normalize_event_code(item)
+        if not event_code:
+            if item.get("notification_event_id") is not None:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="notification_event_id is deprecated; use event_code",
+                )
+            continue
+        if get_event(event_code) is None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message=f"Unknown event_code '{event_code}'",
+            )
+        event_label = event_code
         configs = await validate_notification_service_configs(
             db,
             notification_services=item.get("notification_services"),
@@ -133,7 +158,7 @@ async def prepare_notification_items_for_storage(
         if not configs:
             continue
         prepared.append({
-            "notification_event_id": event_id,
+            "event_code": event_code,
             "notification_services": serialize_for_db(configs),
         })
     return prepared
