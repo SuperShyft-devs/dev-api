@@ -25,6 +25,24 @@ def _count_body_params(components: list[dict[str, Any]]) -> int:
     return 0
 
 
+def _pick_template_entry(
+    data: list[Any], *, preferred_language: str = "en"
+) -> dict[str, Any] | None:
+    if not data:
+        return None
+    pref = preferred_language.strip().lower()
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        lang = str(item.get("language") or "").strip().lower()
+        if lang == pref:
+            return item
+    for item in data:
+        if isinstance(item, dict):
+            return item
+    return None
+
+
 def _header_is_document(components: list[dict[str, Any]]) -> bool:
     for component in components:
         if not isinstance(component, dict):
@@ -53,8 +71,8 @@ async def build_whatsapp_send_payload(
     components_meta: list[dict[str, Any]] = []
     language_code = "en"
     canonical_name = template_name
-    if isinstance(data, list) and data and isinstance(data[0], dict):
-        entry = data[0]
+    entry = _pick_template_entry(data, preferred_language="en") if isinstance(data, list) else None
+    if entry is not None:
         meta_name = entry.get("name")
         if isinstance(meta_name, str) and meta_name.strip():
             canonical_name = meta_name.strip()

@@ -37,6 +37,15 @@ from modules.notifications.whatapi_client import (
 
 logger = logging.getLogger(__name__)
 
+_OTP_WHATSAPP_SERVICE_KEYS = frozenset({"whatapi-otp", "send-otp-whatsapp"})
+
+
+def _whatsapp_fallback_allowed(svc: NotificationService) -> bool:
+    """Legacy GET fallback cannot deliver Meta OTP templates — POST only."""
+    if svc.require_otp:
+        return False
+    return (svc.service_key or "").strip() not in _OTP_WHATSAPP_SERVICE_KEYS
+
 
 def _integration_failure_from_exc(exc: Exception) -> tuple[str, dict[str, Any] | None]:
     if isinstance(exc, AppError) and isinstance(exc.details, dict):
@@ -267,8 +276,23 @@ class DirectNotificationDispatch:
                     },
                 )
             except Exception as exc:
-                logger.warning("WhatAPI POST failed, trying GET fallback: %s", exc)
                 err_msg, err_payload = _integration_failure_from_exc(exc)
+                if not _whatsapp_fallback_allowed(svc):
+                    logger.warning(
+                        "WhatAPI POST failed for OTP service %s (no GET fallback): %s",
+                        svc.service_key,
+                        exc,
+                    )
+                    failures.append(err_msg)
+                    if sync_log_id is not None:
+                        await finalize_integration_sync_log_isolated(
+                            sync_log_id=sync_log_id,
+                            status="failed",
+                            error_message=err_msg,
+                            response_payload=err_payload,
+                        )
+                    continue
+                logger.warning("WhatAPI POST failed, trying GET fallback: %s", exc)
                 failed_url = (
                     str(err_payload.get("url") or "")
                     if isinstance(err_payload, dict)

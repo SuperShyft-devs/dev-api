@@ -42,6 +42,40 @@ def test_resolve_slots_legacy_component_list():
 
 
 @pytest.mark.asyncio
+async def test_build_whatsapp_send_payload_prefers_english_language():
+    client = MagicMock()
+    client.fetch_message_template = AsyncMock(
+        return_value={
+            "data": [
+                {
+                    "name": "otpmsg__",
+                    "language": "sk",
+                    "components": [{"type": "BODY", "text": "{{1}}"}],
+                },
+                {
+                    "name": "otpmsg__",
+                    "language": "en",
+                    "components": [{"type": "BODY", "text": "{{1}}"}],
+                },
+            ]
+        }
+    )
+    svc = NotificationService(
+        service_key="whatapi-otp",
+        display_name="OTP",
+        channel="whatsapp",
+        webhook_path="/test",
+        template_name="otpmsg",
+        template_variables={"slots": [{"index": 1, "source": "otp.otp"}]},
+    )
+    member = {"first_name": "A", "otp": "123456"}
+
+    _, _, language = await build_whatsapp_send_payload(client, svc, member=member)
+
+    assert language == "en"
+
+
+@pytest.mark.asyncio
 async def test_build_whatsapp_send_payload_uses_meta_canonical_template_name():
     client = MagicMock()
     client.fetch_message_template = AsyncMock(

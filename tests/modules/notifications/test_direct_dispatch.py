@@ -214,15 +214,16 @@ async def test_whatsapp_post_failure_uses_fallback(monkeypatch):
     )
 
     svc = NotificationService(
-        service_key="whatapi-otp",
-        display_name="OTP",
+        service_key="booking-confirmation-whatsapp",
+        display_name="Booking",
         channel="whatsapp",
-        webhook_path="/send-otp-whatsapp-v3",
-        template_name="otp",
+        webhook_path="/booking-confirmation-whatsapp-v1",
+        template_name="booking",
         template_variables={
-            "slots": [{"index": 1, "source": "otp"}],
+            "slots": [{"index": 1, "source": "user.first_name"}],
         },
         is_active=True,
+        require_otp=False,
     )
 
     class FailingClient:
@@ -248,3 +249,51 @@ async def test_whatsapp_post_failure_uses_fallback(monkeypatch):
     )
     assert result.status == "sent"
     assert result.queue_id is None
+
+
+@pytest.mark.asyncio
+async def test_whatsapp_otp_post_failure_skips_fallback(monkeypatch):
+    monkeypatch.setattr(
+        settings,
+        "WHATAPI_FALLBACK_WEBHOOK_URL",
+        "https://webhook.whatapi.in/webhook/test",
+    )
+
+    svc = NotificationService(
+        service_key="whatapi-otp",
+        display_name="OTP",
+        channel="whatsapp",
+        webhook_path="/send-otp-whatsapp-v3",
+        template_name="otpmsg",
+        template_variables={"slots": [{"index": 1, "source": "otp.otp"}]},
+        is_active=True,
+        require_otp=True,
+    )
+
+    class FailingClient:
+        async def fetch_message_template(self, *, template_name: str):
+            return {"data": [{"components": [{"type": "BODY", "text": "{{1}}"}], "language": "en"}]}
+
+        async def send_template_message(self, **kwargs):
+            raise RuntimeError("POST failed")
+
+    fallback_called = False
+
+    async def fake_fallback(**kwargs):
+        nonlocal fallback_called
+        fallback_called = True
+        return {"accepted": True, "queue_id": None, "response": {"accepted": True}, "url": "http://x"}
+
+    monkeypatch.setattr(
+        "modules.notifications.direct_dispatch.send_whatsapp_fallback_get",
+        fake_fallback,
+    )
+
+    dispatch = DirectNotificationDispatch(client=FailingClient())
+    result = await dispatch.deliver_batch(
+        svc=svc,
+        notification_id=4,
+        members=[{"first_name": "Test", "phone": "8762830757", "otp": "654321"}],
+    )
+    assert result.status == "failed"
+    assert fallback_called is False
