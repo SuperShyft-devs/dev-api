@@ -186,28 +186,16 @@ class DirectNotificationDispatch:
             send_url = send_messages_request_url()
             sync_log_id = await persist_integration_sync_log_isolated(
                 provider="whatapi",
-                api_url=fetch_url,
+                api_url=send_url,
                 engagement_id=engagement_id,
                 user_id=sync_log_user_id,
                 request_payload={
+                    "http_method": "POST",
+                    "api_name": "messages",
+                    "url": send_url,
                     "notification_id": notification_id,
                     "phone": phone,
                     "template_name": template_label,
-                    "phase": "whatapi_meta",
-                    "calls": [
-                        {
-                            "http_method": "GET",
-                            "url": fetch_url,
-                            "auth": whatapi_auth_descriptor(),
-                            "purpose": "fetch_message_template",
-                        },
-                        {
-                            "http_method": "POST",
-                            "url": send_url,
-                            "auth": whatapi_auth_descriptor(),
-                            "purpose": "send_template_message",
-                        },
-                    ],
                 },
             )
 
@@ -228,30 +216,53 @@ class DirectNotificationDispatch:
                 last_queue_id = send_result.get("queue_id")
                 used_post = True
                 sent_via_post = True
+                send_body = {
+                    "messaging_product": "whatsapp",
+                    "recipient_type": "individual",
+                    "to": normalize_whatsapp_phone(phone),
+                    "type": "template",
+                    "template": {
+                        "name": template_name,
+                        "language": {"policy": "deterministic", "code": language_code},
+                        "components": components,
+                    },
+                }
                 await finalize_integration_sync_log_isolated(
                     sync_log_id=sync_log_id,
                     status="success",
                     api_endpoint_url=send_url,
-                    response_payload={
-                        **send_result,
+                    request_payload={
                         "http_method": "POST",
+                        "api_name": "messages",
                         "url": send_url,
-                        "template_fetch_url": fetch_url,
-                        "send_body": {
-                            "to": normalize_whatsapp_phone(phone),
-                            "template_name": template_name,
-                            "language_code": language_code,
-                            "components": components,
-                        },
+                        "body": send_body,
+                    },
+                    response_payload={
+                        "queue_id": send_result.get("queue_id"),
+                        "message_status": send_result.get("message_status"),
                     },
                 )
             except Exception as exc:
                 logger.warning("WhatAPI POST failed, trying GET fallback: %s", exc)
                 err_msg, err_payload = _integration_failure_from_exc(exc)
+                failed_url = (
+                    str(err_payload.get("url") or "")
+                    if isinstance(err_payload, dict)
+                    else ""
+                )
+                failed_is_get = failed_url.endswith("message_templates") or "message_templates" in failed_url
                 await finalize_integration_sync_log_isolated(
                     sync_log_id=sync_log_id,
                     status="failed",
+                    api_endpoint_url=failed_url or (fetch_url if failed_is_get else send_url),
                     error_message=err_msg,
+                    request_payload={
+                        "http_method": "GET" if failed_is_get else "POST",
+                        "api_name": "message_templates" if failed_is_get else "messages",
+                        "url": failed_url or (fetch_url if failed_is_get else send_url),
+                        "template_name": template_label,
+                        "phone": phone,
+                    },
                     response_payload=err_payload,
                 )
 
@@ -268,23 +279,22 @@ class DirectNotificationDispatch:
                     medialink=fb_media,
                     pdflink=fb_pdf,
                 )
+                fb_query = {
+                    "number": fb_phone,
+                    "message": legacy_csv,
+                    **({"medialink": fb_media} if fb_media else {}),
+                    **({"pdflink": fb_pdf} if fb_pdf else {}),
+                }
                 fb_log_id = await persist_integration_sync_log_isolated(
                     provider="whatapi_fallback",
                     api_url=fb_url,
                     engagement_id=engagement_id,
                     user_id=sync_log_user_id,
                     request_payload={
-                        "notification_id": notification_id,
-                        "phone": fb_phone,
-                        "message": legacy_csv,
                         "http_method": "GET",
+                        "api_name": "whatapi_webhook",
                         "url": fb_url,
-                        "query": {
-                            "number": fb_phone,
-                            "message": legacy_csv,
-                            **({"medialink": fb_media} if fb_media else {}),
-                            **({"pdflink": fb_pdf} if fb_pdf else {}),
-                        },
+                        "body": fb_query,
                     },
                 )
                 try:
@@ -300,7 +310,9 @@ class DirectNotificationDispatch:
                     await finalize_integration_sync_log_isolated(
                         sync_log_id=fb_log_id,
                         status="success" if fb_result.get("accepted") else "failed",
-                        response_payload=fb_result.get("response"),
+                        response_payload=fb_result.get("response") if isinstance(fb_result.get("response"), dict) else {
+                            "accepted": fb_result.get("accepted"),
+                        },
                     )
                 except Exception as fb_exc:
                     err_msg, err_payload = _integration_failure_from_exc(fb_exc)

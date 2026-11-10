@@ -100,6 +100,7 @@ async def finalize_integration_sync_log_isolated(
     response_payload: dict | None = None,
     error_message: str | None = None,
     api_endpoint_url: str | None = None,
+    request_payload: dict | None = None,
 ) -> None:
     audit_repo = AuditRepository()
     async with AsyncSessionLocal() as audit_db:
@@ -110,6 +111,7 @@ async def finalize_integration_sync_log_isolated(
             response_payload=response_payload,
             error_message=error_message,
             api_endpoint_url=api_endpoint_url,
+            request_payload=request_payload,
         )
         await audit_db.commit()
 
