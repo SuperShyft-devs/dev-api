@@ -43,13 +43,11 @@ class CatalogEventResponse(BaseModel):
     trigger_notes: str
     legacy_event_code: str | None = None
     recipient_payload_hints: dict[str, str] = Field(default_factory=dict)
-    user_recipient_context_fields: list[dict[str, str | None]] = Field(default_factory=list)
 
 
 class RecipientConfigPayload(BaseModel):
     phones: list[str] = Field(default_factory=list)
     emails: list[str] = Field(default_factory=list)
-    user_context_key: str | None = None
 
 
 class WizardTemplateSlot(BaseModel):

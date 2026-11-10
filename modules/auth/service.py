@@ -436,25 +436,19 @@ class AuthService:
         db: AsyncSession,
         *,
         delivery: OtpDelivery,
-        request_phone: str | None = None,
-        request_email: str | None = None,
     ) -> None:
         """Send OTP via notification engine."""
-        from modules.notifications.otp_notification_emit import emit_auth_otp_sent
+        from modules.notifications.engine import get_notification_engine
 
-        phone = (request_phone or "").strip() or (
-            delivery.destination if delivery.channel == "phone" else ""
-        )
-        email = (request_email or "").strip() or (
-            delivery.destination if delivery.channel == "email" else ""
-        )
-        await emit_auth_otp_sent(
+        await get_notification_engine().emit(
             db,
-            otp=delivery.otp,
-            service_key=delivery.service_key,
-            phone=phone or None,
-            email=email or None,
-            user_id=delivery.user_id,
+            event_code="auth.otp_sent",
+            context={
+                "user_id": delivery.user_id,
+                "otp": delivery.otp,
+                "service_key": delivery.service_key,
+                "fallback_service_keys": [delivery.service_key],
+            },
         )
 
     async def issue_tokens_for_user(

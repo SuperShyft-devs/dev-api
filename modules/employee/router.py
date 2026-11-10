@@ -95,12 +95,7 @@ async def employee_send_otp(
     )
     await db.commit()
     if delivery is not None:
-        await auth_service.deliver_otp(
-            db,
-            delivery=delivery,
-            request_phone=str(payload.phone) if payload.phone else None,
-            request_email=str(payload.email) if payload.email else None,
-        )
+        await auth_service.deliver_otp(db, delivery=delivery)
         await db.commit()
     return success_response({"session_id": session_id})
 

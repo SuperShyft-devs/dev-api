@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from core.exceptions import AppError
 from modules.notifications.whatapi_client import WhatApiClient, get_whatapi_client
 from modules.notifications.whatapi_sync_logging import log_whatapi_get_message_templates
 
@@ -63,22 +62,13 @@ class WhatsappTemplateProxy:
 
     async def lookup(self, *, template_name: str) -> dict[str, Any]:
         name = template_name.strip()
-        try:
-            raw = await log_whatapi_get_message_templates(
-                template_name=name,
-                engagement_id=None,
-                user_id=None,
-                notification_id=None,
-                operation=lambda: self._client.fetch_message_template(template_name=name),
-            )
-        except AppError as exc:
-            if exc.error_code in ("WHATAPI_ERROR", "CONFIG_ERROR"):
-                return {
-                    "found": False,
-                    "name": template_name.strip(),
-                    "lookup_error": exc.message,
-                }
-            raise
+        raw = await log_whatapi_get_message_templates(
+            template_name=name,
+            engagement_id=None,
+            user_id=None,
+            notification_id=None,
+            operation=lambda: self._client.fetch_message_template(template_name=name),
+        )
         normalized = normalize_template_response(raw)
         if normalized is None:
             return {"found": False, "name": template_name.strip()}
