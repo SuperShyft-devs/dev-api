@@ -5,7 +5,11 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
-from modules.engagement_notifications.service_config import serialize_for_db, validate_notification_service_configs
+from modules.engagement_notifications.service_config import (
+    normalize_notification_services,
+    serialize_for_db,
+    validate_notification_service_configs,
+)
 from modules.notifications.binding_schemas import (
     NotificationBindingCreate,
     NotificationBindingResponse,
@@ -106,10 +110,9 @@ class NotificationBindingsService:
 
     @staticmethod
     def _to_response(row) -> NotificationBindingResponse:
-        services = row.notification_services or []
-        service_key = None
-        if services and isinstance(services[0], dict):
-            service_key = services[0].get("service_key")
+        normalized = normalize_notification_services(row.notification_services)
+        services = serialize_for_db(normalized)
+        service_key = normalized[0].service_key if normalized else None
         return NotificationBindingResponse(
             id=row.id,
             event_code=row.event_code,
