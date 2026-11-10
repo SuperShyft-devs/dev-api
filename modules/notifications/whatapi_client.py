@@ -1,0 +1,165 @@
+"""HTTP client for WhatAPI Meta WhatsApp template APIs."""
+
+from __future__ import annotations
+
+from typing import Any
+
+import httpx
+
+from core.config import settings
+from core.exceptions import AppError
+
+
+def _whatapi_base() -> str:
+    base = (settings.WHATAPI_DOMAIN or "").strip().rstrip("/")
+    if not base:
+        raise AppError(
+            status_code=500,
+            error_code="CONFIG_ERROR",
+            message="WHATAPI_DOMAIN is not configured",
+        )
+    return base
+
+
+def _auth_headers() -> dict[str, str]:
+    token = (settings.WHATAPI_ACCESS_TOKEN or "").strip()
+    if not token:
+        raise AppError(
+            status_code=500,
+            error_code="CONFIG_ERROR",
+            message="WHATAPI_ACCESS_TOKEN is not configured",
+        )
+    return {
+        "Authorization": f"Bearer {token}",
+        "API-KEY": token,
+    }
+
+
+def _meta_path(*parts: str) -> str:
+    version = (settings.WHATAPI_VERSION or "v19.0").strip().strip("/")
+    return f"{_whatapi_base()}/api/meta/{version}/{'/'.join(parts)}"
+
+
+class WhatApiClient:
+    """Fetch templates and send WhatsApp template messages via WhatAPI."""
+
+    async def fetch_message_template(self, *, template_name: str) -> dict[str, Any]:
+        waba_id = (settings.WHATAPI_WABA_ID or "").strip()
+        if not waba_id:
+            raise AppError(
+                status_code=500,
+                error_code="CONFIG_ERROR",
+                message="WHATAPI_WABA_ID is not configured",
+            )
+        url = _meta_path(waba_id, "message_templates")
+        params = {"name": template_name}
+        try:
+            async with httpx.AsyncClient(
+                timeout=settings.WHATAPI_TIMEOUT_SECONDS
+            ) as client:
+                response = await client.get(
+                    url, params=params, headers=_auth_headers()
+                )
+                response.raise_for_status()
+                body = response.json()
+        except httpx.HTTPStatusError as exc:
+            raise AppError(
+                status_code=502,
+                error_code="WHATAPI_ERROR",
+                message=f"WhatAPI template fetch returned HTTP {exc.response.status_code}",
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise AppError(
+                status_code=502,
+                error_code="WHATAPI_ERROR",
+                message="WhatAPI template fetch request failed",
+            ) from exc
+
+        if not isinstance(body, dict):
+            raise AppError(
+                status_code=502,
+                error_code="WHATAPI_ERROR",
+                message="WhatAPI template fetch returned an invalid response",
+            )
+        return body
+
+    async def send_template_message(
+        self,
+        *,
+        to: str,
+        template_name: str,
+        language_code: str = "en",
+        components: list[dict[str, Any]] | None = None,
+    ) -> dict[str, str]:
+        phone_number_id = (settings.WHATAPI_PHONE_NUMBER_ID or "").strip()
+        if not phone_number_id:
+            raise AppError(
+                status_code=500,
+                error_code="CONFIG_ERROR",
+                message="WHATAPI_PHONE_NUMBER_ID is not configured",
+            )
+
+        payload: dict[str, Any] = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to,
+            "type": "template",
+            "template": {
+                "name": template_name,
+                "language": {"policy": "deterministic", "code": language_code},
+            },
+        }
+        if components:
+            payload["template"]["components"] = components
+
+        url = _meta_path(phone_number_id, "messages")
+        try:
+            async with httpx.AsyncClient(
+                timeout=settings.WHATAPI_TIMEOUT_SECONDS
+            ) as client:
+                response = await client.post(
+                    url, json=payload, headers=_auth_headers()
+                )
+                response.raise_for_status()
+                body = response.json()
+        except httpx.HTTPStatusError as exc:
+            raise AppError(
+                status_code=502,
+                error_code="WHATAPI_ERROR",
+                message=f"WhatAPI send returned HTTP {exc.response.status_code}",
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise AppError(
+                status_code=502,
+                error_code="WHATAPI_ERROR",
+                message="WhatAPI send request failed",
+            ) from exc
+
+        if not isinstance(body, dict):
+            raise AppError(
+                status_code=502,
+                error_code="WHATAPI_ERROR",
+                message="WhatAPI send returned an invalid response",
+            )
+
+        message = body.get("message")
+        if not isinstance(message, dict):
+            raise AppError(
+                status_code=502,
+                error_code="WHATAPI_ERROR",
+                message="WhatAPI send response missing message object",
+            )
+        queue_id = message.get("queue_id")
+        message_status = message.get("message_status")
+        if not queue_id or not isinstance(queue_id, str):
+            raise AppError(
+                status_code=502,
+                error_code="WHATAPI_ERROR",
+                message="WhatAPI send response missing queue_id",
+            )
+        status_str = str(message_status or "queued")
+        return {"queue_id": queue_id, "message_status": status_str}
+
+
+def get_whatapi_client() -> WhatApiClient:
+    return WhatApiClient()

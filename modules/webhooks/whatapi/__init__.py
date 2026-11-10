@@ -1,0 +1,1 @@
+"""WhatAPI inbound webhook routes."""

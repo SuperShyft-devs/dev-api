@@ -51,6 +51,11 @@ def _service_dict(s) -> dict:
         "require_otp": s.require_otp,
         "require_session_details": s.require_session_details,
         "require_external_link": s.require_external_link,
+        "template_name": s.template_name,
+        "template_variables": s.template_variables,
+        "email_subject": s.email_subject,
+        "email_body": s.email_body,
+        "email_html": s.email_html,
         "created_at": s.created_at.isoformat() if s.created_at else None,
     }
 

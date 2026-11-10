@@ -99,6 +99,14 @@ class NotificationsRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_notification_by_queue_id(
+        self, db: AsyncSession, *, queue_id: str
+    ) -> Notification | None:
+        result = await db.execute(
+            select(Notification).where(Notification.queue_id == queue_id)
+        )
+        return result.scalar_one_or_none()
+
     async def update_notification(
         self,
         db: AsyncSession,

@@ -91,6 +91,11 @@ class NotificationServiceCreate(BaseModel):
     require_otp: bool = False
     require_session_details: bool = False
     require_external_link: bool = False
+    template_name: OptionalSafeText = None
+    template_variables: dict | list | None = None
+    email_subject: OptionalSafeText = None
+    email_body: OptionalSafeText = None
+    email_html: OptionalSafeText = None
 
 
 class BulkDeleteNotificationsRequest(BaseModel):
@@ -108,3 +113,8 @@ class NotificationServiceUpdate(BaseModel):
     require_otp: bool | None = None
     require_session_details: bool | None = None
     require_external_link: bool | None = None
+    template_name: OptionalSafeText = None
+    template_variables: dict | list | None = None
+    email_subject: OptionalSafeText = None
+    email_body: OptionalSafeText = None
+    email_html: OptionalSafeText = None

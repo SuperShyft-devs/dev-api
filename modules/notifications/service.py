@@ -826,6 +826,11 @@ class NotificationsService:
             require_otp=payload.require_otp,
             require_session_details=payload.require_session_details,
             require_external_link=payload.require_external_link,
+            template_name=payload.template_name,
+            template_variables=payload.template_variables,
+            email_subject=payload.email_subject,
+            email_body=payload.email_body,
+            email_html=payload.email_html,
         )
         return await self._repo.create_service(db, svc)
 
@@ -863,6 +868,16 @@ class NotificationsService:
             svc.require_session_details = payload.require_session_details
         if payload.require_external_link is not None:
             svc.require_external_link = payload.require_external_link
+        if payload.template_name is not None:
+            svc.template_name = payload.template_name
+        if payload.template_variables is not None:
+            svc.template_variables = payload.template_variables
+        if payload.email_subject is not None:
+            svc.email_subject = payload.email_subject
+        if payload.email_body is not None:
+            svc.email_body = payload.email_body
+        if payload.email_html is not None:
+            svc.email_html = payload.email_html
         return await self._repo.update_service(db, svc)
 
     async def delete_notification(

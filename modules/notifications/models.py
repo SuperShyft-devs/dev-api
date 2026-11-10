@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, JSON, String, Text, func, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from db.base import Base
 from db.column_types import NotificationStatusColumn, notification_channel_enum
@@ -25,6 +26,11 @@ class NotificationService(Base):
     require_otp = Column(Boolean, nullable=False, server_default="false")
     require_session_details = Column(Boolean, nullable=False, server_default="false")
     require_external_link = Column(Boolean, nullable=False, server_default="false")
+    template_name = Column(String, nullable=True)
+    template_variables = Column(JSONB, nullable=True)
+    email_subject = Column(String, nullable=True)
+    email_body = Column(Text, nullable=True)
+    email_html = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
@@ -41,6 +47,7 @@ class Notification(Base):
         Index("ix_notifications_svc_eng_status", "service_key", "engagement_id", "status"),
         Index("ix_notifications_engagement_id", "engagement_id"),
         Index("ix_notifications_assessment_instance_id", "assessment_instance_id"),
+        Index("ix_notifications_queue_id", "queue_id"),
     )
 
     notification_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -53,6 +60,7 @@ class Notification(Base):
         Integer, ForeignKey("assessment_instances.assessment_instance_id"), nullable=True
     )
     message = Column(Text, nullable=True)
+    queue_id = Column(String, nullable=True)
     triggered_by_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
     dispatched_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
