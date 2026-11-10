@@ -18,6 +18,36 @@ class DispatchTarget:
     contacts: list[dict] = field(default_factory=list)
 
 
+def _participant_contact_from_context(context: dict) -> list[dict]:
+    """Build a single contact when emit has phone/email but no user_id (staff/partner OTP)."""
+    phone = str(context.get("phone") or "").strip()
+    email = str(context.get("email") or "").strip().lower()
+
+    contact: dict[str, str] = {}
+    participant_details = context.get("participant_details")
+    if isinstance(participant_details, dict):
+        staff = participant_details.get("staff")
+        if isinstance(staff, dict):
+            name = str(staff.get("name") or "").strip()
+            if name:
+                parts = name.split(None, 1)
+                contact["first_name"] = parts[0]
+                if len(parts) > 1:
+                    contact["last_name"] = parts[1]
+            if not phone and staff.get("phone"):
+                phone = str(staff["phone"]).strip()
+            if not email and staff.get("email"):
+                email = str(staff["email"]).strip().lower()
+
+    if phone:
+        contact["phone"] = phone
+    if email:
+        contact["email"] = email
+    if contact.get("phone") or contact.get("email"):
+        return [contact]
+    return []
+
+
 class RecipientResolver:
     def __init__(
         self,
@@ -44,6 +74,9 @@ class RecipientResolver:
                 return DispatchTarget(user_ids=[int(x) for x in uids])
             if uid is not None:
                 return DispatchTarget(user_ids=[int(uid)])
+            contacts = _participant_contact_from_context(context)
+            if contacts:
+                return DispatchTarget(contacts=contacts)
             return DispatchTarget()
 
         if rt in ("assistants", "assistants.phlebo", "assistants.expert", "assistants.staff"):

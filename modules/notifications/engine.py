@@ -137,6 +137,7 @@ class NotificationEngine:
                             db,
                             service_key=service_key,
                             contacts=target.contacts,
+                            otp=str(otp) if otp is not None else None,
                             engagement_id=engagement_id,
                             participant_details=participant_details,
                             session_details=(
