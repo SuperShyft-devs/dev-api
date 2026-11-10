@@ -17,7 +17,7 @@ from modules.notifications.binding_schemas import (
 )
 from modules.notifications.bindings_repository import NotificationBindingsRepository
 from modules.notifications.events_catalog import get_event, list_events
-from modules.notifications.variable_catalog import fields_for_groups
+from modules.notifications.variable_catalog import RECIPIENT_PAYLOAD_HINTS, fields_for_groups
 from modules.notifications.binding_schemas import CatalogEventResponse
 
 
@@ -36,6 +36,7 @@ class NotificationBindingsService:
                 default_recipients=list(e.default_recipients),
                 trigger_notes=e.trigger_notes,
                 legacy_event_code=e.legacy_event_code,
+                recipient_payload_hints=dict(RECIPIENT_PAYLOAD_HINTS),
             )
             for e in list_events()
         ]

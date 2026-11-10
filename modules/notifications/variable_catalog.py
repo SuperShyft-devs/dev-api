@@ -86,3 +86,16 @@ KNOWN_RECIPIENT_TYPES: frozenset[str] = frozenset(
         "custom",
     }
 )
+
+RECIPIENT_PAYLOAD_HINTS: dict[str, str] = {
+    "user": "user_id or participant_user_id (or user_ids)",
+    "members": "members[] or member_contacts[]",
+    "booker": "booker_user_id or booker_contact",
+    "assistants": "engagement_id → all onboarding assistants",
+    "assistants.phlebo": "engagement_id → phlebo assistants",
+    "assistants.expert": "engagement_id → expert assistants",
+    "assistants.staff": "engagement_id → staff assistants",
+    "employees": "employee_contacts or default support staff",
+    "admin": "admin_user_ids, admin_contacts",
+    "custom": "phones and emails configured on this binding",
+}

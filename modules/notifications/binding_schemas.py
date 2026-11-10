@@ -42,6 +42,7 @@ class CatalogEventResponse(BaseModel):
     default_recipients: list[str]
     trigger_notes: str
     legacy_event_code: str | None = None
+    recipient_payload_hints: dict[str, str] = Field(default_factory=dict)
 
 
 class RecipientConfigPayload(BaseModel):
