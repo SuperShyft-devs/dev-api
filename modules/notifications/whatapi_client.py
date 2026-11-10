@@ -71,6 +71,59 @@ def whatapi_auth_descriptor() -> dict[str, str]:
     return {"header": "API-KEY", "value": "(redacted)"}
 
 
+def parse_http_error_body(response: httpx.Response) -> dict[str, Any] | list[Any] | None:
+    """Best-effort JSON (or short text) from a failed WhatAPI HTTP response."""
+    try:
+        parsed = response.json()
+        if isinstance(parsed, (dict, list)):
+            return parsed
+    except Exception:
+        pass
+    text = (response.text or "").strip()
+    if not text:
+        return None
+    return {"raw": text[:2000]}
+
+
+def whatapi_error_summary(body: dict[str, Any] | list[Any] | None) -> str | None:
+    if not isinstance(body, dict):
+        return None
+    for key in ("error", "message", "error_message", "detail"):
+        value = body.get(key)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return None
+
+
+def format_whatapi_http_error(
+    *,
+    http_method: str,
+    url: str,
+    status_code: int,
+    body: dict[str, Any] | list[Any] | None,
+) -> str:
+    summary = whatapi_error_summary(body) if isinstance(body, dict) else None
+    base = f"{http_method} {url} → HTTP {status_code}"
+    if summary:
+        return f"{base}: {summary}"
+    return base
+
+
+def whatapi_http_error_details(
+    *,
+    http_method: str,
+    url: str,
+    status_code: int,
+    body: dict[str, Any] | list[Any] | None,
+) -> dict[str, Any]:
+    return {
+        "http_method": http_method,
+        "url": url,
+        "http_status": status_code,
+        "response_body": body,
+    }
+
+
 class WhatApiClient:
     """Fetch templates and send WhatsApp template messages via WhatAPI."""
 
@@ -93,10 +146,22 @@ class WhatApiClient:
                 response.raise_for_status()
                 body = response.json()
         except httpx.HTTPStatusError as exc:
+            err_body = parse_http_error_body(exc.response)
             raise AppError(
                 status_code=502,
                 error_code="WHATAPI_ERROR",
-                message=f"GET {url} → HTTP {exc.response.status_code}",
+                message=format_whatapi_http_error(
+                    http_method="GET",
+                    url=url,
+                    status_code=exc.response.status_code,
+                    body=err_body,
+                ),
+                details=whatapi_http_error_details(
+                    http_method="GET",
+                    url=url,
+                    status_code=exc.response.status_code,
+                    body=err_body,
+                ),
             ) from exc
         except httpx.HTTPError as exc:
             raise AppError(
@@ -153,10 +218,22 @@ class WhatApiClient:
                 response.raise_for_status()
                 body = response.json()
         except httpx.HTTPStatusError as exc:
+            err_body = parse_http_error_body(exc.response)
             raise AppError(
                 status_code=502,
                 error_code="WHATAPI_ERROR",
-                message=f"POST {url} → HTTP {exc.response.status_code}",
+                message=format_whatapi_http_error(
+                    http_method="POST",
+                    url=url,
+                    status_code=exc.response.status_code,
+                    body=err_body,
+                ),
+                details=whatapi_http_error_details(
+                    http_method="POST",
+                    url=url,
+                    status_code=exc.response.status_code,
+                    body=err_body,
+                ),
             ) from exc
         except httpx.HTTPError as exc:
             raise AppError(

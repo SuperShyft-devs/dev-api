@@ -5,7 +5,80 @@ from __future__ import annotations
 import pytest
 
 from core.config import settings
-from modules.notifications.whatapi_client import WhatApiClient
+import httpx
+
+from modules.notifications.whatapi_client import (
+    WhatApiClient,
+    format_whatapi_http_error,
+    parse_http_error_body,
+)
+
+
+def test_format_whatapi_http_error_includes_provider_message():
+    msg = format_whatapi_http_error(
+        http_method="GET",
+        url="https://crmapi1.whatapi.in/api/meta/v19.0/waba/message_templates?name=otp",
+        status_code=401,
+        body={"success": False, "error": "token invalidated"},
+    )
+    assert "401" in msg
+    assert "token invalidated" in msg
+
+
+def test_parse_http_error_body_json():
+    response = httpx.Response(
+        401,
+        json={"success": False, "error": "token invalidated"},
+        request=httpx.Request("GET", "https://example.com"),
+    )
+    body = parse_http_error_body(response)
+    assert body == {"success": False, "error": "token invalidated"}
+
+
+@pytest.mark.asyncio
+async def test_fetch_message_template_http_401_propagates_body(monkeypatch):
+    monkeypatch.setattr(settings, "WHATAPI_DOMAIN", "https://crmapi1.whatapi.in")
+    monkeypatch.setattr(settings, "WHATAPI_VERSION", "v19.0")
+    monkeypatch.setattr(settings, "WHATAPI_API_KEY", "bad-key")
+    monkeypatch.setattr(settings, "WHATAPI_WABA_ID", "waba-123")
+
+    url = "https://crmapi1.whatapi.in/api/meta/v19.0/waba-123/message_templates?name=otp"
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def get(self, request_url, headers=None):
+            request = httpx.Request("GET", request_url)
+            response = httpx.Response(
+                401,
+                request=request,
+                json={"success": False, "error": "token invalidated"},
+            )
+            raise httpx.HTTPStatusError("401", request=request, response=response)
+
+    monkeypatch.setattr(
+        "modules.notifications.whatapi_client.httpx.AsyncClient", FakeClient
+    )
+
+    from core.exceptions import AppError
+
+    client = WhatApiClient()
+    with pytest.raises(AppError) as exc_info:
+        await client.fetch_message_template(template_name="otp")
+    assert "token invalidated" in str(exc_info.value)
+    assert exc_info.value.details is not None
+    assert exc_info.value.details["http_status"] == 401
+    assert exc_info.value.details["response_body"] == {
+        "success": False,
+        "error": "token invalidated",
+    }
 
 
 @pytest.mark.asyncio

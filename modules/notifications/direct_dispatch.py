@@ -25,6 +25,7 @@ from modules.notifications.whatsapp_fallback_get import (
     send_whatsapp_fallback_get,
 )
 from modules.notifications.whatsapp_template_builder import build_whatsapp_send_payload
+from core.exceptions import AppError
 from modules.notifications.whatapi_client import (
     WhatApiClient,
     get_whatapi_client,
@@ -34,6 +35,12 @@ from modules.notifications.whatapi_client import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _integration_failure_from_exc(exc: Exception) -> tuple[str, dict[str, Any] | None]:
+    if isinstance(exc, AppError) and isinstance(exc.details, dict):
+        return str(exc), dict(exc.details)
+    return str(exc), None
 
 
 @dataclass
@@ -240,10 +247,12 @@ class DirectNotificationDispatch:
                 )
             except Exception as exc:
                 logger.warning("WhatAPI POST failed, trying GET fallback: %s", exc)
+                err_msg, err_payload = _integration_failure_from_exc(exc)
                 await finalize_integration_sync_log_isolated(
                     sync_log_id=sync_log_id,
                     status="failed",
-                    error_message=str(exc),
+                    error_message=err_msg,
+                    response_payload=err_payload,
                 )
 
                 fb_phone = normalize_whatsapp_phone(phone)
@@ -294,11 +303,13 @@ class DirectNotificationDispatch:
                         response_payload=fb_result.get("response"),
                     )
                 except Exception as fb_exc:
-                    failures.append(str(fb_exc))
+                    err_msg, err_payload = _integration_failure_from_exc(fb_exc)
+                    failures.append(err_msg)
                     await finalize_integration_sync_log_isolated(
                         sync_log_id=fb_log_id,
                         status="failed",
-                        error_message=str(fb_exc),
+                        error_message=err_msg,
+                        response_payload=err_payload,
                     )
 
         if failures:

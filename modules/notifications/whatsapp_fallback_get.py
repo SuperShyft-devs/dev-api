@@ -8,6 +8,12 @@ from urllib.parse import urlencode
 import httpx
 
 from core.config import settings
+from core.exceptions import AppError
+from modules.notifications.whatapi_client import (
+    format_whatapi_http_error,
+    parse_http_error_body,
+    whatapi_http_error_details,
+)
 
 
 def build_whatsapp_fallback_get_url(
@@ -54,9 +60,29 @@ async def send_whatsapp_fallback_get(
             response = await client.get(url)
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
-            raise RuntimeError(f"GET {url} → HTTP {exc.response.status_code}") from exc
+            err_body = parse_http_error_body(exc.response)
+            raise AppError(
+                status_code=502,
+                error_code="WHATAPI_FALLBACK_ERROR",
+                message=format_whatapi_http_error(
+                    http_method="GET",
+                    url=url,
+                    status_code=exc.response.status_code,
+                    body=err_body,
+                ),
+                details=whatapi_http_error_details(
+                    http_method="GET",
+                    url=url,
+                    status_code=exc.response.status_code,
+                    body=err_body,
+                ),
+            ) from exc
         except httpx.HTTPError as exc:
-            raise RuntimeError(f"GET {url} request failed") from exc
+            raise AppError(
+                status_code=502,
+                error_code="WHATAPI_FALLBACK_ERROR",
+                message=f"GET {url} request failed",
+            ) from exc
         try:
             body = response.json()
         except Exception:
