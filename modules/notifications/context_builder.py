@@ -29,7 +29,7 @@ def build_member_context(
 
     gift_url = str(pd.get("gift_url") or "").strip()
 
-    return {
+    context: dict[str, Any] = {
         "user": {
             "first_name": first_name,
             "last_name": str(member.get("last_name") or "").strip(),
@@ -59,3 +59,10 @@ def build_member_context(
         "participant_details": pd,
         "external_link": str(member.get("external_link") or "").strip(),
     }
+
+    for key in ("engagement", "consultation", "booking"):
+        block = member.get(key)
+        if isinstance(block, dict) and block:
+            context[key] = {k: v for k, v in block.items() if v is not None}
+
+    return context

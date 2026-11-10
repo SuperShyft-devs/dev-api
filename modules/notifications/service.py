@@ -600,6 +600,15 @@ class NotificationsService:
 
         members: list[dict] = []
         stored_contacts: list[dict] = []
+        _optional_member_keys = (
+            "blood_report_url",
+            "bio_ai_report_url",
+            "face_scan_report_url",
+            "external_link",
+            "engagement",
+            "consultation",
+            "booking",
+        )
         for contact in contacts:
             member: dict = {
                 "first_name": str(contact.get("first_name") or ""),
@@ -611,6 +620,9 @@ class NotificationsService:
                 member["otp"] = otp_value
             if session_details is not None:
                 member["session_details"] = session_details.model_dump(mode="json", exclude_none=True)
+            for key in _optional_member_keys:
+                if key in contact and contact.get(key) not in (None, ""):
+                    member[key] = contact[key]
             members.append(member)
 
             stored: dict = {

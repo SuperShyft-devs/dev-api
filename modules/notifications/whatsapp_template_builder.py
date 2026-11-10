@@ -49,8 +49,12 @@ async def build_whatsapp_send_payload(
     data = template_body.get("data")
     components_meta: list[dict[str, Any]] = []
     language_code = "en"
+    canonical_name = template_name
     if isinstance(data, list) and data and isinstance(data[0], dict):
         entry = data[0]
+        meta_name = entry.get("name")
+        if isinstance(meta_name, str) and meta_name.strip():
+            canonical_name = meta_name.strip()
         raw_components = entry.get("components")
         if isinstance(raw_components, list):
             components_meta = raw_components
@@ -87,4 +91,4 @@ async def build_whatsapp_send_payload(
             }
         )
 
-    return template_name, components, language_code
+    return canonical_name, components, language_code

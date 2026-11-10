@@ -96,3 +96,85 @@ async def test_whatapi_post_updates_notification_by_queue_id(
     await test_db_session.refresh(notification)
     assert notification.status == "sent"
     assert notification.completed_at is not None
+    assert notification.message == "WhatsApp delivered (delivered)"
+
+
+@pytest.mark.asyncio
+async def test_whatapi_post_updates_message_on_failed(
+    async_client, test_db_session, monkeypatch
+):
+    service_key = "whatapi-wh-fail"
+    await _seed_service(test_db_session, service_key=service_key)
+    queue_id = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+    notification = Notification(
+        service_key=service_key,
+        status="pending",
+        channel="whatsapp",
+        user={"contacts": ["919876543210"]},
+        message="WhatsApp template queued via WhatAPI POST",
+        queue_id=queue_id,
+        dispatched_at=datetime.now(timezone.utc),
+    )
+    test_db_session.add(notification)
+    await test_db_session.commit()
+    await test_db_session.refresh(notification)
+
+    payload = {
+        "message": {
+            "queue_id": queue_id,
+            "message_status": "failed",
+            "errors": [{"title": "Message undeliverable"}],
+        }
+    }
+    resp = await async_client.post("/webhooks/whatapi", json=payload)
+    assert resp.status_code == 200
+
+    await test_db_session.refresh(notification)
+    assert notification.status == "failed"
+    assert "undeliverable" in (notification.message or "").lower()
+
+
+@pytest.mark.asyncio
+async def test_whatapi_post_meta_envelope_with_queue_and_statuses(
+    async_client, test_db_session,
+):
+    service_key = "whatapi-wh-meta"
+    await _seed_service(test_db_session, service_key=service_key)
+    queue_id = "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+    notification = Notification(
+        service_key=service_key,
+        status="pending",
+        channel="whatsapp",
+        user={"contacts": ["919876543210"]},
+        message="queued",
+        queue_id=queue_id,
+        dispatched_at=datetime.now(timezone.utc),
+    )
+    test_db_session.add(notification)
+    await test_db_session.commit()
+    await test_db_session.refresh(notification)
+
+    payload = {
+        "queue_id": queue_id,
+        "entry": [
+            {
+                "changes": [
+                    {
+                        "value": {
+                            "statuses": [
+                                {
+                                    "status": "delivered",
+                                    "id": "wamid.IGNORED",
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        ],
+    }
+    resp = await async_client.post("/webhooks/whatapi", json=payload)
+    assert resp.status_code == 200
+
+    await test_db_session.refresh(notification)
+    assert notification.status == "sent"
