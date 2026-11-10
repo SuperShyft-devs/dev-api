@@ -60,6 +60,15 @@ def build_member_context(
         "external_link": str(member.get("external_link") or "").strip(),
     }
 
+    if pd:
+        context["support"] = {
+            "ticket_id": str(pd.get("ticket_id") or "").strip(),
+            "query_text": str(pd.get("query_text") or "").strip(),
+            "contact_input": str(
+                pd.get("contact_input") or pd.get("phone") or ""
+            ).strip(),
+        }
+
     for key in ("engagement", "consultation", "booking"):
         block = member.get(key)
         if isinstance(block, dict) and block:

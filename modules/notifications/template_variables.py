@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 
@@ -127,14 +128,21 @@ def build_legacy_message_csv(
     return ",".join(parts)
 
 
+def _expand_email_placeholder(path: str) -> str:
+    key = path.strip()
+    if key == "first_name":
+        return "user.first_name"
+    if key == "email":
+        return "user.email"
+    return key
+
+
 def interpolate_email_template(text: str, context: dict[str, Any]) -> str:
-    user = context.get("user") if isinstance(context.get("user"), dict) else {}
-    replacements = {
-        "{{first_name}}": str(user.get("first_name") or ""),
-        "{{otp}}": str(context.get("otp") or ""),
-        "{{email}}": str(user.get("email") or ""),
-    }
-    out = text
-    for key, value in replacements.items():
-        out = out.replace(key, value)
-    return out
+    if not text:
+        return text
+
+    def replacer(match: re.Match[str]) -> str:
+        inner = _expand_email_placeholder(match.group(1))
+        return _get_nested(context, inner)
+
+    return re.sub(r"\{\{([^}]+)\}\}", replacer, text)

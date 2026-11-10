@@ -618,6 +618,8 @@ class NotificationsService:
             }
             if otp_value:
                 member["otp"] = otp_value
+            if participant_details is not None:
+                member["participant_details"] = participant_details
             if session_details is not None:
                 member["session_details"] = session_details.model_dump(mode="json", exclude_none=True)
             for key in _optional_member_keys:

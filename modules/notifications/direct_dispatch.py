@@ -71,6 +71,7 @@ class DirectNotificationDispatch:
                 svc=svc,
                 notification_id=notification_id,
                 members=members,
+                participant_details=participant_details,
                 engagement_id=engagement_id,
                 sync_log_user_id=sync_log_user_id,
             )
@@ -89,12 +90,15 @@ class DirectNotificationDispatch:
         svc: NotificationService,
         notification_id: int,
         members: list[dict[str, Any]],
+        participant_details: dict[str, Any] | None,
         engagement_id: int | None,
         sync_log_user_id: int | None,
     ) -> DeliverResult:
         failures: list[str] = []
         for member in members:
-            context = build_member_context(member)
+            context = build_member_context(
+                member, participant_details=participant_details
+            )
             to_email = str(context["user"].get("email") or "").strip()
             if not to_email:
                 failures.append("missing recipient email")

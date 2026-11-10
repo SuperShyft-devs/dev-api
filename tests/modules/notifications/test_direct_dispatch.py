@@ -86,6 +86,29 @@ async def test_whatsapp_post_pending(monkeypatch):
     assert result.queue_id == "q-test-001"
 
 
+def test_interpolate_email_support_placeholders():
+    from modules.notifications.context_builder import build_member_context
+    from modules.notifications.template_variables import interpolate_email_template
+
+    context = build_member_context(
+        {"first_name": "Ops", "email": "ops@example.com"},
+        participant_details={
+            "contact_input": "8762830777",
+            "query_text": "Need help with report",
+            "ticket_id": "129",
+        },
+    )
+    html = (
+        "Hi {{user.first_name}}, phone {{support.contact_input}}, "
+        "query {{support.query_text}}, otp {{otp}}"
+    )
+    out = interpolate_email_template(html, {**context, "otp": "999"})
+    assert "Ops" in out
+    assert "8762830777" in out
+    assert "Need help with report" in out
+    assert "{{" not in out
+
+
 @pytest.mark.asyncio
 async def test_email_sent_immediately(monkeypatch):
     svc = NotificationService(
