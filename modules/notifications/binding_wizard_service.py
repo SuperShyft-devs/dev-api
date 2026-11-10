@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppError
@@ -186,17 +187,27 @@ class NotificationBindingWizardService:
             )
         recipient_config = self._validate_recipient(payload, ev)
         svc = await self._ensure_service(db, event_code=payload.event_code, spec=payload.service)
-        row = await self._bindings_repo.create(
-            db,
-            event_code=payload.event_code,
-            event_name=ev.name,
-            recipient_type=payload.recipient_type.strip(),
-            notification_services=serialize_for_db(
-                [NotificationServiceConfigItem(service_key=svc.service_key)]
-            ),
-            engagement_type_id=payload.engagement_type_id,
-            recipient_config=recipient_config,
-        )
+        try:
+            row = await self._bindings_repo.create(
+                db,
+                event_code=payload.event_code,
+                event_name=ev.name,
+                recipient_type=payload.recipient_type.strip(),
+                notification_services=serialize_for_db(
+                    [NotificationServiceConfigItem(service_key=svc.service_key)]
+                ),
+                engagement_type_id=payload.engagement_type_id,
+                recipient_config=recipient_config,
+            )
+        except IntegrityError as exc:
+            raise AppError(
+                status_code=409,
+                error_code="CONFLICT",
+                message=(
+                    "A binding already exists for this event, recipient type, "
+                    "and engagement scope. Edit the existing binding instead."
+                ),
+            ) from exc
         return self._bindings_service._to_response(row)
 
     async def update_binding_wizard(
