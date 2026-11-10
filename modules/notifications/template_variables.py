@@ -138,12 +138,35 @@ def _expand_email_placeholder(path: str) -> str:
     return key
 
 
+def render_otp_digit_boxes_html(context: dict[str, Any]) -> str:
+    """Six high-contrast digit cells for OTP emails (email client friendly)."""
+    otp = str(_get_nested(context, "otp.otp") or "").strip()
+    digits = [c for c in otp if c.isdigit()][:6]
+    if not digits:
+        return (
+            '<span style="font-size:32px;font-weight:700;color:#ffffff;'
+            'letter-spacing:6px;font-family:Consolas,Monaco,monospace;">'
+            f"{otp}</span>"
+        )
+    cell = (
+        'display:inline-block;min-width:40px;max-width:48px;padding:14px 6px;'
+        "margin:0 3px;background-color:rgba(255,255,255,0.14);border-radius:10px;"
+        "font-size:28px;font-weight:700;color:#ffffff;line-height:1;"
+        'font-family:Consolas,Monaco,"Courier New",monospace;text-align:center;'
+        "vertical-align:middle;"
+    )
+    return "".join(f'<span style="{cell}">{d}</span>' for d in digits)
+
+
 def interpolate_email_template(text: str, context: dict[str, Any]) -> str:
     if not text:
         return text
 
     def replacer(match: re.Match[str]) -> str:
-        inner = _expand_email_placeholder(match.group(1))
+        raw = match.group(1).strip()
+        if raw == "otp.digit_boxes":
+            return render_otp_digit_boxes_html(context)
+        inner = _expand_email_placeholder(raw)
         return _get_nested(context, inner)
 
     return re.sub(r"\{\{([^}]+)\}\}", replacer, text)

@@ -139,6 +139,18 @@ def test_interpolate_email_support_placeholders():
     assert "{{" not in out
 
 
+def test_interpolate_email_otp_digit_boxes():
+    from modules.notifications.template_variables import interpolate_email_template
+
+    html = "<div>{{otp.digit_boxes}}</div>"
+    out = interpolate_email_template(html, {"otp": {"otp": "158374"}})
+    for digit in "158374":
+        assert f">{digit}</span>" in out
+    assert "color:#ffffff" in out
+    assert "28px" in out
+    assert "{{" not in out
+
+
 @pytest.mark.asyncio
 async def test_email_uses_staff_address_when_participant_user_present(monkeypatch):
     svc = NotificationService(
