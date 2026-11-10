@@ -24,12 +24,20 @@ def _channel_for_service_key(conn, service_key: str) -> str:
     return "unknown"
 
 
+def _drop_legacy_binding_uniques(conn) -> None:
+    for name in ("uq_notification_events_binding", "uq_notification_events_code_recipient"):
+        conn.execute(text(f'ALTER TABLE notification_events DROP CONSTRAINT IF EXISTS "{name}"'))
+
+
 def upgrade() -> None:
-    op.add_column(
-        "notification_events",
-        sa.Column("delivery_channel", sa.String(), nullable=True),
+    op.execute(
+        text(
+            "ALTER TABLE notification_events "
+            "ADD COLUMN IF NOT EXISTS delivery_channel VARCHAR"
+        )
     )
     conn = op.get_bind()
+    _drop_legacy_binding_uniques(conn)
     rows = conn.execute(
         text(
             """
@@ -120,7 +128,7 @@ def upgrade() -> None:
     )
     op.alter_column("notification_events", "delivery_channel", nullable=False)
 
-    op.drop_constraint("uq_notification_events_binding", "notification_events", type_="unique")
+    _drop_legacy_binding_uniques(conn)
     op.create_unique_constraint(
         "uq_notification_events_binding",
         "notification_events",
