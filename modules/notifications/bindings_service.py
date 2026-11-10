@@ -13,6 +13,7 @@ from modules.notifications.binding_schemas import (
 )
 from modules.notifications.bindings_repository import NotificationBindingsRepository
 from modules.notifications.events_catalog import get_event, list_events
+from modules.notifications.variable_catalog import fields_for_groups
 from modules.notifications.binding_schemas import CatalogEventResponse
 
 
@@ -27,6 +28,7 @@ class NotificationBindingsService:
                 name=e.name,
                 status=e.status,
                 variable_groups=list(e.variable_groups),
+                variable_fields=fields_for_groups(e.variable_groups),
                 default_recipients=list(e.default_recipients),
                 trigger_notes=e.trigger_notes,
                 legacy_event_code=e.legacy_event_code,
@@ -104,11 +106,17 @@ class NotificationBindingsService:
 
     @staticmethod
     def _to_response(row) -> NotificationBindingResponse:
+        services = row.notification_services or []
+        service_key = None
+        if services and isinstance(services[0], dict):
+            service_key = services[0].get("service_key")
         return NotificationBindingResponse(
             id=row.id,
             event_code=row.event_code,
             event_name=row.event_name,
             recipient_type=row.recipient_type,
-            notification_services=row.notification_services or [],
+            notification_services=services,
             engagement_type_id=row.engagement_type_id,
+            recipient_config=row.recipient_config if hasattr(row, "recipient_config") else None,
+            service_key=service_key,
         )

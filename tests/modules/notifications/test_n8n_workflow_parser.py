@@ -19,6 +19,11 @@ from modules.notifications.n8n_workflow_parser import (
 
 WORKFLOWS = default_workflows_dir()
 
+pytestmark = pytest.mark.skipif(
+    not WORKFLOWS.is_dir() or not any(WORKFLOWS.glob("*.json")),
+    reason="n8n workflow artifacts removed (Prompt 6 cleanup)",
+)
+
 
 def test_parse_message_csv_template_otp():
     name, slots = parse_message_csv_template("otp,123456")

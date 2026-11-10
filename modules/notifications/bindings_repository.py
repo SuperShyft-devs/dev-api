@@ -43,6 +43,7 @@ class NotificationBindingsRepository:
         recipient_type: str,
         notification_services: list,
         engagement_type_id: int | None = None,
+        recipient_config: dict | None = None,
     ) -> NotificationEventBinding:
         obj = NotificationEventBinding(
             event_code=event_code,
@@ -50,6 +51,7 @@ class NotificationBindingsRepository:
             recipient_type=recipient_type,
             notification_services=notification_services,
             engagement_type_id=engagement_type_id,
+            recipient_config=recipient_config,
         )
         db.add(obj)
         await db.flush()
@@ -64,6 +66,7 @@ class NotificationBindingsRepository:
         recipient_type: str | None = None,
         notification_services: list | None = None,
         engagement_type_id: int | None = None,
+        recipient_config: dict | None = None,
     ) -> NotificationEventBinding:
         if event_name is not None:
             binding.event_name = event_name
@@ -71,6 +74,8 @@ class NotificationBindingsRepository:
             binding.recipient_type = recipient_type
         if notification_services is not None:
             binding.notification_services = notification_services
+        if recipient_config is not None:
+            binding.recipient_config = recipient_config
         await db.flush()
         return binding
 

@@ -42,6 +42,7 @@ class NotificationEventBinding(Base):
     recipient_type = Column(String, nullable=False)
     notification_services = Column(JSON, nullable=False, server_default=text("'[]'"))
     engagement_type_id = Column(Integer, ForeignKey("engagement_types.id"), nullable=True)
+    recipient_config = Column(JSONB, nullable=True)
 
 
 class NotificationService(Base):
@@ -53,7 +54,7 @@ class NotificationService(Base):
     service_key = Column(String, nullable=False, unique=True)
     display_name = Column(String, nullable=False)
     channel = Column(notification_channel_enum, nullable=False)
-    webhook_path = Column(String, nullable=False)
+    webhook_path = Column(String, nullable=False, server_default="")
     is_active = Column(Boolean, nullable=False, server_default="true")
     require_blood_report_url = Column(Boolean, nullable=False, server_default="false")
     require_bio_ai_report_url = Column(Boolean, nullable=False, server_default="false")

@@ -542,7 +542,7 @@ def _task_for_operation(category: str, path: str, method: str) -> str:
             return "dispatch"
         if "services" in path:
             return "services"
-        if "/bindings" in path or "/catalog" in path:
+        if "/bindings" in path or "/catalog" in path or "/whatsapp-templates" in path:
             return "defaults"
         if "event" in path:
             return "events"

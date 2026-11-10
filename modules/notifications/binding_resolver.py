@@ -23,6 +23,7 @@ class ResolvedBinding:
     recipient_type: str
     notification_services: list[dict]
     event_name: str
+    recipient_config: dict | None = None
 
 
 class BindingResolver:
@@ -75,6 +76,7 @@ class BindingResolver:
                             )
                         ),
                         event_name=ev.name,
+                        recipient_config=None,
                     )
                 ]
             return []
@@ -101,6 +103,9 @@ class BindingResolver:
                     recipient_type=row.recipient_type,
                     notification_services=services,
                     event_name=row.event_name,
+                    recipient_config=(
+                        row.recipient_config if isinstance(row.recipient_config, dict) else None
+                    ),
                 )
             )
         return resolved

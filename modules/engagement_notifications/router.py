@@ -18,6 +18,8 @@ from modules.engagement_notifications.schemas import (
     configs_to_api,
 )
 from modules.notifications.events_catalog import get_event
+from modules.notifications.binding_schemas import EngagementNotificationWizardPayload
+from modules.notifications.binding_wizard_service import NotificationBindingWizardService
 
 router = APIRouter(tags=["engagement-notifications"])
 
@@ -48,6 +50,20 @@ async def get_engagement_notifications(
             ).model_dump()
         )
     return success_response(data)
+
+
+@router.post("/engagements/{engagement_id}/notifications/wizard")
+async def save_engagement_notification_wizard(
+    engagement_id: int,
+    payload: EngagementNotificationWizardPayload,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+):
+    _ = employee
+    wizard = NotificationBindingWizardService()
+    result = await wizard.save_engagement_wizard(db, engagement_id, payload)
+    await db.commit()
+    return success_response(result)
 
 
 @router.put("/engagements/{engagement_id}/notifications")

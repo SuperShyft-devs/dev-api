@@ -29,7 +29,13 @@ from modules.notifications.schemas import (
     PrepareReportsRequest,
 )
 from modules.notifications.bindings_service import NotificationBindingsService
-from modules.notifications.binding_schemas import NotificationBindingCreate, NotificationBindingUpdate
+from modules.notifications.binding_schemas import (
+    NotificationBindingCreate,
+    NotificationBindingUpdate,
+    WizardBindingPayload,
+)
+from modules.notifications.binding_wizard_service import NotificationBindingWizardService
+from modules.notifications.whatsapp_template_proxy import WhatsappTemplateProxy
 from modules.notifications.service import NotificationsService
 from modules.users.dependencies import get_participant_journey_service
 from modules.users.participant_journey_service import ParticipantJourneyService
@@ -312,6 +318,52 @@ async def update_notification_binding(
 ):
     _ = employee
     row = await service.update_binding(db, binding_id, payload)
+    await db.commit()
+    return success_response(row.model_dump())
+
+
+def _wizard_service() -> NotificationBindingWizardService:
+    return NotificationBindingWizardService()
+
+
+def _template_proxy() -> WhatsappTemplateProxy:
+    return WhatsappTemplateProxy()
+
+
+@router.get("/whatsapp-templates")
+async def lookup_whatsapp_template(
+    name: str,
+    employee: EmployeeContext = Depends(get_current_employee),
+    proxy: WhatsappTemplateProxy = Depends(_template_proxy),
+):
+    _ = employee
+    result = await proxy.lookup(template_name=name)
+    return success_response(result)
+
+
+@router.post("/bindings/wizard", status_code=201)
+async def create_binding_wizard(
+    payload: WizardBindingPayload,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: NotificationBindingWizardService = Depends(_wizard_service),
+):
+    _ = employee
+    row = await service.create_binding_wizard(db, payload)
+    await db.commit()
+    return success_response(row.model_dump())
+
+
+@router.put("/bindings/wizard/{binding_id}")
+async def update_binding_wizard(
+    binding_id: int,
+    payload: WizardBindingPayload,
+    db: AsyncSession = Depends(get_db),
+    employee: EmployeeContext = Depends(get_current_employee),
+    service: NotificationBindingWizardService = Depends(_wizard_service),
+):
+    _ = employee
+    row = await service.update_binding_wizard(db, binding_id, payload)
     await db.commit()
     return success_response(row.model_dump())
 

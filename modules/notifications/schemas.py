@@ -83,7 +83,7 @@ class NotificationServiceCreate(BaseModel):
     service_key: ServiceKey
     display_name: SafeDisplayName
     channel: str = Field(..., pattern=r"^(email|whatsapp)$")
-    webhook_path: SafeText
+    webhook_path: SafeText = ""
     is_active: bool = True
     require_blood_report_url: bool = False
     require_bio_ai_report_url: bool = False

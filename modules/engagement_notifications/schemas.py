@@ -43,6 +43,7 @@ class EngagementNotificationsUpsertRequest(BaseModel):
 
 class NotificationDefaultItem(BaseModel):
     event_code: str = Field(min_length=1)
+    recipient_type: str | None = None
     notification_services: list[NotificationServiceConfigItem] = Field(default_factory=list)
 
     @field_validator("notification_services", mode="before")

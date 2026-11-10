@@ -66,10 +66,23 @@ class NotificationEngine:
         external_link = context.get("external_link")
 
         for binding in bindings:
+            emit_context = dict(context)
+            if binding.recipient_type == "custom" and binding.recipient_config:
+                contacts: list[dict] = []
+                for phone in binding.recipient_config.get("phones") or []:
+                    p = str(phone).strip()
+                    if p:
+                        contacts.append({"phone": p})
+                for email in binding.recipient_config.get("emails") or []:
+                    e = str(email).strip()
+                    if e:
+                        contacts.append({"email": e})
+                if contacts:
+                    emit_context["custom_contacts"] = contacts
             target = await self._recipient_resolver.resolve(
                 db,
                 recipient_type=binding.recipient_type,
-                context=context,
+                context=emit_context,
                 engagement_id=engagement_id,
             )
             if not target.user_ids and not target.contacts:
