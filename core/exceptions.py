@@ -41,6 +41,7 @@ def _map_status_to_error_code(status_code: int) -> str:
         401: "AUTH_FAILED",
         403: "FORBIDDEN",
         404: "NOT_FOUND",
+        405: "METHOD_NOT_ALLOWED",
         409: "CONFLICT",
         422: "INVALID_STATE",
         429: "RATE_LIMITED",
