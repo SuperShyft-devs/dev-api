@@ -78,6 +78,7 @@ async def partner_send_otp(
             delivery=delivery,
             request_phone=str(payload.phone) if payload.phone else None,
             request_email=str(payload.email) if payload.email else None,
+            notify_all_channels=payload.phone is not None,
         )
         await db.commit()
     return success_response({"session_id": session_id})

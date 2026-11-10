@@ -210,6 +210,7 @@ class PartnerAuthService:
         delivery: PartnerOtpDelivery,
         request_phone: str | None = None,
         request_email: str | None = None,
+        notify_all_channels: bool = False,
     ) -> None:
         from modules.notifications.otp_notification_emit import emit_auth_otp_sent
 
@@ -227,6 +228,7 @@ class PartnerAuthService:
                 "phone": delivery.phone or "",
                 "email": delivery.email or "",
             },
+            notify_all_channels=notify_all_channels,
         )
 
     async def verify_otp(
