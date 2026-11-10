@@ -23,6 +23,11 @@ from modules.notifications.bindings_service import NotificationBindingsService
 from modules.notifications.events_catalog import get_event
 from modules.notifications.models import NotificationService
 from modules.notifications.repository import NotificationsRepository
+from modules.notifications.emit_context_catalog import (
+    ALLOWED_USER_CONTEXT_KEYS,
+    default_user_context_key,
+    user_context_fields_for_event,
+)
 from modules.notifications.variable_catalog import KNOWN_RECIPIENT_TYPES
 
 
@@ -87,6 +92,19 @@ class NotificationBindingWizardService:
                     message="Custom recipient requires at least one phone or email",
                 )
             return {"phones": list(cfg.phones), "emails": list(cfg.emails)}
+        if rt == "user":
+            cfg = payload.recipient_config
+            key = (cfg.user_context_key if cfg else None) or default_user_context_key(
+                ev.code
+            )
+            allowed = {f["key"] for f in user_context_fields_for_event(ev.code)}
+            if key not in allowed or key not in ALLOWED_USER_CONTEXT_KEYS:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message=f"Invalid user_context_key '{key}' for event '{ev.code}'",
+                )
+            return {"user_context_key": key}
         if rt not in ev.default_recipients and rt not in (
             "assistants",
             "departments",

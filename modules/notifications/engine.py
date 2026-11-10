@@ -84,6 +84,7 @@ class NotificationEngine:
                 recipient_type=binding.recipient_type,
                 context=emit_context,
                 engagement_id=engagement_id,
+                recipient_config=binding.recipient_config,
             )
             if not target.user_ids and not target.contacts:
                 continue

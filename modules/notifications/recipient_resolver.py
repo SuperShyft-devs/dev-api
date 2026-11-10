@@ -34,10 +34,21 @@ class RecipientResolver:
         recipient_type: str,
         context: dict,
         engagement_id: int | None = None,
+        recipient_config: dict | None = None,
     ) -> DispatchTarget:
         rt = (recipient_type or "").strip()
 
         if rt == "user":
+            cfg = recipient_config if isinstance(recipient_config, dict) else {}
+            preferred = (cfg.get("user_context_key") or "").strip()
+            if preferred == "user_ids":
+                uids = context.get("user_ids")
+                if isinstance(uids, list) and uids:
+                    return DispatchTarget(user_ids=[int(x) for x in uids])
+            elif preferred:
+                uid = context.get(preferred)
+                if uid is not None:
+                    return DispatchTarget(user_ids=[int(uid)])
             uid = context.get("user_id") or context.get("participant_user_id")
             uids = context.get("user_ids")
             if uids:
