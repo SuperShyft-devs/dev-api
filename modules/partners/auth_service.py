@@ -203,19 +203,30 @@ class PartnerAuthService:
         )
         return created.session_id, delivery
 
-    async def deliver_otp(self, db: AsyncSession, *, delivery: PartnerOtpDelivery) -> None:
-        await self._notifications_service.dispatch_to_contacts(
+    async def deliver_otp(
+        self,
+        db: AsyncSession,
+        *,
+        delivery: PartnerOtpDelivery,
+        request_phone: str | None = None,
+        request_email: str | None = None,
+    ) -> None:
+        from modules.notifications.otp_notification_emit import emit_auth_otp_sent
+
+        phone = (request_phone or delivery.phone or "").strip() or None
+        email = (request_email or delivery.email or "").strip() or None
+        await emit_auth_otp_sent(
             db,
-            service_key=delivery.service_key,
-            contacts=[
-                {
-                    "first_name": delivery.name,
-                    "last_name": "",
-                    "phone": delivery.phone or "",
-                    "email": delivery.email or "",
-                }
-            ],
             otp=delivery.otp,
+            service_key=delivery.service_key,
+            phone=phone,
+            email=email,
+            staff={
+                "partner_id": delivery.partner_id,
+                "name": delivery.name,
+                "phone": delivery.phone or "",
+                "email": delivery.email or "",
+            },
         )
 
     async def verify_otp(

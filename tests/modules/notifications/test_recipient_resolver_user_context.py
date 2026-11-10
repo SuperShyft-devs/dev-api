@@ -54,6 +54,30 @@ async def test_user_recipient_resolves_phone_from_context(test_db_session, monke
 
 
 @pytest.mark.asyncio
+async def test_user_recipient_contact_fallback_for_staff_phone(test_db_session):
+    class _FakeUsers:
+        async def get_user_by_phone(self, db, phone):
+            return None
+
+        async def get_user_by_email(self, db, email):
+            return None
+
+    resolver = RecipientResolver(users_repository=_FakeUsers())
+    target = await resolver.resolve(
+        test_db_session,
+        recipient_type="user",
+        context={
+            "phone": "8762830757",
+            "participant_details": {"staff": {"employee_id": 9, "name": "Admin User"}},
+        },
+        recipient_config={"user_context_key": "phone"},
+    )
+    assert not target.user_ids
+    assert target.contacts and target.contacts[0]["phone"] == "8762830757"
+    assert target.contacts[0]["employee_id"] == 9
+
+
+@pytest.mark.asyncio
 async def test_user_recipient_falls_back_without_config(test_db_session):
     resolver = RecipientResolver()
     target = await resolver.resolve(

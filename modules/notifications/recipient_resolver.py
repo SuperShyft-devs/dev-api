@@ -54,6 +54,9 @@ class RecipientResolver:
                 )
                 if lookup is not None:
                     return DispatchTarget(user_ids=[lookup])
+                contact = self._contact_from_context(context, preferred)
+                if contact:
+                    return DispatchTarget(contacts=[contact])
             elif preferred:
                 uid = context.get(preferred)
                 if uid is not None:
@@ -128,6 +131,37 @@ class RecipientResolver:
             return DispatchTarget()
 
         return DispatchTarget()
+
+    def _contact_from_context(self, context: dict, kind: str) -> dict | None:
+        pd = context.get("participant_details")
+        staff = pd.get("staff") if isinstance(pd, dict) else None
+        if not isinstance(staff, dict):
+            staff = {}
+        raw = context.get(kind) or staff.get(kind)
+        if raw is None:
+            return None
+        value = str(raw).strip()
+        if not value:
+            return None
+        name = str(staff.get("name") or "").strip()
+        parts = name.split(None, 1) if name else []
+        first_name = parts[0] if parts else ""
+        last_name = parts[1] if len(parts) > 1 else ""
+        contact: dict = {
+            "first_name": first_name,
+            "last_name": last_name,
+            "phone": value if kind == "phone" else str(staff.get("phone") or context.get("phone") or "").strip(),
+            "email": value if kind == "email" else str(staff.get("email") or context.get("email") or "").strip(),
+        }
+        if staff.get("employee_id") is not None:
+            contact["employee_id"] = int(staff["employee_id"])
+        if staff.get("partner_id") is not None:
+            contact["partner_id"] = int(staff["partner_id"])
+        if kind == "phone" and not contact["phone"]:
+            return None
+        if kind == "email" and not contact["email"]:
+            return None
+        return contact
 
     async def _user_id_from_contact(
         self,
