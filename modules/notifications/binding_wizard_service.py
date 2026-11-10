@@ -11,6 +11,7 @@ from core.exceptions import AppError
 from modules.engagement_notifications.repository import EngagementNotificationsRepository
 from modules.engagement_notifications.service_config import (
     NotificationServiceConfigItem,
+    normalize_notification_services,
     serialize_for_db,
 )
 from modules.notifications.binding_schemas import (
@@ -175,6 +176,41 @@ class NotificationBindingWizardService:
         )
         return await self._notifications_repo.create_service(db, svc)
 
+    async def _binding_for_scope(
+        self,
+        db: AsyncSession,
+        *,
+        event_code: str,
+        recipient_type: str,
+        engagement_type_id: int | None,
+    ):
+        rt = recipient_type.strip()
+        rows = await self._bindings_repo.list_for_event(
+            db,
+            event_code=event_code,
+            engagement_type_id=engagement_type_id,
+        )
+        for row in rows:
+            if row.recipient_type != rt:
+                continue
+            if engagement_type_id is None:
+                if row.engagement_type_id is None:
+                    return row
+            elif row.engagement_type_id == engagement_type_id:
+                return row
+        return None
+
+    def _merge_service_keys(
+        self,
+        existing_services: list | None,
+        service_key: str,
+    ) -> list[NotificationServiceConfigItem]:
+        configs = normalize_notification_services(existing_services)
+        keys = {c.service_key for c in configs}
+        if service_key and service_key not in keys:
+            configs.append(NotificationServiceConfigItem(service_key=service_key))
+        return configs
+
     async def create_binding_wizard(
         self, db: AsyncSession, payload: WizardBindingPayload
     ) -> NotificationBindingResponse:
@@ -187,27 +223,59 @@ class NotificationBindingWizardService:
             )
         recipient_config = self._validate_recipient(payload, ev)
         svc = await self._ensure_service(db, event_code=payload.event_code, spec=payload.service)
+        rt = payload.recipient_type.strip()
+        existing = await self._binding_for_scope(
+            db,
+            event_code=payload.event_code,
+            recipient_type=rt,
+            engagement_type_id=payload.engagement_type_id,
+        )
+        merged = self._merge_service_keys(existing.notification_services if existing else None, svc.service_key)
+        if existing is not None:
+            row = await self._bindings_repo.update(
+                db,
+                existing,
+                event_name=ev.name,
+                recipient_type=rt,
+                notification_services=serialize_for_db(merged),
+                recipient_config=recipient_config,
+            )
+            return self._bindings_service._to_response(row)
         try:
             row = await self._bindings_repo.create(
                 db,
                 event_code=payload.event_code,
                 event_name=ev.name,
-                recipient_type=payload.recipient_type.strip(),
-                notification_services=serialize_for_db(
-                    [NotificationServiceConfigItem(service_key=svc.service_key)]
-                ),
+                recipient_type=rt,
+                notification_services=serialize_for_db(merged),
                 engagement_type_id=payload.engagement_type_id,
                 recipient_config=recipient_config,
             )
         except IntegrityError as exc:
-            raise AppError(
-                status_code=409,
-                error_code="CONFLICT",
-                message=(
-                    "A binding already exists for this event, recipient type, "
-                    "and engagement scope. Edit the existing binding instead."
-                ),
-            ) from exc
+            existing = await self._binding_for_scope(
+                db,
+                event_code=payload.event_code,
+                recipient_type=rt,
+                engagement_type_id=payload.engagement_type_id,
+            )
+            if existing is None:
+                raise AppError(
+                    status_code=409,
+                    error_code="CONFLICT",
+                    message=(
+                        "A binding already exists for this event, recipient type, "
+                        "and engagement scope. Edit the existing binding instead."
+                    ),
+                ) from exc
+            merged = self._merge_service_keys(existing.notification_services, svc.service_key)
+            row = await self._bindings_repo.update(
+                db,
+                existing,
+                event_name=ev.name,
+                recipient_type=rt,
+                notification_services=serialize_for_db(merged),
+                recipient_config=recipient_config,
+            )
         return self._bindings_service._to_response(row)
 
     async def update_binding_wizard(
@@ -225,14 +293,13 @@ class NotificationBindingWizardService:
             )
         recipient_config = self._validate_recipient(payload, ev)
         svc = await self._ensure_service(db, event_code=payload.event_code, spec=payload.service)
+        merged = self._merge_service_keys(row.notification_services, svc.service_key)
         updated = await self._bindings_repo.update(
             db,
             row,
             event_name=ev.name,
             recipient_type=payload.recipient_type.strip(),
-            notification_services=serialize_for_db(
-                [NotificationServiceConfigItem(service_key=svc.service_key)]
-            ),
+            notification_services=serialize_for_db(merged),
             recipient_config=recipient_config,
         )
         if payload.engagement_type_id is not None:

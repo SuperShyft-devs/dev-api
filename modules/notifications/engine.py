@@ -89,7 +89,10 @@ class NotificationEngine:
             if not target.user_ids and not target.contacts:
                 continue
 
+            preferred_service_key = str(emit_context.get("service_key") or "").strip()
             for service_key in extract_service_keys(binding.notification_services):
+                if preferred_service_key and service_key != preferred_service_key:
+                    continue
                 try:
                     svc = await self._notifications_repository.get_service_by_key(
                         db, service_key=service_key
