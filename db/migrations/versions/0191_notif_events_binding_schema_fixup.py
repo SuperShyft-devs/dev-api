@@ -8,7 +8,7 @@ from __future__ import annotations
 from alembic import op
 from sqlalchemy import text
 
-revision = "0191_notif_events_binding_schema_fixup"
+revision = "0191_notif_binding_fixup"
 down_revision = "0190_notif_recipient_config"
 branch_labels = None
 depends_on = None
