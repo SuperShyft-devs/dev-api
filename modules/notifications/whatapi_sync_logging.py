@@ -57,6 +57,7 @@ async def log_whatapi_get_message_templates(
             "api_name": "message_templates",
             "url": url,
             "query": {"name": (template_name or "").strip()},
+            "call_order": 1,
             **({"notification_id": notification_id} if notification_id is not None else {}),
         },
     )
@@ -73,6 +74,7 @@ async def log_whatapi_get_message_templates(
                 "api_name": "message_templates",
                 "url": url,
                 "query": {"name": (template_name or "").strip()},
+                "call_order": 1,
                 **({"notification_id": notification_id} if notification_id is not None else {}),
             },
             response_payload=compact_template_response(body),

@@ -185,20 +185,7 @@ class DirectNotificationDispatch:
             template_label = (svc.template_name or "").strip()
             fetch_url = message_templates_request_url(template_name=template_label)
             send_url = send_messages_request_url()
-            sync_log_id = await persist_integration_sync_log_isolated(
-                provider="whatapi",
-                api_url=send_url,
-                engagement_id=engagement_id,
-                user_id=sync_log_user_id,
-                request_payload={
-                    "http_method": "POST",
-                    "api_name": "messages",
-                    "url": send_url,
-                    "notification_id": notification_id,
-                    "phone": phone,
-                    "template_name": template_label,
-                },
-            )
+            sync_log_id: int | None = None
 
             sent_via_post = False
             try:
@@ -217,6 +204,21 @@ class DirectNotificationDispatch:
                     member=member,
                     participant_details=participant_details,
                     template_body=template_body,
+                )
+                sync_log_id = await persist_integration_sync_log_isolated(
+                    provider="whatapi",
+                    api_url=send_url,
+                    engagement_id=engagement_id,
+                    user_id=sync_log_user_id,
+                    request_payload={
+                        "http_method": "POST",
+                        "api_name": "messages",
+                        "url": send_url,
+                        "notification_id": notification_id,
+                        "phone": phone,
+                        "template_name": template_name,
+                        "call_order": 2,
+                    },
                 )
                 send_result = await self._client.send_template_message(
                     to=normalize_whatsapp_phone(phone),
@@ -247,6 +249,8 @@ class DirectNotificationDispatch:
                         "api_name": "messages",
                         "url": send_url,
                         "body": send_body,
+                        "notification_id": notification_id,
+                        "call_order": 2,
                     },
                     response_payload={
                         "queue_id": send_result.get("queue_id"),
@@ -262,20 +266,23 @@ class DirectNotificationDispatch:
                     else ""
                 )
                 failed_is_get = failed_url.endswith("message_templates") or "message_templates" in failed_url
-                await finalize_integration_sync_log_isolated(
-                    sync_log_id=sync_log_id,
-                    status="failed",
-                    api_endpoint_url=failed_url or (fetch_url if failed_is_get else send_url),
-                    error_message=err_msg,
-                    request_payload={
-                        "http_method": "GET" if failed_is_get else "POST",
-                        "api_name": "message_templates" if failed_is_get else "messages",
-                        "url": failed_url or (fetch_url if failed_is_get else send_url),
-                        "template_name": template_label,
-                        "phone": phone,
-                    },
-                    response_payload=err_payload,
-                )
+                if sync_log_id is not None:
+                    await finalize_integration_sync_log_isolated(
+                        sync_log_id=sync_log_id,
+                        status="failed",
+                        api_endpoint_url=failed_url or (fetch_url if failed_is_get else send_url),
+                        error_message=err_msg,
+                        request_payload={
+                            "http_method": "GET" if failed_is_get else "POST",
+                            "api_name": "message_templates" if failed_is_get else "messages",
+                            "url": failed_url or (fetch_url if failed_is_get else send_url),
+                            "template_name": template_label,
+                            "phone": phone,
+                            "notification_id": notification_id,
+                            "call_order": 2 if not failed_is_get else 1,
+                        },
+                        response_payload=err_payload,
+                    )
 
                 fb_phone = normalize_whatsapp_phone(phone)
                 fb_media = (
