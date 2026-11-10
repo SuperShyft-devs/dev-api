@@ -16,6 +16,7 @@ from modules.notifications.binding_schemas import (
     NotificationBindingUpdate,
 )
 from modules.notifications.bindings_repository import NotificationBindingsRepository
+from modules.notifications.repository import NotificationsRepository
 from modules.notifications.events_catalog import get_event, list_events
 from modules.notifications.variable_catalog import RECIPIENT_PAYLOAD_HINTS, fields_for_groups
 from modules.notifications.binding_schemas import CatalogEventResponse
@@ -72,11 +73,19 @@ class NotificationBindingsService:
             notification_services=[c.model_dump() for c in payload.notification_services],
             event_label=payload.event_code,
         )
+        delivery_channel = "unknown"
+        if configs:
+            svc_row = await NotificationsRepository().get_service_by_key(
+                db, service_key=configs[0].service_key
+            )
+            if svc_row is not None and svc_row.channel:
+                delivery_channel = str(svc_row.channel).strip().lower()
         row = await self._repo.create(
             db,
             event_code=payload.event_code,
             event_name=payload.event_name,
             recipient_type=payload.recipient_type,
+            delivery_channel=delivery_channel,
             notification_services=serialize_for_db(configs),
             engagement_type_id=payload.engagement_type_id,
         )
@@ -120,11 +129,15 @@ class NotificationBindingsService:
         normalized = normalize_notification_services(row.notification_services)
         services = serialize_for_db(normalized)
         service_key = normalized[0].service_key if normalized else None
+        delivery_channel = (
+            str(getattr(row, "delivery_channel", "") or "").strip().lower() or "unknown"
+        )
         return NotificationBindingResponse(
             id=row.id,
             event_code=row.event_code,
             event_name=row.event_name,
             recipient_type=row.recipient_type,
+            delivery_channel=delivery_channel,
             notification_services=services,
             engagement_type_id=row.engagement_type_id,
             recipient_config=row.recipient_config if hasattr(row, "recipient_config") else None,

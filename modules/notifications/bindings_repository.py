@@ -19,6 +19,7 @@ class NotificationBindingsRepository:
         q = select(NotificationEventBinding).order_by(
             NotificationEventBinding.event_code.asc(),
             NotificationEventBinding.recipient_type.asc(),
+            NotificationEventBinding.delivery_channel.asc(),
             NotificationEventBinding.id.asc(),
         )
         if event_code is not None:
@@ -34,17 +35,19 @@ class NotificationBindingsRepository:
         )
         return result.scalar_one_or_none()
 
-    async def find_unique_binding(
+    async def find_binding_by_slot(
         self,
         db: AsyncSession,
         *,
         event_code: str,
         recipient_type: str,
         engagement_type_id: int | None,
+        delivery_channel: str,
     ) -> NotificationEventBinding | None:
         q = select(NotificationEventBinding).where(
             NotificationEventBinding.event_code == event_code,
             NotificationEventBinding.recipient_type == recipient_type,
+            NotificationEventBinding.delivery_channel == delivery_channel,
         )
         if engagement_type_id is None:
             q = q.where(NotificationEventBinding.engagement_type_id.is_(None))
@@ -61,6 +64,7 @@ class NotificationBindingsRepository:
         event_name: str,
         recipient_type: str,
         notification_services: list,
+        delivery_channel: str,
         engagement_type_id: int | None = None,
         recipient_config: dict | None = None,
     ) -> NotificationEventBinding:
@@ -68,6 +72,7 @@ class NotificationBindingsRepository:
             event_code=event_code,
             event_name=event_name,
             recipient_type=recipient_type,
+            delivery_channel=delivery_channel,
             notification_services=notification_services,
             engagement_type_id=engagement_type_id,
             recipient_config=recipient_config,
@@ -86,11 +91,14 @@ class NotificationBindingsRepository:
         notification_services: list | None = None,
         engagement_type_id: int | None = None,
         recipient_config: dict | None = None,
+        delivery_channel: str | None = None,
     ) -> NotificationEventBinding:
         if event_name is not None:
             binding.event_name = event_name
         if recipient_type is not None:
             binding.recipient_type = recipient_type
+        if delivery_channel is not None:
+            binding.delivery_channel = delivery_channel
         if notification_services is not None:
             binding.notification_services = notification_services
         if recipient_config is not None:
@@ -116,6 +124,10 @@ class NotificationBindingsRepository:
             )
         else:
             q = q.where(NotificationEventBinding.engagement_type_id.is_(None))
-        q = q.order_by(NotificationEventBinding.engagement_type_id.desc().nullslast())
+        q = q.order_by(
+            NotificationEventBinding.engagement_type_id.desc().nullslast(),
+            NotificationEventBinding.delivery_channel.asc(),
+            NotificationEventBinding.id.asc(),
+        )
         result = await db.execute(q)
         return list(result.scalars().all())

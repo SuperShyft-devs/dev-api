@@ -27,6 +27,7 @@ class NotificationBindingResponse(BaseModel):
     event_code: str
     event_name: str
     recipient_type: str
+    delivery_channel: str
     notification_services: list[dict]
     engagement_type_id: int | None = None
     recipient_config: dict | None = None

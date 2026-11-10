@@ -94,14 +94,21 @@ async def seed_family_onboard_onboarding_notification_setup(
         text(
             """
             INSERT INTO notification_events (
-                event_code, event_name, recipient_type, notification_services, engagement_type_id
+                event_code, event_name, recipient_type, notification_services,
+                engagement_type_id, delivery_channel
             )
-            VALUES ('users.onboarded', 'User onboarded', 'assistants', CAST(:services AS json), :type_id)
+            VALUES (
+                'users.onboarded', 'User onboarded', 'assistants', CAST(:services AS json), :type_id,
+                COALESCE(
+                    (SELECT channel::text FROM notification_services WHERE service_key = :service_key),
+                    'unknown'
+                )
+            )
             ON CONFLICT ON CONSTRAINT uq_notification_events_binding DO UPDATE
             SET notification_services = EXCLUDED.notification_services
             """
         ),
-        {"type_id": type_id, "services": services_json},
+        {"type_id": type_id, "services": services_json, "service_key": service_key},
     )
     await seed_employee(
         test_db_session,

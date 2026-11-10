@@ -218,20 +218,25 @@ async def test_support_notify_noop_when_no_assistants(test_db_session, monkeypat
         text(
             """
             INSERT INTO notification_events (
-                event_code, event_name, recipient_type, notification_services, engagement_type_id
+                event_code, event_name, recipient_type, notification_services,
+                engagement_type_id, delivery_channel
             )
             VALUES (
                 'support.ticket_created',
                 'Support ticket created',
                 'departments.ops',
                 CAST(:services AS json),
-                NULL
+                NULL,
+                COALESCE(
+                    (SELECT channel::text FROM notification_services WHERE service_key = :service_key),
+                    'unknown'
+                )
             )
             ON CONFLICT ON CONSTRAINT uq_notification_events_binding DO UPDATE
             SET notification_services = EXCLUDED.notification_services
             """
         ),
-        {"services": json.dumps([{"service_key": service_key}])},
+        {"services": json.dumps([{"service_key": service_key}]), "service_key": service_key},
     )
     await test_db_session.commit()
 

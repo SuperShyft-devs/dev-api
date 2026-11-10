@@ -90,11 +90,7 @@ class BindingResolver:
                 override_services = en.notification_services
 
         resolved: list[ResolvedBinding] = []
-        seen_recipient: set[str] = set()
         for row in bindings:
-            if row.recipient_type in seen_recipient:
-                continue
-            seen_recipient.add(row.recipient_type)
             services = override_services if override_services is not None else row.notification_services
             if not extract_service_keys(services):
                 continue

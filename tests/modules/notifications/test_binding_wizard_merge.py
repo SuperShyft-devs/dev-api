@@ -1,4 +1,4 @@
-"""Wizard create merges services onto an existing recipient binding."""
+"""Wizard creates one binding row per delivery channel."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from modules.notifications.models import NotificationEventBinding, NotificationS
 
 
 @pytest.mark.asyncio
-async def test_create_binding_wizard_merges_second_channel(test_db_session):
+async def test_create_binding_wizard_separate_channel_rows(test_db_session):
     suffix = uuid.uuid4().hex[:8]
     wa = NotificationService(
         service_key=f"test-wa-{suffix}",
@@ -63,9 +63,9 @@ async def test_create_binding_wizard_merges_second_channel(test_db_session):
     )
     await test_db_session.commit()
 
-    assert first.id == second.id
-    keys = {s["service_key"] for s in second.notification_services}
-    assert keys == {wa.service_key, em.service_key}
+    assert first.id != second.id
+    assert first.delivery_channel == "whatsapp"
+    assert second.delivery_channel == "email"
 
     rows = (
         await test_db_session.execute(
@@ -75,4 +75,4 @@ async def test_create_binding_wizard_merges_second_channel(test_db_session):
             )
         )
     ).scalars().all()
-    assert len(rows) == 1
+    assert len(rows) == 2
