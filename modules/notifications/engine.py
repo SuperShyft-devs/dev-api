@@ -29,8 +29,9 @@ class NotificationEngine:
         binding_resolver: BindingResolver | None = None,
         recipient_resolver: RecipientResolver | None = None,
     ) -> None:
-        self._notifications_service = notifications_service or NotificationsService()
-        self._notifications_repository = notifications_repository or NotificationsRepository()
+        repo = notifications_repository or NotificationsRepository()
+        self._notifications_repository = repo
+        self._notifications_service = notifications_service or NotificationsService(repository=repo)
         self._binding_resolver = binding_resolver or BindingResolver()
         self._recipient_resolver = recipient_resolver or RecipientResolver()
 
@@ -150,8 +151,20 @@ _engine: NotificationEngine | None = None
 def get_notification_engine() -> NotificationEngine:
     global _engine
     if _engine is None:
-        _engine = NotificationEngine()
+        from modules.notifications.dependencies import get_notifications_service
+
+        svc = get_notifications_service()
+        _engine = NotificationEngine(
+            notifications_service=svc,
+            notifications_repository=svc._repo,
+        )
     return _engine
+
+
+def reset_notification_engine() -> None:
+    """Clear singleton (tests only)."""
+    global _engine
+    _engine = None
 
 
 async def emit_system_error(

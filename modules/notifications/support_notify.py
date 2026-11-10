@@ -7,9 +7,14 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.notifications.engine import get_notification_engine
+from modules.platform_settings.repository import PlatformSettingsRepository
 from modules.support.models import SupportTicket
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_service_keys(raw: str | None) -> list[str]:
+    return [k.strip() for k in (raw or "").split(",") if k.strip()]
 
 
 def participant_details_from_support_ticket(
@@ -36,14 +41,21 @@ async def notify_default_onboarding_assistants_on_support_query(
     *,
     notifications_service=None,
     notifications_repository=None,
-    platform_settings_repository=None,
+    platform_settings_repository: PlatformSettingsRepository | None = None,
     ticket: SupportTicket,
     user,
 ) -> None:
     """Emit support.ticket_created for default staff assistants."""
     _ = notifications_service
     _ = notifications_repository
-    _ = platform_settings_repository
+    platform_settings_repository = platform_settings_repository or PlatformSettingsRepository()
+    settings_row = await platform_settings_repository.get_by_id(db)
+    fallback_keys = _parse_service_keys(
+        getattr(settings_row, "default_support_query_notification", None) if settings_row else None
+    )
+    if not fallback_keys:
+        return
+
     details = participant_details_from_support_ticket(user, ticket=ticket)
     try:
         await get_notification_engine().emit(
@@ -52,6 +64,7 @@ async def notify_default_onboarding_assistants_on_support_query(
             context={
                 "participant_details": details,
                 "user_id": ticket.user_id,
+                "fallback_service_keys": fallback_keys,
             },
         )
     except Exception as exc:

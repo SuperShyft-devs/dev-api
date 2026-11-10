@@ -99,37 +99,16 @@ async def test_support_notify_dispatches_to_default_assistants(test_db_session, 
     test_db_session.add(ticket)
     await test_db_session.flush()
 
-    import json
+    from modules.notifications.engine import get_notification_engine, reset_notification_engine
 
-    await test_db_session.execute(
-        text(
-            """
-            INSERT INTO notification_events (
-                event_code, event_name, recipient_type, notification_services, engagement_type_id
-            )
-            VALUES (
-                'support.ticket_created',
-                'Support ticket created',
-                'employees',
-                CAST(:services AS json),
-                NULL
-            )
-            ON CONFLICT ON CONSTRAINT uq_notification_events_binding DO UPDATE
-            SET notification_services = EXCLUDED.notification_services
-            """
-        ),
-        {"services": json.dumps([{"service_key": service_key}])},
-    )
-    await test_db_session.commit()
-
-    from modules.notifications.engine import get_notification_engine
-
+    reset_notification_engine()
     dispatch_mock = AsyncMock(return_value={"notification_id": 1})
     engine = get_notification_engine()
     monkeypatch.setattr(engine._notifications_service, "dispatch_to_contacts", dispatch_mock)
 
     await notify_default_onboarding_assistants_on_support_query(
         test_db_session,
+        platform_settings_repository=PlatformSettingsRepository(),
         ticket=ticket,
         user=user,
     )
@@ -176,14 +155,16 @@ async def test_support_notify_noop_when_no_service_keys(test_db_session, monkeyp
     test_db_session.add(ticket)
     await test_db_session.flush()
 
-    from modules.notifications.engine import get_notification_engine
+    from modules.notifications.engine import get_notification_engine, reset_notification_engine
 
+    reset_notification_engine()
     dispatch_mock = AsyncMock()
     engine = get_notification_engine()
     monkeypatch.setattr(engine._notifications_service, "dispatch_to_contacts", dispatch_mock)
 
     await notify_default_onboarding_assistants_on_support_query(
         test_db_session,
+        platform_settings_repository=PlatformSettingsRepository(),
         ticket=ticket,
         user=user,
     )
@@ -245,14 +226,16 @@ async def test_support_notify_noop_when_no_assistants(test_db_session, monkeypat
     )
     await test_db_session.commit()
 
-    from modules.notifications.engine import get_notification_engine
+    from modules.notifications.engine import get_notification_engine, reset_notification_engine
 
+    reset_notification_engine()
     dispatch_mock = AsyncMock()
     engine = get_notification_engine()
     monkeypatch.setattr(engine._notifications_service, "dispatch_to_contacts", dispatch_mock)
 
     await notify_default_onboarding_assistants_on_support_query(
         test_db_session,
+        platform_settings_repository=PlatformSettingsRepository(),
         ticket=ticket,
         user=user,
     )

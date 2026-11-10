@@ -56,7 +56,10 @@ class BindingResolver:
             event_code=event_code,
             engagement_type_id=engagement_type_id,
         )
-        if not bindings:
+        has_configured_services = any(
+            extract_service_keys(row.notification_services) for row in bindings
+        )
+        if not bindings or not has_configured_services:
             fallback_services = ctx.get("fallback_service_keys") or []
             if isinstance(fallback_services, str):
                 fallback_services = [fallback_services]
