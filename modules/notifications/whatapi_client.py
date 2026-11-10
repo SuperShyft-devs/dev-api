@@ -21,18 +21,19 @@ def _whatapi_base() -> str:
     return base
 
 
-def _auth_headers() -> dict[str, str]:
-    token = (settings.WHATAPI_ACCESS_TOKEN or "").strip()
-    if not token:
+def _whatapi_api_key() -> str:
+    key = (settings.WHATAPI_API_KEY or settings.WHATAPI_ACCESS_TOKEN or "").strip()
+    if not key:
         raise AppError(
             status_code=500,
             error_code="CONFIG_ERROR",
-            message="WHATAPI_ACCESS_TOKEN is not configured",
+            message="WHATAPI_API_KEY or WHATAPI_ACCESS_TOKEN is not configured",
         )
-    return {
-        "Authorization": f"Bearer {token}",
-        "API-KEY": token,
-    }
+    return key
+
+
+def _auth_headers() -> dict[str, str]:
+    return {"API-KEY": _whatapi_api_key()}
 
 
 def _meta_path(*parts: str) -> str:

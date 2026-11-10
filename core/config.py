@@ -199,6 +199,7 @@ class Settings:
     WHATAPI_DOMAIN: str = os.getenv("WHATAPI_DOMAIN", "").rstrip("/")
     WHATAPI_VERSION: str = os.getenv("WHATAPI_VERSION", "v19.0")
     WHATAPI_ACCESS_TOKEN: str = os.getenv("WHATAPI_ACCESS_TOKEN", "")
+    WHATAPI_API_KEY: str = os.getenv("WHATAPI_API_KEY", "")
     WHATAPI_WABA_ID: str = os.getenv("WHATAPI_WABA_ID", "")
     WHATAPI_PHONE_NUMBER_ID: str = os.getenv("WHATAPI_PHONE_NUMBER_ID", "")
     WHATAPI_TIMEOUT_SECONDS: int = int(os.getenv("WHATAPI_TIMEOUT_SECONDS", "15"))
