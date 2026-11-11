@@ -126,66 +126,23 @@ class EngagementNotificationsRepository:
         engagement_id: int,
         engagement_type_id: int,
     ) -> list[EngagementNotification]:
-        """Auto-populate engagement_notifications from type-level + global bindings."""
-        type_rows = await self.list_defaults_for_type(db, engagement_type_id)
-        all_bindings = await self._bindings_repo.list_all(db)
-        global_rows = [r for r in all_bindings if r.engagement_type_id is None]
-        type_event_codes = {r.event_code for r in type_rows}
-        sources = list(type_rows)
-        for row in global_rows:
-            if row.event_code not in type_event_codes:
-                sources.append(row)
+        """Auto-populate engagement_notifications from global bindings + applicability."""
+        del engagement_type_id
+        from modules.engagements.models import Engagement
+        from modules.engagement_notifications.notification_setup import (
+            collect_global_default_services_for_applicable,
+        )
+        from modules.notifications.event_applicability import profile_from_engagement
 
-        by_event: dict[str, list] = {}
-        for row in sources:
-            if row.event_code not in _ENGAGEMENT_SCOPED_EVENT_CODES:
-                continue
-            configs = normalize_notification_services(row.notification_services)
-            if not configs:
-                continue
-            bucket = by_event.setdefault(row.event_code, [])
-            seen = {c.service_key for c in bucket}
-            for cfg in configs:
-                if cfg.service_key and cfg.service_key not in seen:
-                    seen.add(cfg.service_key)
-                    bucket.append(cfg)
-
-        items: list[dict] = []
-        for event_code, configs in sorted(by_event.items()):
-            if not configs:
-                continue
-            keys = [c.service_key for c in configs if c.service_key]
-            if not keys:
-                continue
-            result = await db.execute(
-                select(NotificationService).where(NotificationService.service_key.in_(keys))
-            )
-            services_by_key = {svc.service_key: svc for svc in result.scalars().all()}
-            filtered = []
-            for cfg in configs:
-                svc = services_by_key.get(cfg.service_key)
-                if svc is None:
-                    continue
-                link = cfg.external_link
-                if svc.require_external_link and not (link and str(link).strip()):
-                    link = "https://app.supershyft.com"
-                filtered.append(
-                    NotificationServiceConfigItem(
-                        service_key=cfg.service_key,
-                        external_link=link,
-                    )
-                )
-            if not filtered:
-                continue
-            items.append(
-                {
-                    "event_code": event_code,
-                    "notification_services": serialize_for_db(filtered),
-                }
-            )
-        if not items:
+        engagement = await db.get(Engagement, engagement_id)
+        if engagement is None:
             return []
-        return await self.upsert_for_engagement(db, engagement_id, items)
+        profile = await profile_from_engagement(db, engagement)
+        items = await collect_global_default_services_for_applicable(db, profile)
+        scoped = [i for i in items if i["event_code"] in _ENGAGEMENT_SCOPED_EVENT_CODES]
+        if not scoped:
+            return []
+        return await self.upsert_for_engagement(db, engagement_id, scoped)
 
     async def list_defaults_for_type(
         self,

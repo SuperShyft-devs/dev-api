@@ -71,6 +71,13 @@ class NotificationDefaultsUpsertRequest(BaseModel):
     defaults: list[NotificationDefaultItem] = Field(default_factory=list)
 
 
+class NotificationSetupPreviewRequest(BaseModel):
+    engagement_kind: str = Field(min_length=1)
+    blood_collection_type: str | None = None
+    auto_booking: bool | None = None
+    consultation_mode: str | None = None
+
+
 __all__ = [
     "EngagementNotificationItem",
     "EngagementNotificationResponse",

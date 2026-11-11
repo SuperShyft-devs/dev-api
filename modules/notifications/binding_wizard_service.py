@@ -229,6 +229,12 @@ class NotificationBindingWizardService:
                 error_code="INVALID_INPUT",
                 message=f"Unknown event_code '{payload.event_code}'",
             )
+        if payload.engagement_type_id is not None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Global bindings must not set engagement_type_id; use Notifications for defaults only.",
+            )
         recipient_config = self._validate_recipient(payload, ev)
         condition_key, emit_condition = self._validate_emit_condition(payload, ev)
         recipient_type = payload.recipient_type.strip()
@@ -284,6 +290,12 @@ class NotificationBindingWizardService:
             )
         recipient_config = self._validate_recipient(payload, ev)
         condition_key, emit_condition = self._validate_emit_condition(payload, ev)
+        if payload.engagement_type_id is not None:
+            raise AppError(
+                status_code=400,
+                error_code="INVALID_INPUT",
+                message="Global bindings must not set engagement_type_id.",
+            )
         delivery_channel = payload.service.channel.strip().lower()
         svc = await self._ensure_service(db, event_code=payload.event_code, spec=payload.service)
         updated = await self._bindings_repo.update(
@@ -299,9 +311,6 @@ class NotificationBindingWizardService:
             condition_key=condition_key,
             emit_condition=emit_condition,
         )
-        if payload.engagement_type_id is not None:
-            updated.engagement_type_id = payload.engagement_type_id
-            await db.flush()
         return self._bindings_service._to_response(updated)
 
     async def save_engagement_wizard(

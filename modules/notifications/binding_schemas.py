@@ -72,6 +72,8 @@ class CatalogEventResponse(BaseModel):
     trigger_kind: Literal["http", "cron", "webhook", "internal"] = "http"
     allows_payload_recipient: bool = False
     payload_contact_fields: list[PayloadContactFieldResponse] = Field(default_factory=list)
+    catalog_groups: list[str] = Field(default_factory=list)
+    show_on_engagement_wizard: bool = False
 
 
 class RecipientConfigPayload(BaseModel):
