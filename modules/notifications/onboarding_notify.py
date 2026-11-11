@@ -72,7 +72,7 @@ async def notify_onboarding_assistants_on_enrollment(
     participant_user_id: int,
     participant_details: dict[str, str] | None,
 ) -> None:
-    """Emit users.onboarded for onboarding assistants."""
+    """Emit ``users.onboarded`` for every global/engagement binding (participant + assistants, etc.)."""
     _ = notifications_service
     _ = notifications_repository
     _ = engagements_repository
@@ -84,7 +84,6 @@ async def notify_onboarding_assistants_on_enrollment(
             db,
             event_code="users.onboarded",
             engagement_id=engagement_id,
-            recipient_types=["assistants"],
             context={
                 "participant_user_id": participant_user_id,
                 "participant_details": details,
