@@ -122,7 +122,11 @@ class WizardBindingPayload(BaseModel):
 
 class EngagementNotificationWizardPayload(BaseModel):
     event_code: str = Field(min_length=1)
+    recipient_type: str = Field(min_length=1)
+    recipient_config: RecipientConfigPayload | None = None
+    emit_condition: EmitConditionPayload | None = None
     service: WizardServiceSpec
+    binding_id: int | None = None
 
 
 class WhatsappTemplateMetaResponse(BaseModel):

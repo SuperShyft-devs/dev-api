@@ -17,6 +17,12 @@ from modules.engagement_notifications.service_config import (
 class EngagementNotificationItem(BaseModel):
     event_code: str = Field(min_length=1)
     notification_services: list[NotificationServiceConfigItem] = Field(default_factory=list)
+    recipient_type: str | None = None
+    delivery_channel: str | None = None
+    recipient_config: dict | None = None
+    condition_key: str | None = None
+    emit_condition: dict | None = None
+    event_name: str | None = None
 
     @field_validator("notification_services", mode="before")
     @classmethod
@@ -30,6 +36,12 @@ class EngagementNotificationResponse(BaseModel):
     event_code: str
     notification_services: list[NotificationServiceConfigItem]
     event_display_name: str | None = None
+    recipient_type: str | None = None
+    delivery_channel: str | None = None
+    recipient_config: dict | None = None
+    condition_key: str | None = "default"
+    emit_condition: dict | None = None
+    event_name: str | None = None
 
     @field_validator("notification_services", mode="before")
     @classmethod

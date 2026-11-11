@@ -176,6 +176,7 @@ async def _resolve_service_keys_for_engagement(
     result = await db.execute(
         select(EngagementNotification.event_code, EngagementNotification.notification_services)
         .where(EngagementNotification.engagement_id == engagement_id)
+        .where(EngagementNotification.recipient_type == "user")
         .where(
             EngagementNotification.event_code.in_(
                 ("reports.blood_ready", "reports.bioai_ready")

@@ -1635,6 +1635,7 @@ class EngagementsRepository:
             .where(EngagementParticipant.paid.is_(True))
             .where(curr_pbb.c.collection_date == collection_date)
             .where(EngagementNotification.event_code == "reminders.pretest")
+            .where(EngagementNotification.recipient_type == "user")
             .distinct()
             .order_by(
                 EngagementParticipant.engagement_id.asc(),
@@ -1679,6 +1680,7 @@ class EngagementsRepository:
             )
             .where(self._scheduled_or_running_engagement_status_filter())
             .where(EngagementNotification.event_code == "reminders.booking_guide")
+            .where(EngagementNotification.recipient_type == "user")
             .distinct()
             .order_by(Engagement.engagement_id.asc())
         )
@@ -1738,6 +1740,7 @@ class EngagementsRepository:
                 EngagementNotification.notification_services,
             )
             .where(EngagementNotification.event_code == "reminders.questionnaire_before")
+            .where(EngagementNotification.recipient_type == "user")
             .subquery("en_before")
         )
 
@@ -1747,6 +1750,7 @@ class EngagementsRepository:
                 EngagementNotification.notification_services,
             )
             .where(EngagementNotification.event_code == "reminders.questionnaire_after")
+            .where(EngagementNotification.recipient_type == "user")
             .subquery("en_after")
         )
 
@@ -1828,6 +1832,7 @@ class EngagementsRepository:
             WHERE e.status IN (CAST(:status_scheduled AS smallint), CAST(:status_running AS smallint))
               AND ep.paid IS TRUE
               AND en.event_code = 'reminders.consultation_ready_to_book'
+              AND en.recipient_type = 'user'
               AND et.code IN ('bio_ai_with_consultation', 'blood_test_with_consultation')
               AND EXISTS (
                     SELECT 1
@@ -1915,6 +1920,7 @@ class EngagementsRepository:
             WHERE e.status IN (CAST(:status_scheduled AS smallint), CAST(:status_running AS smallint))
               AND ep.paid IS TRUE
               AND en.event_code = 'reminders.consultation_reminder'
+              AND en.recipient_type = 'user'
               AND cb.consultation_date = :consultation_date
               AND cb.want IS TRUE
             ORDER BY ep.engagement_id ASC, ep.user_id ASC, cb.expert_type ASC
