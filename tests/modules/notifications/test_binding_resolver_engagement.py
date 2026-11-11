@@ -1,4 +1,4 @@
-"""BindingResolver uses engagement_notifications only when engagement_id is set."""
+"""BindingResolver prefers engagement slots, else global defaults."""
 
 from __future__ import annotations
 
