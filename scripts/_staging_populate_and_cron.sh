@@ -6,6 +6,7 @@ set -a
 source .env
 set +a
 EID="${1:-}"
+export STAGING_EID="$EID"
 python - <<'PY'
 import asyncio
 import os
