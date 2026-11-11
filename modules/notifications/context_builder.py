@@ -12,6 +12,16 @@ def normalize_whatsapp_phone(phone: str | None) -> str:
     return digits
 
 
+def format_phone_display(phone: str | None) -> str:
+    """Human-readable phone for template slots (not WhatsApp E.164 routing)."""
+    digits = "".join(ch for ch in str(phone or "") if ch.isdigit())
+    if len(digits) == 12 and digits.startswith("91"):
+        return digits[2:]
+    if len(digits) == 11 and digits.startswith("0"):
+        return digits[1:]
+    return digits or str(phone or "").strip()
+
+
 def _strip_placeholder(value: object | None) -> str:
     text = str(value or "").strip()
     return "" if text == "-" else text
@@ -40,11 +50,12 @@ def _participant_block_from_pd(
     phone = _strip_placeholder(pd.get("phone"))
     if not phone and fallback_member:
         phone = _strip_placeholder(fallback_member.get("phone"))
+    display_phone = format_phone_display(phone) if phone else ""
     return {
         "name": name or first or "Participant",
         "first_name": first,
         "last_name": last,
-        "phone": normalize_whatsapp_phone(phone) if phone else "",
+        "phone": display_phone,
         "email": _strip_placeholder(pd.get("email"))
         or _strip_placeholder((fallback_member or {}).get("email")),
         "age": _strip_placeholder(pd.get("age")),
@@ -87,6 +98,9 @@ def build_member_context(
         user_block = {k: str(v or "").strip() for k, v in pd_user.items()}
     elif has_enrolled_participant:
         user_block = dict(participant_block)
+        user_block["phone"] = normalize_whatsapp_phone(
+            str(pd.get("phone") or participant_block.get("phone") or "")
+        )
     else:
         legacy_first = member_first or "Participant"
         user_block = {

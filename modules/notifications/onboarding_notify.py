@@ -14,6 +14,48 @@ logger = logging.getLogger(__name__)
 _MISSING_DETAIL = "-"
 
 
+def participant_details_from_onboard_payload(
+    payload,
+    *,
+    engagement,
+    source: str,
+    participant_user_id: int,
+    collection_date: str | None = None,
+    collection_time: str | None = None,
+    cabin_name: str | None = None,
+) -> dict[str, str]:
+    """Build participant_details from a public/engagement onboard payload (before User row sync)."""
+
+    class _PayloadUser:
+        first_name = getattr(payload, "first_name", None) or ""
+        last_name = getattr(payload, "last_name", None) or ""
+        email = getattr(payload, "email", None)
+        phone = getattr(payload, "phone", None)
+        age = getattr(payload, "age", None)
+        gender = getattr(payload, "gender", None)
+        address = getattr(payload, "address", None)
+        pin_code = getattr(payload, "pincode", None)
+        pincode = getattr(payload, "pincode", None)
+
+    coll_date = collection_date
+    if coll_date is None and getattr(payload, "blood_collection_date", None) is not None:
+        coll_date = str(payload.blood_collection_date)
+    coll_time = collection_time
+    if coll_time is None and getattr(payload, "blood_collection_time_slot", None) is not None:
+        coll_time = str(payload.blood_collection_time_slot)
+
+    return participant_details_from_user(
+        _PayloadUser(),
+        source=source,
+        participant_user_id=participant_user_id,
+        collection_date=coll_date,
+        collection_time=coll_time,
+        cabin_name=cabin_name,
+        engagement_name=getattr(engagement, "engagement_name", None),
+        engagement_code=getattr(engagement, "engagement_code", None),
+    )
+
+
 def detail_or_hyphen(value: object | None) -> str:
     """Return a non-empty string for notification participant_details fields."""
     if value is None:

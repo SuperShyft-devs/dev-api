@@ -126,7 +126,10 @@ def variable_fields_for_recipient(
     event_groups: tuple[str, ...] | list[str],
     recipient_type: str | None,
 ) -> list[str]:
-    return fields_for_groups(variable_groups_for_recipient(event_groups, recipient_type))
+    groups = variable_groups_for_recipient(event_groups, recipient_type)
+    if is_team_recipient(recipient_type):
+        groups = [g for g in groups if g != "user"]
+    return fields_for_groups(groups)
 
 
 KNOWN_RECIPIENT_TYPES: frozenset[str] = frozenset(

@@ -72,4 +72,4 @@ def test_ops_recipient_gets_staff_and_participant_blocks():
     }
     slots = resolve_slots(tv, ctx)
     assert slots[0] == "Hi Priya"
-    assert slots[1] == "New joiner: Pratheek Bedre (918762830757)"
+    assert slots[1] == "New joiner: Pratheek Bedre (8762830757)"

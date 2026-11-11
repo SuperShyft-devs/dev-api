@@ -195,7 +195,11 @@ class DirectNotificationDispatch:
 
         for member in members:
             context = build_member_context(member, participant_details=participant_details)
-            phone = str(context["user"].get("phone") or "").strip()
+            phone = str(member.get("phone") or "").strip()
+            if not phone:
+                phone = str((context.get("staff") or {}).get("phone") or "").strip()
+            if not phone:
+                phone = str(context["user"].get("phone") or "").strip()
             if not phone:
                 failures.append("missing recipient phone")
                 continue

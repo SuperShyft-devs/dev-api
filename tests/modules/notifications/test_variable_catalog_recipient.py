@@ -11,7 +11,7 @@ def test_ops_recipient_includes_staff_and_participant():
     fields = variable_fields_for_recipient(groups, "departments.ops")
     assert fields[0] == "staff.name"
     assert "participant.name" in fields
-    assert "user.name" in fields
+    assert "user.name" not in fields
 
 
 def test_user_recipient_unchanged():

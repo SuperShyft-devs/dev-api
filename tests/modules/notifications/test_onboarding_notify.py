@@ -289,6 +289,10 @@ def test_detail_or_hyphen_uses_placeholder_for_blank_values():
 
 
 def test_participant_details_from_onboard_payload_fills_missing_with_hyphen():
+    from types import SimpleNamespace
+
+    from modules.notifications.onboarding_notify import participant_details_from_onboard_payload
+
     payload = PublicUserOnboardRequest(
         first_name="Pratheek",
         last_name="Bedre",
@@ -299,8 +303,13 @@ def test_participant_details_from_onboard_payload_fills_missing_with_hyphen():
         blood_collection_date=date(2026, 8, 23),
         blood_collection_time_slot="09:00",
     )
-    details = UsersService._participant_details_from_onboard_payload(
+    engagement = SimpleNamespace(
+        engagement_name="Camp ABC",
+        engagement_code="ABC456",
+    )
+    details = participant_details_from_onboard_payload(
         payload,
+        engagement=engagement,
         source="public",
         participant_user_id=5,
     )
@@ -309,6 +318,8 @@ def test_participant_details_from_onboard_payload_fills_missing_with_hyphen():
     assert details["name"] == "Pratheek Bedre"
     assert details["collection_date"] == "2026-08-23"
     assert details["collection_time"] == "09:00"
+    assert details["engagement_name"] == "Camp ABC"
+    assert details["engagement_code"] == "ABC456"
     # Must pass DispatchRequest nested-string validation (empty strings previously failed).
     DispatchRequest(
         service_key="booking-alert-whatsapp",

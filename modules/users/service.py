@@ -2475,33 +2475,6 @@ class UsersService:
             cabin_key=key,
         )
 
-    @staticmethod
-    def _participant_details_from_onboard_payload(
-        payload: PublicUserOnboardRequest | EngagementUserOnboardRequest,
-        *,
-        source: str,
-        participant_user_id: int,
-        cabin_name: str | None = None,
-    ) -> dict[str, str]:
-        from modules.notifications.onboarding_notify import detail_or_hyphen
-
-        first_name = payload.first_name or ""
-        last_name = payload.last_name or ""
-        name = f"{first_name} {last_name}".strip()
-        return {
-            "name": detail_or_hyphen(name),
-            "email": detail_or_hyphen(payload.email),
-            "phone": detail_or_hyphen(payload.phone),
-            "age": detail_or_hyphen(payload.age),
-            "gender": detail_or_hyphen(payload.gender),
-            "address": detail_or_hyphen(payload.address),
-            "pincode": detail_or_hyphen(payload.pincode),
-            "collection_date": detail_or_hyphen(payload.blood_collection_date),
-            "collection_time": detail_or_hyphen(payload.blood_collection_time_slot),
-            "cabin_name": detail_or_hyphen(cabin_name),
-            "engagement": detail_or_hyphen(source),
-            "participant_user_id": str(participant_user_id),
-        }
 
     async def _notify_onboarding_assistants(
         self,
@@ -2528,8 +2501,11 @@ class UsersService:
             collection_date=getattr(payload, "blood_collection_date", None),
             cabin_key=resolved_cabin_key,
         )
-        participant_details = self._participant_details_from_onboard_payload(
+        from modules.notifications.onboarding_notify import participant_details_from_onboard_payload
+
+        participant_details = participant_details_from_onboard_payload(
             payload,
+            engagement=engagement,
             source=source,
             participant_user_id=participant_user_id,
             cabin_name=cabin_name,
