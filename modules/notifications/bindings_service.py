@@ -18,7 +18,14 @@ from modules.notifications.binding_schemas import (
 from modules.notifications.bindings_repository import NotificationBindingsRepository
 from modules.notifications.repository import NotificationsRepository
 from modules.notifications.events_catalog import get_event, list_events
-from modules.notifications.emit_contact_catalog import payload_contact_fields_for_event
+from modules.notifications.emit_contact_catalog import (
+    payload_contact_fields_for_event,
+    payload_layout_for_event,
+)
+from modules.notifications.event_payload_meta import (
+    EVENT_PAYLOAD_ADMIN_HINT,
+    payload_trigger_apis_for_event,
+)
 from modules.notifications.event_trigger_source import allows_payload_recipient, trigger_source_for_event
 from modules.notifications.variable_catalog import RECIPIENT_PAYLOAD_HINTS, fields_for_groups
 from modules.notifications.binding_schemas import CatalogEventResponse, PayloadContactFieldResponse
@@ -55,6 +62,9 @@ class NotificationBindingsService:
                     trigger_source=ts,
                     allows_payload_recipient=allow_payload,
                     payload_contact_fields=payload_fields,
+                    payload_layout=payload_layout_for_event(e.code) if allow_payload else "default",
+                    payload_trigger_apis=payload_trigger_apis_for_event(e.code) if allow_payload else [],
+                    payload_admin_hint=EVENT_PAYLOAD_ADMIN_HINT.get(e.code, "") if allow_payload else "",
                 )
             )
         return out

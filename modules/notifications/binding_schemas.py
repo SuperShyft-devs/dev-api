@@ -43,6 +43,9 @@ class PayloadContactFieldResponse(BaseModel):
     group: str
     description: str = ""
     example: str = ""
+    audience: str = ""
+    channels: list[str] = Field(default_factory=list)
+    sort_order: int = 0
 
 
 class CatalogEventResponse(BaseModel):
@@ -58,6 +61,9 @@ class CatalogEventResponse(BaseModel):
     trigger_source: str = "api"
     allows_payload_recipient: bool = False
     payload_contact_fields: list[PayloadContactFieldResponse] = Field(default_factory=list)
+    payload_layout: str = "default"
+    payload_trigger_apis: list[str] = Field(default_factory=list)
+    payload_admin_hint: str = ""
 
 
 class RecipientConfigPayload(BaseModel):
