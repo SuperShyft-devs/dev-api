@@ -108,6 +108,25 @@ def test_build_member_context_otp_nested_for_catalog_variables():
     assert slots == ["482913", "Pratheek"]
 
 
+def test_build_member_context_maps_participant_details_booking():
+    from modules.notifications.context_builder import build_member_context
+
+    context = build_member_context(
+        {"first_name": "Hawai", "phone": "7676872231"},
+        participant_details={
+            "name": "Hawai Hawai",
+            "collection_date": "2026-11-10",
+            "collection_time": "10:00",
+            "engagement": "public",
+            "address": "HSR Layout",
+        },
+    )
+    assert context["booking"]["collection_date"] == "2026-11-10"
+    assert context["booking"]["collection_time"] == "10:00"
+    assert context["engagement"]["engagement_name"] == "public"
+    assert context["user"]["address"] == "HSR Layout"
+
+
 def test_interpolate_email_support_placeholders():
     from modules.notifications.context_builder import build_member_context
     from modules.notifications.template_variables import interpolate_email_template
@@ -261,6 +280,67 @@ async def test_whatsapp_post_failure_uses_fallback(monkeypatch):
     )
     assert result.status == "sent"
     assert result.queue_id is None
+
+
+@pytest.mark.asyncio
+async def test_whatsapp_template_config_error_skips_fallback(monkeypatch):
+    monkeypatch.setattr(
+        settings,
+        "WHATAPI_FALLBACK_WEBHOOK_URL",
+        "https://webhook.whatapi.in/webhook/test",
+    )
+
+    svc = NotificationService(
+        service_key="welcome-whatsapp",
+        display_name="Welcome",
+        channel="whatsapp",
+        webhook_path="/welcome-whatsapp-v3",
+        template_name="camp13",
+        template_variables=None,
+        is_active=True,
+        require_otp=False,
+    )
+
+    class TemplateClient:
+        async def fetch_message_template(self, *, template_name: str):
+            return {
+                "data": [
+                    {
+                        "name": "camp13",
+                        "language": "en",
+                        "components": [
+                            {
+                                "type": "BODY",
+                                "text": "Hello {{1}}\n\n{{2}}\n{{3}}\n{{4}}\n{{5}}\n{{6}}",
+                            }
+                        ],
+                    }
+                ]
+            }
+
+        async def send_template_message(self, **kwargs):
+            raise AssertionError("send should not run")
+
+    fallback_called = False
+
+    async def fake_fallback(**kwargs):
+        nonlocal fallback_called
+        fallback_called = True
+        return {"accepted": True, "response": {}, "url": "http://x"}
+
+    monkeypatch.setattr(
+        "modules.notifications.direct_dispatch.send_whatsapp_fallback_get",
+        fake_fallback,
+    )
+
+    dispatch = DirectNotificationDispatch(client=TemplateClient())
+    result = await dispatch.deliver_batch(
+        svc=svc,
+        notification_id=88,
+        members=[{"first_name": "Hawai", "phone": "7676872231"}],
+    )
+    assert result.status == "failed"
+    assert fallback_called is False
 
 
 @pytest.mark.asyncio

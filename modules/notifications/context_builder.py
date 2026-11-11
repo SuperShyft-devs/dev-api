@@ -43,6 +43,7 @@ def build_member_context(
             "name": member_name if member_name != "Team member" else legacy_first,
             "phone": normalize_whatsapp_phone(member.get("phone")),
             "email": str(member.get("email") or "").strip(),
+            "address": str(pd.get("address") or member.get("address") or "").strip(),
         }
 
     context: dict[str, Any] = {
@@ -92,5 +93,21 @@ def build_member_context(
         block = member.get(key)
         if isinstance(block, dict) and block:
             context[key] = {k: v for k, v in block.items() if v is not None}
+
+    if pd:
+        coll_date = str(pd.get("collection_date") or "").strip()
+        coll_time = str(pd.get("collection_time") or "").strip()
+        if coll_date or coll_time:
+            booking = dict(context.get("booking") or {})
+            if coll_date:
+                booking.setdefault("collection_date", coll_date)
+            if coll_time:
+                booking.setdefault("collection_time", coll_time)
+            context["booking"] = booking
+        eng_label = str(pd.get("engagement") or "").strip()
+        if eng_label:
+            engagement = dict(context.get("engagement") or {})
+            engagement.setdefault("engagement_name", eng_label)
+            context["engagement"] = engagement
 
     return context

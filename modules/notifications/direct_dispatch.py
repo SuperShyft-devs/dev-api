@@ -277,6 +277,14 @@ class DirectNotificationDispatch:
                 )
             except Exception as exc:
                 err_msg, err_payload = _integration_failure_from_exc(exc)
+                if isinstance(exc, AppError) and exc.error_code == "INVALID_INPUT":
+                    failures.append(err_msg)
+                    logger.warning(
+                        "WhatAPI send skipped (config/template): event service=%s %s",
+                        svc.service_key,
+                        err_msg,
+                    )
+                    continue
                 if not _whatsapp_fallback_allowed(svc):
                     logger.warning(
                         "WhatAPI POST failed for OTP service %s (no GET fallback): %s",
