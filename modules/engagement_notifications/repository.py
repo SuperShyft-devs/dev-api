@@ -16,6 +16,22 @@ from modules.notifications.bindings_repository import NotificationBindingsReposi
 from modules.notifications.events_catalog import get_event, map_legacy_event_code
 from modules.notifications.models import NotificationEventBinding
 
+# Events crons and report loaders read from engagement_notifications (not emit engine).
+_ENGAGEMENT_SCOPED_EVENT_CODES = frozenset(
+    {
+        "reminders.pretest",
+        "reminders.questionnaire_before",
+        "reminders.questionnaire_after",
+        "reminders.booking_guide",
+        "reminders.consultation_ready_to_book",
+        "reminders.consultation_reminder",
+        "reports.blood_ready",
+        "reports.bioai_ready",
+        "reports.face_scan_ready",
+        "users.onboarded",
+    }
+)
+
 
 class EngagementNotificationsRepository:
     """Database queries for engagement_notifications and type-level defaults."""
@@ -100,16 +116,38 @@ class EngagementNotificationsRepository:
         engagement_id: int,
         engagement_type_id: int,
     ) -> list[EngagementNotification]:
-        """Auto-populate engagement_notifications from type-level bindings."""
-        defaults = await self.list_defaults_for_type(db, engagement_type_id)
-        items = []
-        for d in defaults:
-            configs = normalize_notification_services(d.notification_services)
-            if configs:
-                items.append({
-                    "event_code": d.event_code,
-                    "notification_services": serialize_for_db(configs),
-                })
+        """Auto-populate engagement_notifications from type-level + global bindings."""
+        type_rows = await self.list_defaults_for_type(db, engagement_type_id)
+        all_bindings = await self._bindings_repo.list_all(db)
+        global_rows = [r for r in all_bindings if r.engagement_type_id is None]
+        type_event_codes = {r.event_code for r in type_rows}
+        sources = list(type_rows)
+        for row in global_rows:
+            if row.event_code not in type_event_codes:
+                sources.append(row)
+
+        by_event: dict[str, list] = {}
+        for row in sources:
+            if row.event_code not in _ENGAGEMENT_SCOPED_EVENT_CODES:
+                continue
+            configs = normalize_notification_services(row.notification_services)
+            if not configs:
+                continue
+            bucket = by_event.setdefault(row.event_code, [])
+            seen = {c.service_key for c in bucket}
+            for cfg in configs:
+                if cfg.service_key and cfg.service_key not in seen:
+                    seen.add(cfg.service_key)
+                    bucket.append(cfg)
+
+        items = [
+            {
+                "event_code": event_code,
+                "notification_services": serialize_for_db(configs),
+            }
+            for event_code, configs in sorted(by_event.items())
+            if configs
+        ]
         if not items:
             return []
         return await self.upsert_for_engagement(db, engagement_id, items)
