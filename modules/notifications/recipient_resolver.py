@@ -11,6 +11,15 @@ from modules.employee.notify_contacts import employees_to_notify_contacts
 from modules.employee.repository import EmployeeRepository
 from modules.engagements.repository import EngagementsRepository
 
+_LEGACY_RECIPIENT_TYPE_ALIASES: dict[str, str] = {
+    "oa.all": "assistants",
+    "oa.phlebo": "assistants.phlebo",
+    "oa.expert": "assistants.expert",
+    "oa.staff": "assistants.staff",
+    "participant": "user",
+    "booker": "user",
+}
+
 
 @dataclass
 class DispatchTarget:
@@ -66,6 +75,7 @@ class RecipientResolver:
         engagement_id: int | None = None,
     ) -> DispatchTarget:
         rt = (recipient_type or "").strip()
+        rt = _LEGACY_RECIPIENT_TYPE_ALIASES.get(rt, rt)
 
         if rt == "user":
             uid = context.get("user_id") or context.get("participant_user_id")
