@@ -2919,6 +2919,7 @@ class UsersService:
                 source="public",
                 collection_date=str(payload.blood_collection_date or ""),
                 collection_time=str(payload.blood_collection_time_slot or ""),
+                cabin_key=getattr(payload, "blood_collection_cabin", None),
             )
         else:
             await self._notify_onboarding_assistants(
