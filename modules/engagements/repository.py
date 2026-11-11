@@ -1827,7 +1827,7 @@ class EngagementsRepository:
              AND ihr.engagement_id = ep.engagement_id
             WHERE e.status IN (CAST(:status_scheduled AS smallint), CAST(:status_running AS smallint))
               AND ep.paid IS TRUE
-              AND en.event_code = 'consultations.ready_to_book'
+              AND en.event_code = 'reminders.consultation_ready_to_book'
               AND et.code IN ('bio_ai_with_consultation', 'blood_test_with_consultation')
               AND EXISTS (
                     SELECT 1
@@ -1914,7 +1914,7 @@ class EngagementsRepository:
             LEFT JOIN engagement_slot_info esi ON esi.slot_detail_id = e.slot_detail_id
             WHERE e.status IN (CAST(:status_scheduled AS smallint), CAST(:status_running AS smallint))
               AND ep.paid IS TRUE
-              AND en.event_code = 'consultations.reminder'
+              AND en.event_code = 'reminders.consultation_reminder'
               AND cb.consultation_date = :consultation_date
               AND cb.want IS TRUE
             ORDER BY ep.engagement_id ASC, ep.user_id ASC, cb.expert_type ASC

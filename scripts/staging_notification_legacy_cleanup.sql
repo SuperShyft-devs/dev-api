@@ -11,9 +11,9 @@ UPDATE notification_events SET event_code = 'bookings.phlebo_reassigned', event_
 UPDATE notification_events SET event_code = 'bookings.phlebo_enroute', event_name = 'Phlebo en route' WHERE event_code = 'collection.phlebo.enroute';
 UPDATE notification_events SET event_code = 'bookings.phlebo_delayed', event_name = 'Phlebo delayed' WHERE event_code = 'collection.phlebo.delayed';
 UPDATE notification_events SET event_code = 'system.cpu_threshold', event_name = 'CPU threshold exceeded' WHERE event_code = 'system.cpu.alert';
-UPDATE notification_events SET event_code = 'assistants.consultation_booked', event_name = 'Consultation booked (assistants)' WHERE event_code = 'consultation.booked';
-UPDATE notification_events SET event_code = 'consultations.reminder', event_name = 'Consultation reminder' WHERE event_code = 'consultation.reminder';
-UPDATE notification_events SET event_code = 'consultations.ready_to_book', event_name = 'Ready to book consultation' WHERE event_code = 'consultation.ready';
+UPDATE notification_events SET event_code = 'consultations.booked', event_name = 'Consultation booked' WHERE event_code IN ('consultation.booked', 'assistants.consultation_booked');
+UPDATE notification_events SET event_code = 'reminders.consultation_reminder', event_name = 'Consultation reminder' WHERE event_code IN ('consultation.reminder', 'consultations.reminder');
+UPDATE notification_events SET event_code = 'reminders.consultation_ready_to_book', event_name = 'Ready to book consultation' WHERE event_code IN ('consultation.ready', 'consultations.ready_to_book');
 UPDATE notification_events SET event_code = 'reminders.pretest', event_name = 'Pretest reminder' WHERE event_code = 'collection.reminder.pretest';
 UPDATE notification_events SET event_code = 'reminders.booking_guide', event_name = 'Booking guide' WHERE event_code = 'collection.reminder.booking_guide';
 UPDATE notification_events SET event_code = 'reminders.questionnaire_before', event_name = 'Questionnaire reminder (before)' WHERE event_code = 'assessment.reminder.before';
@@ -65,9 +65,9 @@ FROM (VALUES
   ('collection.phlebo.enroute', 'bookings.phlebo_enroute'),
   ('collection.phlebo.delayed', 'bookings.phlebo_delayed'),
   ('system.cpu.alert', 'system.cpu_threshold'),
-  ('consultation.booked', 'assistants.consultation_booked'),
-  ('consultation.reminder', 'consultations.reminder'),
-  ('consultation.ready', 'consultations.ready_to_book'),
+  ('consultation.booked', 'consultations.booked'),
+  ('consultation.reminder', 'reminders.consultation_reminder'),
+  ('consultation.ready', 'reminders.consultation_ready_to_book'),
   ('collection.reminder.pretest', 'reminders.pretest'),
   ('collection.reminder.booking_guide', 'reminders.booking_guide'),
   ('assessment.reminder.before', 'reminders.questionnaire_before'),
@@ -81,9 +81,12 @@ FROM (VALUES
   ('blood_report_ready', 'reports.blood_ready'),
   ('bioai_report_ready', 'reports.bioai_ready'),
   ('report_ready', 'reports.face_scan_ready'),
-  ('consultation_ready', 'consultations.ready_to_book'),
-  ('consultation_remainder', 'consultations.reminder'),
-  ('consultation_booking_alert', 'assistants.consultation_booked'),
+  ('consultation_ready', 'reminders.consultation_ready_to_book'),
+  ('consultation_remainder', 'reminders.consultation_reminder'),
+  ('consultation_booking_alert', 'consultations.booked'),
+  ('assistants.consultation_booked', 'consultations.booked'),
+  ('consultations.ready_to_book', 'reminders.consultation_ready_to_book'),
+  ('consultations.reminder', 'reminders.consultation_reminder'),
   ('booking_guide', 'reminders.booking_guide')
 ) AS fixed(legacy, new_code)
 WHERE en.event_code = fixed.legacy;

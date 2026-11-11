@@ -10,15 +10,15 @@ from modules.notifications.events_catalog import (
 )
 
 
-def test_events_catalog_has_35_events():
-    assert len(EVENTS) == 35
-    assert len(list_events()) == 35
-    assert len(list_events(status="current")) == 21
-    assert len(list_events(status="add")) == 14
+def test_events_catalog_has_34_events():
+    assert len(EVENTS) == 34
+    assert len(list_events()) == 34
+    assert len(list_events(status="current")) == 22
+    assert len(list_events(status="add")) == 12
 
 
 def test_current_event_codes_count():
-    assert len(current_event_codes()) == 21
+    assert len(current_event_codes()) == 22
 
 
 def test_legacy_map_covers_onboarding():
@@ -33,6 +33,9 @@ def test_legacy_map_keys_match_known_auto_events():
         "pretest_guidelines",
         "blood_report_ready",
         "consultation_remainder",
+        "consultation_booking_alert",
     ):
         assert legacy in LEGACY_EVENT_CODE_MAP
         assert get_event(LEGACY_EVENT_CODE_MAP[legacy]) is not None
+    assert map_legacy_event_code("consultation_ready") == "reminders.consultation_ready_to_book"
+    assert map_legacy_event_code("consultation_booking_alert") == "consultations.booked"

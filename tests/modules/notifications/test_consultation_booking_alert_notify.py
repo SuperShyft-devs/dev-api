@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date
 from unittest.mock import AsyncMock
 
@@ -54,6 +55,24 @@ async def _seed_diagnostic_package(test_db_session, diagnostic_package_id: int =
     await test_db_session.commit()
 
 
+async def _seed_global_binding(test_db_session) -> None:
+    services = json.dumps([{"service_key": SERVICE_KEY, "external_link": None}])
+    await test_db_session.execute(
+        text(
+            """
+            INSERT INTO notification_events (
+                event_code, event_name, recipient_type, delivery_channel, notification_services
+            )
+            VALUES (
+                'consultations.booked', 'Consultation booked', 'assistants', 'whatsapp', CAST(:services AS json)
+            )
+            ON CONFLICT ON CONSTRAINT uq_notification_events_binding DO NOTHING
+            """
+        ),
+        {"services": services},
+    )
+
+
 async def _seed_event_and_binding(test_db_session, engagement_id: int) -> None:
     await test_db_session.execute(
         text(
@@ -67,7 +86,7 @@ async def _seed_event_and_binding(test_db_session, engagement_id: int) -> None:
     await upsert_engagement_notification(
         test_db_session,
         engagement_id=engagement_id,
-        event_code="assistants.consultation_booked",
+        event_code="consultations.booked",
         service_keys=[SERVICE_KEY],
     )
     await test_db_session.commit()
@@ -110,13 +129,18 @@ async def test_consultation_booking_alert_dispatches_with_session_details(test_d
     test_db_session.add(participant)
     await test_db_session.commit()
 
-    dispatch_mock = AsyncMock()
-    notifications_service = NotificationsService(NotificationsRepository())
-    monkeypatch.setattr(notifications_service, "dispatch", dispatch_mock)
+    await _seed_global_binding(test_db_session)
+    emit_mock = AsyncMock()
+    engine_mock = type("Engine", (), {"emit": emit_mock})()
     monkeypatch.setattr(
-        "modules.notifications.consultation_booking_alert_notify.resolve_consultation_booking_alert_user_ids",
-        AsyncMock(return_value=[201, 202]),
+        "modules.notifications.engine.get_notification_engine",
+        lambda: engine_mock,
     )
+    monkeypatch.setattr(
+        "modules.notifications.consultation_booking_alert_notify.resolve_consultation_booking_alert_contacts",
+        AsyncMock(return_value=[{"partner_id": 201, "phone": "9990000001"}]),
+    )
+    notifications_service = NotificationsService(NotificationsRepository())
 
     await notify_onboarding_assistants_on_consultation_booking(
         test_db_session,
@@ -131,17 +155,17 @@ async def test_consultation_booking_alert_dispatches_with_session_details(test_d
         consultation_slot="10:30",
     )
 
-    dispatch_mock.assert_awaited_once()
-    payload = dispatch_mock.await_args.kwargs["payload"]
-    assert payload.service_key == SERVICE_KEY
-    assert payload.user_ids == [201, 202]
-    assert payload.engagement_id == 99101
-    assert payload.participant_details["participant_user_id"] == "5101"
-    assert payload.session_details is not None
-    assert payload.session_details.want is True
-    assert payload.session_details.date == date(2026, 3, 15)
-    assert payload.session_details.slot == "10:30"
-    assert payload.session_details.expert_type == "doctor"
+    emit_mock.assert_awaited_once()
+    assert emit_mock.await_args.kwargs["event_code"] == "consultations.booked"
+    assert emit_mock.await_args.kwargs["engagement_id"] == 99101
+    assert emit_mock.await_args.kwargs["recipient_types"] == ["assistants"]
+    ctx = emit_mock.await_args.kwargs["context"]
+    assert ctx["participant_user_id"] == 5101
+    session_details = ctx["session_details"]
+    assert session_details.want is True
+    assert session_details.date == date(2026, 3, 15)
+    assert session_details.slot == "10:30"
+    assert session_details.expert_type == "doctor"
 
 
 @pytest.mark.asyncio
@@ -458,9 +482,13 @@ async def test_consultation_booking_alert_skips_without_services(test_db_session
     test_db_session.add(participant)
     await test_db_session.commit()
 
-    dispatch_mock = AsyncMock()
+    emit_mock = AsyncMock()
+    engine_mock = type("Engine", (), {"emit": emit_mock})()
+    monkeypatch.setattr(
+        "modules.notifications.engine.get_notification_engine",
+        lambda: engine_mock,
+    )
     notifications_service = NotificationsService(NotificationsRepository())
-    monkeypatch.setattr(notifications_service, "dispatch", dispatch_mock)
 
     await notify_onboarding_assistants_on_consultation_booking(
         test_db_session,
@@ -475,4 +503,4 @@ async def test_consultation_booking_alert_skips_without_services(test_db_session
         consultation_slot="11:00",
     )
 
-    dispatch_mock.assert_not_awaited()
+    emit_mock.assert_not_awaited()

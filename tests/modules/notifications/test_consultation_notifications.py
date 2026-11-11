@@ -122,7 +122,7 @@ async def _insert_engagement(
         await upsert_engagement_notification(
             test_db_session,
             engagement_id=engagement_id,
-            event_code="consultations.ready_to_book",
+            event_code="reminders.consultation_ready_to_book",
             service_keys=service_keys,
         )
 
