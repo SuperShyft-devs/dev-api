@@ -21,6 +21,17 @@ VARIABLE_GROUP_FIELDS: dict[str, tuple[str, ...]] = {
         "staff.phone",
         "staff.email",
     ),
+    "participant": (
+        "participant.name",
+        "participant.first_name",
+        "participant.last_name",
+        "participant.phone",
+        "participant.email",
+        "participant.age",
+        "participant.gender",
+        "participant.address",
+        "participant.pincode",
+    ),
     "engagement": (
         "engagement.engagement_id",
         "engagement.engagement_code",

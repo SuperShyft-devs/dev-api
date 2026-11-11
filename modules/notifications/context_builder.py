@@ -12,6 +12,48 @@ def normalize_whatsapp_phone(phone: str | None) -> str:
     return digits
 
 
+def _strip_placeholder(value: object | None) -> str:
+    text = str(value or "").strip()
+    return "" if text == "-" else text
+
+
+def _participant_block_from_pd(
+    pd: dict[str, Any],
+    *,
+    fallback_member: dict[str, Any] | None = None,
+) -> dict[str, str]:
+    name = _strip_placeholder(pd.get("name"))
+    first = _strip_placeholder(pd.get("first_name"))
+    last = _strip_placeholder(pd.get("last_name"))
+    if not first and name:
+        parts = name.split(None, 1)
+        first = parts[0]
+        last = parts[1] if len(parts) > 1 else ""
+    if not name:
+        name = f"{first} {last}".strip()
+    if not name and fallback_member:
+        mf = _strip_placeholder(fallback_member.get("first_name"))
+        ml = _strip_placeholder(fallback_member.get("last_name"))
+        first = first or mf
+        last = last or ml
+        name = f"{first} {ml}".strip() or first
+    phone = _strip_placeholder(pd.get("phone"))
+    if not phone and fallback_member:
+        phone = _strip_placeholder(fallback_member.get("phone"))
+    return {
+        "name": name or first or "Participant",
+        "first_name": first,
+        "last_name": last,
+        "phone": normalize_whatsapp_phone(phone) if phone else "",
+        "email": _strip_placeholder(pd.get("email"))
+        or _strip_placeholder((fallback_member or {}).get("email")),
+        "age": _strip_placeholder(pd.get("age")),
+        "gender": _strip_placeholder(pd.get("gender")),
+        "address": _strip_placeholder(pd.get("address")),
+        "pincode": _strip_placeholder(pd.get("pincode")),
+    }
+
+
 def build_member_context(
     member: dict[str, Any],
     *,
@@ -32,9 +74,19 @@ def build_member_context(
     gift_url = str(pd.get("gift_url") or "").strip()
     otp_value = str(member.get("otp") or "").strip()
 
+    participant_block = _participant_block_from_pd(pd, fallback_member=member)
+    has_enrolled_participant = bool(
+        pd.get("participant_user_id")
+        or _strip_placeholder(pd.get("name"))
+        or _strip_placeholder(pd.get("phone"))
+        or _strip_placeholder(pd.get("email"))
+    )
+
     pd_user = pd.get("user") if isinstance(pd.get("user"), dict) else {}
     if pd_user:
         user_block = {k: str(v or "").strip() for k, v in pd_user.items()}
+    elif has_enrolled_participant:
+        user_block = dict(participant_block)
     else:
         legacy_first = member_first or "Participant"
         user_block = {
@@ -68,6 +120,7 @@ def build_member_context(
             "email": str(member.get("email") or "").strip(),
         },
         "user": user_block,
+        "participant": participant_block,
         "session": {
             "date": session_date,
             "time": session_time,

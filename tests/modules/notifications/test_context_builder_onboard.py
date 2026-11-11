@@ -41,3 +41,35 @@ def test_session_and_engagement_from_participant_details():
     assert slots[0] == "Hiii Pratheek"
     assert slots[1] == "onboarded to My Camp Name"
     assert slots[2] == "Hii2 2026-11-20 Cabin A 10:00"
+
+
+def test_ops_recipient_gets_staff_and_participant_blocks():
+    """Ops/staff binding: staff.* = notify recipient; participant.* = enrolled user."""
+    ops = {
+        "first_name": "Priya",
+        "last_name": "Ops",
+        "phone": "9000000001",
+        "email": "ops@supershyft.com",
+    }
+    pd = {
+        "name": "Pratheek Bedre",
+        "phone": "8762830757",
+        "email": "p@example.com",
+        "participant_user_id": "42",
+        "engagement_name": "Camp X",
+    }
+    ctx = build_member_context(ops, participant_details=pd)
+    assert ctx["staff"]["first_name"] == "Priya"
+    assert ctx["participant"]["name"] == "Pratheek Bedre"
+    assert ctx["participant"]["first_name"] == "Pratheek"
+    assert ctx["user"]["first_name"] == "Pratheek"
+
+    tv = {
+        "slots": [
+            {"index": 1, "source": "literal", "value": "Hi {{staff.first_name}}"},
+            {"index": 2, "source": "literal", "value": "New joiner: {{participant.name}} ({{participant.phone}})"},
+        ]
+    }
+    slots = resolve_slots(tv, ctx)
+    assert slots[0] == "Hi Priya"
+    assert slots[1] == "New joiner: Pratheek Bedre (918762830757)"
