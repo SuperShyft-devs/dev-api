@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from modules.notifications.models import NotificationService
 
 from modules.engagement_notifications.service_config import (
+    NotificationServiceConfigItem,
     extract_service_keys,
     normalize_notification_services,
     prepare_notification_items_for_storage,
@@ -150,12 +151,23 @@ class EngagementNotificationsRepository:
             if not keys:
                 continue
             result = await db.execute(
-                select(NotificationService.service_key).where(
-                    NotificationService.service_key.in_(keys)
-                )
+                select(NotificationService).where(NotificationService.service_key.in_(keys))
             )
-            known = {row[0] for row in result.all()}
-            filtered = [c for c in configs if c.service_key in known]
+            services_by_key = {svc.service_key: svc for svc in result.scalars().all()}
+            filtered = []
+            for cfg in configs:
+                svc = services_by_key.get(cfg.service_key)
+                if svc is None:
+                    continue
+                link = cfg.external_link
+                if svc.require_external_link and not (link and str(link).strip()):
+                    link = "https://app.supershyft.com"
+                filtered.append(
+                    NotificationServiceConfigItem(
+                        service_key=cfg.service_key,
+                        external_link=link,
+                    )
+                )
             if not filtered:
                 continue
             items.append(
