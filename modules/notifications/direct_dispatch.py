@@ -24,7 +24,10 @@ from modules.notifications.whatsapp_fallback_get import (
     build_whatsapp_fallback_get_url,
     send_whatsapp_fallback_get,
 )
-from modules.notifications.whatapi_sync_logging import log_whatapi_get_message_templates
+from modules.notifications.whatapi_sync_logging import (
+    log_whatapi_get_message_templates,
+    log_whatapi_messages_failure,
+)
 from modules.notifications.whatsapp_template_builder import build_whatsapp_send_payload
 from core.exceptions import AppError
 from modules.notifications.whatapi_client import (
@@ -186,6 +189,7 @@ class DirectNotificationDispatch:
     ) -> DeliverResult:
         failures: list[str] = []
         last_queue_id: str | None = None
+        last_post_failure: str | None = None
         used_post = False
         used_fallback = False
 
@@ -277,6 +281,20 @@ class DirectNotificationDispatch:
                 )
             except Exception as exc:
                 err_msg, err_payload = _integration_failure_from_exc(exc)
+                last_post_failure = err_msg
+                failure_phase = "messages_post" if sync_log_id is not None else "template_build"
+                if sync_log_id is None:
+                    await log_whatapi_messages_failure(
+                        template_name=template_label,
+                        service_key=str(svc.service_key or ""),
+                        phone=normalize_whatsapp_phone(phone) or phone,
+                        engagement_id=engagement_id,
+                        user_id=sync_log_user_id,
+                        notification_id=notification_id,
+                        error_message=err_msg,
+                        response_payload=err_payload,
+                        failure_phase=failure_phase,
+                    )
                 if isinstance(exc, AppError) and exc.error_code == "INVALID_INPUT":
                     failures.append(err_msg)
                     logger.warning(
@@ -398,9 +416,12 @@ class DirectNotificationDispatch:
             )
 
         now = datetime.now(timezone.utc)
+        fallback_msg = "WhatsApp sent via WhatAPI GET fallback"
+        if last_post_failure:
+            fallback_msg = f"POST failed: {last_post_failure}. {fallback_msg}"
         return DeliverResult(
             status="sent",
-            message="WhatsApp sent via WhatAPI GET fallback",
+            message=fallback_msg,
             queue_id=None,
             completed_at=now,
         )

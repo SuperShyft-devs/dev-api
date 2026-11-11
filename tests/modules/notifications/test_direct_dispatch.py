@@ -333,6 +333,17 @@ async def test_whatsapp_template_config_error_skips_fallback(monkeypatch):
         fake_fallback,
     )
 
+    failures_logged: list[dict] = []
+
+    async def fake_messages_failure(**kwargs):
+        failures_logged.append(kwargs)
+        return None
+
+    monkeypatch.setattr(
+        "modules.notifications.direct_dispatch.log_whatapi_messages_failure",
+        fake_messages_failure,
+    )
+
     dispatch = DirectNotificationDispatch(client=TemplateClient())
     result = await dispatch.deliver_batch(
         svc=svc,
@@ -341,6 +352,10 @@ async def test_whatsapp_template_config_error_skips_fallback(monkeypatch):
     )
     assert result.status == "failed"
     assert fallback_called is False
+    assert len(failures_logged) == 1
+    assert failures_logged[0]["failure_phase"] == "template_build"
+    assert failures_logged[0]["service_key"] == "welcome-whatsapp"
+    assert "expects" in failures_logged[0]["error_message"].lower()
 
 
 @pytest.mark.asyncio

@@ -95,6 +95,51 @@ async def log_whatapi_get_message_templates(
         raise
 
 
+async def log_whatapi_messages_failure(
+    *,
+    template_name: str,
+    service_key: str,
+    phone: str | None,
+    engagement_id: int | None,
+    user_id: int | None,
+    notification_id: int | None,
+    error_message: str,
+    response_payload: dict[str, Any] | None = None,
+    failure_phase: str,
+) -> None:
+    """Record a failed direct-send POST (build or send) with root cause for admin logs."""
+    from modules.notifications.whatapi_client import send_messages_request_url
+
+    url = send_messages_request_url()
+    payload = {
+        "http_method": "POST",
+        "api_name": "messages",
+        "url": url,
+        "template_name": (template_name or "").strip() or None,
+        "service_key": (service_key or "").strip() or None,
+        "failure_phase": failure_phase,
+        "phone": phone,
+        "notification_id": notification_id,
+        "call_order": 2,
+    }
+    sync_log_id = await persist_integration_sync_log_isolated(
+        provider="whatapi",
+        api_url=url,
+        engagement_id=engagement_id,
+        user_id=user_id,
+        request_payload=payload,
+        status="pending",
+    )
+    await finalize_integration_sync_log_isolated(
+        sync_log_id=sync_log_id,
+        status="failed",
+        api_endpoint_url=url,
+        error_message=(error_message or "WhatsApp direct send failed")[:2000],
+        request_payload=payload,
+        response_payload=response_payload,
+    )
+
+
 async def log_whatapi_inbound_webhook(
     *,
     api_url: str,
