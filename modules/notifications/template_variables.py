@@ -31,13 +31,23 @@ def _get_nested(context: dict[str, Any], path: str) -> str:
     return str(node).strip()
 
 
+def _normalize_slot_source(source: str) -> str:
+    """Accept admin-style `{{user.first_name}}` stored as source instead of a context path."""
+    trimmed = source.strip()
+    match = re.fullmatch(r"\{\{([^}]+)\}\}", trimmed)
+    if match:
+        return _expand_email_placeholder(match.group(1).strip())
+    return trimmed
+
+
 def resolve_slot(slot: dict[str, Any], context: dict[str, Any]) -> str:
     source = str(slot.get("source") or "").strip()
     if source == "literal":
-        return str(slot.get("value") or "")
+        raw = str(slot.get("value") or "")
+        return interpolate_email_template(raw, context)
     if source.startswith("expression:"):
         return source.removeprefix("expression:")
-    return _get_nested(context, source)
+    return _get_nested(context, _normalize_slot_source(source))
 
 
 def _resolve_member_ref(ref: str, context: dict[str, Any]) -> str:

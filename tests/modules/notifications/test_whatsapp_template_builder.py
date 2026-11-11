@@ -20,6 +20,17 @@ def test_resolve_slots_otp():
     assert resolve_slots(tv, context) == ["654321"]
 
 
+def test_resolve_slots_literal_mustache_interpolates():
+    context = {"user": {"first_name": "Pratheek"}}
+    tv = {
+        "slots": [
+            {"index": 1, "source": "literal", "value": "Hello {{user.first_name}}"},
+            {"index": 2, "source": "{{user.first_name}}"},
+        ]
+    }
+    assert resolve_slots(tv, context) == ["Hello Pratheek", "Pratheek"]
+
+
 def test_legacy_csv_otp():
     assert build_legacy_message_csv("otp", ["123456"]) == "otp,123456"
 
