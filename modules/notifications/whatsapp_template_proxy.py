@@ -22,6 +22,15 @@ def _count_body_positional_params(components: list[dict[str, Any]]) -> int:
     return max_index
 
 
+def _header_format(components: list[dict[str, Any]]) -> str | None:
+    for comp in components:
+        if str(comp.get("type") or "").upper() != "HEADER":
+            continue
+        fmt = str(comp.get("format") or "").strip().upper()
+        return fmt or None
+    return None
+
+
 def _component_types(components: list[dict[str, Any]]) -> list[str]:
     types: list[str] = []
     for comp in components:
@@ -51,6 +60,7 @@ def normalize_template_response(raw: dict[str, Any]) -> dict[str, Any] | None:
         "status": str(item.get("status") or ""),
         "parameter_format": str(item.get("parameter_format") or ""),
         "body_positional_count": _count_body_positional_params(components),
+        "header_format": _header_format(components),
         "component_types": _component_types(components),
         "body_text": body_text,
     }

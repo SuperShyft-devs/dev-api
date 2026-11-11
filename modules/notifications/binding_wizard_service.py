@@ -16,6 +16,7 @@ from modules.notifications.binding_schemas import (
     EngagementNotificationWizardPayload,
     NotificationBindingResponse,
     WizardBindingPayload,
+    WizardTemplateHeader,
     WizardTemplateSlot,
 )
 from modules.notifications.bindings_repository import NotificationBindingsRepository
@@ -39,13 +40,13 @@ def build_template_variables(
     *,
     template_variables: dict | list | None,
     template_slots: list[WizardTemplateSlot] | None,
+    template_header: WizardTemplateHeader | None = None,
 ) -> dict | list | None:
     if template_variables is not None:
         return template_variables
-    if not template_slots:
-        return None
-    return {
-        "slots": [
+    out: dict = {}
+    if template_slots:
+        out["slots"] = [
             {
                 "index": slot.index,
                 "source": slot.source,
@@ -53,7 +54,12 @@ def build_template_variables(
             }
             for slot in template_slots
         ]
-    }
+    if template_header is not None:
+        header: dict = {"source": template_header.source}
+        if template_header.value is not None:
+            header["value"] = template_header.value
+        out["header"] = header
+    return out or None
 
 
 class NotificationBindingWizardService:
@@ -117,6 +123,7 @@ class NotificationBindingWizardService:
             svc.template_variables = build_template_variables(
                 template_variables=spec.template_variables,
                 template_slots=spec.template_slots,
+                template_header=spec.template_header,
             )
             svc.email_subject = spec.email_subject
             svc.email_body = spec.email_body
@@ -149,6 +156,7 @@ class NotificationBindingWizardService:
             template_variables=build_template_variables(
                 template_variables=spec.template_variables,
                 template_slots=spec.template_slots,
+                template_header=spec.template_header,
             ),
             email_subject=spec.email_subject,
             email_body=spec.email_body,

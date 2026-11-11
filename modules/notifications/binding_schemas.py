@@ -57,6 +57,11 @@ class WizardTemplateSlot(BaseModel):
     value: str | None = None
 
 
+class WizardTemplateHeader(BaseModel):
+    source: str = Field(min_length=1)
+    value: str | None = None
+
+
 class WizardServiceSpec(BaseModel):
     notification_service_id: int | None = None
     service_key: str | None = None
@@ -65,6 +70,7 @@ class WizardServiceSpec(BaseModel):
     template_name: str | None = None
     template_variables: dict | list | None = None
     template_slots: list[WizardTemplateSlot] | None = None
+    template_header: WizardTemplateHeader | None = None
     email_subject: str | None = None
     email_body: str | None = None
     email_html: str | None = None
@@ -92,5 +98,6 @@ class WhatsappTemplateMetaResponse(BaseModel):
     status: str | None = None
     parameter_format: str | None = None
     body_positional_count: int | None = None
+    header_format: str | None = None
     component_types: list[str] = Field(default_factory=list)
     body_text: str | None = None

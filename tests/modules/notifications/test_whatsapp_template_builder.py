@@ -9,6 +9,7 @@ import pytest
 from modules.notifications.models import NotificationService
 from modules.notifications.template_variables import (
     build_legacy_message_csv,
+    resolve_header_link,
     resolve_slots,
 )
 from modules.notifications.whatsapp_template_builder import build_whatsapp_send_payload
@@ -18,6 +19,21 @@ def test_resolve_slots_otp():
     context = {"otp": {"otp": "654321"}, "user": {"first_name": "A"}}
     tv = {"slots": [{"index": 1, "source": "otp.otp"}]}
     assert resolve_slots(tv, context) == ["654321"]
+
+
+def test_resolve_header_link_literal_and_variable():
+    context = {"user": {"first_name": "A"}, "gift": {"gift_card_url": "https://x/y.pdf"}}
+    assert (
+        resolve_header_link(
+            {"header": {"source": "literal", "value": "https://static/pretest.pdf"}},
+            context,
+        )
+        == "https://static/pretest.pdf"
+    )
+    assert (
+        resolve_header_link({"header": {"source": "gift.gift_card_url"}}, context)
+        == "https://x/y.pdf"
+    )
 
 
 def test_resolve_slots_literal_mustache_interpolates():

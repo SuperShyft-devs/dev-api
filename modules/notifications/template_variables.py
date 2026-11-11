@@ -115,17 +115,26 @@ def resolve_header_link(
     header = template_variables.get("header")
     if isinstance(header, dict):
         source = str(header.get("source") or "").strip()
+        if source == "literal":
+            raw = str(header.get("value") or "").strip()
+            return interpolate_email_template(raw, context) or None
         if source:
-            value = _get_nested(context, source)
+            normalized = _normalize_slot_source(source)
+            value = _get_nested(context, normalized)
             if value:
                 return value
     attachments = template_variables.get("attachments")
     if isinstance(attachments, dict):
         for key in ("pdflink", "medialink"):
             ref = attachments.get(key)
-            if isinstance(ref, str) and "{{" in ref:
+            if not isinstance(ref, str) or not ref.strip():
+                continue
+            if ref.strip().startswith("http"):
+                return ref.strip()
+            if "{{" in ref:
                 source = ref.replace("{{", "").replace("}}", "").strip()
-                value = _get_nested(context, source) if "." in source else str(context.get(source) or "")
+                inner = _expand_email_placeholder(source) if "." not in source else source
+                value = _get_nested(context, inner) if "." in inner else str(context.get(inner) or "")
                 if value:
                     return value
     return None
