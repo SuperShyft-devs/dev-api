@@ -5,6 +5,8 @@ from __future__ import annotations
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from modules.notifications.models import NotificationService
+
 from modules.engagement_notifications.service_config import (
     extract_service_keys,
     normalize_notification_services,
@@ -140,14 +142,28 @@ class EngagementNotificationsRepository:
                     seen.add(cfg.service_key)
                     bucket.append(cfg)
 
-        items = [
-            {
-                "event_code": event_code,
-                "notification_services": serialize_for_db(configs),
-            }
-            for event_code, configs in sorted(by_event.items())
-            if configs
-        ]
+        items: list[dict] = []
+        for event_code, configs in sorted(by_event.items()):
+            if not configs:
+                continue
+            keys = [c.service_key for c in configs if c.service_key]
+            if not keys:
+                continue
+            result = await db.execute(
+                select(NotificationService.service_key).where(
+                    NotificationService.service_key.in_(keys)
+                )
+            )
+            known = {row[0] for row in result.all()}
+            filtered = [c for c in configs if c.service_key in known]
+            if not filtered:
+                continue
+            items.append(
+                {
+                    "event_code": event_code,
+                    "notification_services": serialize_for_db(filtered),
+                }
+            )
         if not items:
             return []
         return await self.upsert_for_engagement(db, engagement_id, items)

@@ -13,6 +13,7 @@ Optional phases:
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 
@@ -163,13 +164,20 @@ async def _backfill_engagement_notifications() -> dict[str, Any]:
         for engagement_id, engagement_type in rows:
             if engagement_type is None:
                 continue
-            existing = await repo.list_for_engagement(db, int(engagement_id))
-            if existing:
-                continue
-            await repo.populate_from_defaults(
-                db, engagement_id=int(engagement_id), engagement_type_id=int(engagement_type)
-            )
-            updated += 1
+            try:
+                await repo.populate_from_defaults(
+                    db,
+                    engagement_id=int(engagement_id),
+                    engagement_type_id=int(engagement_type),
+                )
+                updated += 1
+            except Exception as exc:
+                await db.rollback()
+                logging.warning(
+                    "populate_from_defaults skipped engagement_id=%s: %s",
+                    engagement_id,
+                    exc,
+                )
         await db.commit()
     return {"engagements_backfilled": updated}
 
