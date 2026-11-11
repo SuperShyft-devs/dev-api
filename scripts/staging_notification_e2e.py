@@ -83,6 +83,22 @@ async def _ensure_engagement_notifications(db, engagement_id: int, engagement_ty
     await repo.populate_from_defaults(db, engagement_id=engagement_id, engagement_type_id=engagement_type_id)
 
 
+async def _mark_participant_paid(*, user_id: int, engagement_id: int) -> None:
+    """Staging public onboard may leave paid=false; reminder crons require paid participants."""
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text(
+                """
+                UPDATE engagement_participants
+                SET paid = true
+                WHERE user_id = :uid AND engagement_id = :eid
+                """
+            ),
+            {"uid": user_id, "eid": engagement_id},
+        )
+        await db.commit()
+
+
 async def _patch_collection_date(
     *,
     user_id: int,
@@ -100,7 +116,7 @@ async def _patch_collection_date(
                 WHERE pbb.engagement_participant_id = ep.engagement_participant_id
                   AND ep.user_id = :uid
                   AND ep.engagement_id = :eid
-                  AND pbb.status = 'active'
+                  AND pbb.status = 1
                 """
             ),
             {
@@ -147,6 +163,7 @@ async def _run_onboard_phases(
             if eng_type is not None:
                 await _ensure_engagement_notifications(db, engagement_id, int(eng_type))
             await db.commit()
+        await _mark_participant_paid(user_id=user_id, engagement_id=engagement_id)
         results.append(
             {
                 "label": "onboard",
