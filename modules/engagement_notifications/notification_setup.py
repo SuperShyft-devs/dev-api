@@ -8,123 +8,155 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.engagement_notifications.repository import EngagementNotificationsRepository
 from modules.engagement_notifications.service_config import (
-    NotificationServiceConfigItem,
-    extract_service_keys,
+    configs_to_api,
     normalize_notification_services,
-    serialize_for_db,
 )
 from modules.engagements.models import Engagement
 from modules.notifications.bindings_repository import NotificationBindingsRepository
+from modules.notifications.bindings_service import NotificationBindingsService
 from modules.notifications.event_applicability import (
-    catalog_groups_for_event,
+    EngagementNotificationProfile,
+    engagement_notification_applicable,
+    list_applicable_event_codes,
     profile_from_engagement,
+    profile_from_mapping,
+    profile_key,
+    profile_label,
+    show_on_engagement_wizard,
 )
-from modules.notifications.events_catalog import get_event
-from modules.notifications.models import NotificationService
-from sqlalchemy import select
+from modules.notifications.events_catalog import get_event, list_events
 
 
-def _merge_service_configs(bindings: list) -> list[dict[str, Any]]:
-    seen: set[str] = set()
-    out: list[dict[str, Any]] = []
-    for row in bindings:
-        for cfg in normalize_notification_services(row.notification_services):
-            if cfg.service_key and cfg.service_key not in seen:
-                seen.add(cfg.service_key)
-                out.append(cfg.model_dump(mode="json"))
-    return out
+def _slot_to_api(row) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "engagement_id": row.engagement_id,
+        "event_code": row.event_code,
+        "event_name": row.event_name,
+        "recipient_type": row.recipient_type,
+        "delivery_channel": row.delivery_channel,
+        "notification_services": configs_to_api(row.notification_services),
+        "recipient_config": row.recipient_config,
+        "condition_key": row.condition_key,
+        "emit_condition": row.emit_condition,
+        "source_binding_id": row.source_binding_id,
+    }
+
+
+def _global_binding_to_api(row) -> dict[str, Any]:
+    return NotificationBindingsService()._to_response(row).model_dump()
 
 
 async def build_notification_setup_for_profile(
     db: AsyncSession,
-    profile,
+    profile: EngagementNotificationProfile,
     *,
     engagement_id: int | None = None,
-) -> list[dict[str, Any]]:
-    from modules.notifications.event_applicability import list_applicable_event_codes
-
+    extra_event_codes: frozenset[str] | None = None,
+) -> dict[str, Any]:
     bindings_repo = NotificationBindingsRepository()
     en_repo = EngagementNotificationsRepository()
-    overrides: dict[str, list] = {}
-    if engagement_id is not None:
-        for row in await en_repo.list_for_engagement(db, engagement_id):
-            overrides[row.event_code] = row.notification_services or []
 
-    result: list[dict[str, Any]] = []
-    for event_code in list_applicable_event_codes(profile):
+    applicable = set(list_applicable_event_codes(profile))
+    engagement_slots_by_event: dict[str, list] = {}
+    extra_codes: set[str] = set()
+    if engagement_id is not None:
+        for slot in await en_repo.list_for_engagement(db, engagement_id):
+            engagement_slots_by_event.setdefault(slot.event_code, []).append(slot)
+            if slot.event_code not in applicable:
+                extra_codes.add(slot.event_code)
+    if extra_event_codes:
+        extra_codes |= set(extra_event_codes)
+
+    all_event_codes = sorted(applicable | extra_codes)
+    events_out: list[dict[str, Any]] = []
+    for event_code in all_event_codes:
         ev = get_event(event_code)
-        bindings = await bindings_repo.list_for_event(db, event_code=event_code)
-        default_services = _merge_service_configs(bindings)
-        override_raw = overrides.get(event_code)
-        override_services = (
-            [c.model_dump(mode="json") for c in normalize_notification_services(override_raw)]
-            if override_raw
-            else []
+        global_rows = await bindings_repo.list_for_event(
+            db, event_code=event_code, engagement_type_id=None
         )
-        result.append(
+        global_only = [r for r in global_rows if r.engagement_type_id is None]
+        slots = engagement_slots_by_event.get(event_code, [])
+        events_out.append(
             {
                 "event_code": event_code,
                 "name": ev.name if ev else event_code,
-                "catalog_groups": list(catalog_groups_for_event(event_code)),
-                "default_services": default_services,
-                "override_services": override_services,
+                "is_applicable": event_code in applicable,
+                "is_extra": event_code in extra_codes and event_code not in applicable,
+                "global_bindings": [_global_binding_to_api(r) for r in global_only],
+                "engagement_bindings": [_slot_to_api(s) for s in slots],
             }
         )
-    return result
+
+    return {
+        "profile_key": profile_key(profile),
+        "profile_label": profile_label(profile),
+        "engagement_id": engagement_id,
+        "events": events_out,
+        "applicable_event_count": len(applicable),
+    }
 
 
 async def build_notification_setup_for_engagement(
     db: AsyncSession,
     engagement_id: int,
-) -> list[dict[str, Any]]:
+) -> dict[str, Any]:
     row = await db.get(Engagement, engagement_id)
     if row is None:
-        return []
+        return {
+            "profile_key": "",
+            "profile_label": "",
+            "engagement_id": engagement_id,
+            "events": [],
+            "applicable_event_count": 0,
+        }
     profile = await profile_from_engagement(db, row)
     return await build_notification_setup_for_profile(db, profile, engagement_id=engagement_id)
 
 
+def list_addable_event_codes(profile: EngagementNotificationProfile) -> list[dict[str, str]]:
+    applicable = set(list_applicable_event_codes(profile))
+    out: list[dict[str, str]] = []
+    for ev in list_events():
+        if not show_on_engagement_wizard(ev.code):
+            continue
+        if ev.code in applicable:
+            continue
+        if engagement_notification_applicable(ev.code, profile):
+            continue
+        out.append({"code": ev.code, "name": ev.name})
+    return sorted(out, key=lambda x: x["code"])
+
+
 async def collect_global_default_services_for_applicable(
     db: AsyncSession,
-    profile,
+    profile: EngagementNotificationProfile,
 ) -> list[dict]:
-    """Services to seed engagement_notifications (populate_from_defaults)."""
+    """Legacy helper: one merged service list per applicable event."""
     bindings_repo = NotificationBindingsRepository()
-    items: list[dict] = []
-    from modules.notifications.event_applicability import list_applicable_event_codes
+    from modules.engagement_notifications.repository import (
+        EngagementNotificationsRepository,
+    )
 
+    en_repo = EngagementNotificationsRepository()
+    items: list[dict] = []
     for event_code in list_applicable_event_codes(profile):
-        bindings = await bindings_repo.list_for_event(db, event_code=event_code)
-        configs = _merge_service_configs(bindings)
-        if not configs:
-            continue
-        keys = [c["service_key"] for c in configs if c.get("service_key")]
-        if not keys:
-            continue
-        svc_rows = await db.execute(
-            select(NotificationService).where(NotificationService.service_key.in_(keys))
-        )
-        services_by_key = {s.service_key: s for s in svc_rows.scalars().all()}
-        filtered: list[NotificationServiceConfigItem] = []
-        for cfg in configs:
-            sk = str(cfg.get("service_key") or "")
-            svc = services_by_key.get(sk)
-            if svc is None:
+        bindings = await bindings_repo.list_for_event(db, event_code=event_code, engagement_type_id=None)
+        merged = []
+        seen: set[str] = set()
+        for row in bindings:
+            if row.engagement_type_id is not None:
                 continue
-            link = cfg.get("external_link")
-            if svc.require_external_link and not (link and str(link).strip()):
-                link = "https://app.supershyft.com"
-            filtered.append(
-                NotificationServiceConfigItem(
-                    service_key=sk,
-                    external_link=str(link).strip() if link else None,
-                )
-            )
-        if filtered:
+            for cfg in normalize_notification_services(row.notification_services):
+                if cfg.service_key and cfg.service_key not in seen:
+                    seen.add(cfg.service_key)
+                    merged.append(cfg.model_dump(mode="json"))
+        if merged:
             items.append(
                 {
                     "event_code": event_code,
-                    "notification_services": serialize_for_db(filtered),
+                    "notification_services": merged,
                 }
             )
+    _ = en_repo
     return items

@@ -648,7 +648,9 @@ def classify_operation(route_template: str, method: str) -> RouteCapability | No
         category = "reports"
     elif path.startswith(("/checklist", "/checklist-templates")):
         category = "checklists_tasks"
-    elif path.startswith("/engagements") and "/notifications" in path:
+    elif path == "/engagements/notification-setup" or (
+        path.startswith("/engagements") and "/notifications" in path
+    ):
         category = "notifications"
     elif path.startswith("/engagements"):
         category = "engagements"

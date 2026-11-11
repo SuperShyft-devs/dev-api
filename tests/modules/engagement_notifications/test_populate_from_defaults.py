@@ -22,11 +22,11 @@ async def test_populate_from_defaults_merges_global_when_type_empty(test_db_sess
             INSERT INTO engagements (
                 engagement_id, engagement_name, engagement_code, engagement_type,
                 assessment_package_id, diagnostic_package_id, city, slot_duration,
-                start_date, end_date, status
+                start_date, end_date, status, blood_collection_type, payment_type
             )
             VALUES (
                 :eid, 'E2E Notify', 'E2E88001', :etype, 1, 1, 'BLR', 20,
-                '2026-12-01', '2026-12-01', 3
+                '2026-12-01', '2026-12-01', 3, 'camp_collection', 'paid_by_group'
             )
             ON CONFLICT (engagement_id) DO NOTHING
             """
@@ -49,11 +49,11 @@ async def test_populate_from_defaults_merges_global_when_type_empty(test_db_sess
             """
             INSERT INTO notification_events (
                 event_code, event_name, recipient_type, delivery_channel,
-                notification_services, engagement_type_id
+                notification_services, engagement_type_id, condition_key
             )
             VALUES (
                 'reminders.pretest', 'Pretest', 'user', 'whatsapp',
-                CAST(:services AS jsonb), NULL
+                CAST(:services AS jsonb), NULL, 'default'
             )
             """
         ),

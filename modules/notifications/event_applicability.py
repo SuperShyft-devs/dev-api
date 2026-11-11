@@ -53,6 +53,7 @@ class EngagementNotificationProfile:
     blood_collection_type: str | None
     auto_booking: bool | None
     consultation_mode: str | None
+    payment_type: str | None = None
 
     @property
     def has_blood_collection(self) -> bool:
@@ -80,11 +81,15 @@ def profile_from_mapping(data: dict[str, Any]) -> EngagementNotificationProfile:
         auto = None
     else:
         auto = bool(ab)
+    pt = data.get("payment_type")
+    if pt is not None:
+        pt = str(pt).strip() or None
     return EngagementNotificationProfile(
         engagement_kind=kind,
         blood_collection_type=bct,
         auto_booking=auto,
         consultation_mode=cm,
+        payment_type=pt,
     )
 
 
@@ -94,13 +99,24 @@ def _profile_from_row_fields(
     blood_collection_type: str | None,
     auto_booking: bool | None,
     consultation_mode: str | None,
+    payment_type: str | None = None,
 ) -> EngagementNotificationProfile:
     return EngagementNotificationProfile(
         engagement_kind=engagement_kind,
         blood_collection_type=blood_collection_type,
         auto_booking=auto_booking,
         consultation_mode=consultation_mode,
+        payment_type=payment_type,
     )
+
+
+def _payment_type_str(row: Any) -> str | None:
+    pt = getattr(row, "payment_type", None)
+    if pt is None:
+        return None
+    if hasattr(pt, "value"):
+        return str(pt.value)
+    return str(pt).strip() or None
 
 
 def profile_from_engagement_row(row: Any) -> EngagementNotificationProfile:
@@ -123,6 +139,7 @@ def profile_from_engagement_row(row: Any) -> EngagementNotificationProfile:
         blood_collection_type=bct_str,
         auto_booking=bool(auto) if auto is not None else None,
         consultation_mode=cm_str,
+        payment_type=_payment_type_str(row),
     )
 
 
@@ -153,7 +170,135 @@ async def profile_from_engagement(db: Any, row: Any) -> EngagementNotificationPr
         blood_collection_type=bct_str,
         auto_booking=bool(auto) if auto is not None else None,
         consultation_mode=cm_str,
+        payment_type=_payment_type_str(row),
     )
+
+
+CANONICAL_ENGAGEMENT_PROFILE_KEYS: tuple[str, ...] = (
+    "engagement_type_bio_aiandpayment_type_paid_by_groupandblood_collection_campandauto_booking_on",
+    "engagement_type_bio_aiandpayment_type_paid_by_groupandblood_collection_campandauto_booking_off",
+    "engagement_type_bio_aiandpayment_type_paid_by_groupandblood_collection_homeandauto_booking_on",
+    "engagement_type_bio_aiandpayment_type_paid_by_groupandblood_collection_homeandauto_booking_off",
+    "engagement_type_bio_aiandpayment_type_paid_by_patientandblood_collection_campandauto_booking_on",
+    "engagement_type_bio_aiandpayment_type_paid_by_patientandblood_collection_campandauto_booking_off",
+    "engagement_type_bio_aiandpayment_type_paid_by_patientandblood_collection_homeandauto_booking_on",
+    "engagement_type_bio_aiandpayment_type_paid_by_patientandblood_collection_homeandauto_booking_off",
+    "engagement_type_blood_testandpayment_type_paid_by_groupandblood_collection_campandauto_booking_on",
+    "engagement_type_blood_testandpayment_type_paid_by_groupandblood_collection_campandauto_booking_off",
+    "engagement_type_blood_testandpayment_type_paid_by_groupandblood_collection_homeandauto_booking_on",
+    "engagement_type_blood_testandpayment_type_paid_by_groupandblood_collection_homeandauto_booking_off",
+    "engagement_type_blood_testandpayment_type_paid_by_patientandblood_collection_campandauto_booking_on",
+    "engagement_type_blood_testandpayment_type_paid_by_patientandblood_collection_campandauto_booking_off",
+    "engagement_type_blood_testandpayment_type_paid_by_patientandblood_collection_homeandauto_booking_on",
+    "engagement_type_blood_testandpayment_type_paid_by_patientandblood_collection_homeandauto_booking_off",
+    "engagement_type_bio_ai_with_consultationandpayment_type_paid_by_groupandconsultation_mode_onlineandblood_collection_campandauto_booking_on",
+    "engagement_type_bio_ai_with_consultationandpayment_type_paid_by_groupandconsultation_mode_onlineandblood_collection_campandauto_booking_off",
+    "engagement_type_bio_ai_with_consultationandpayment_type_paid_by_groupandconsultation_mode_onlineandblood_collection_homeandauto_booking_on",
+    "engagement_type_bio_ai_with_consultationandpayment_type_paid_by_groupandconsultation_mode_onlineandblood_collection_homeandauto_booking_off",
+    "engagement_type_bio_ai_with_consultationandpayment_type_paid_by_groupandconsultation_mode_offlineandblood_collection_campandauto_booking_on",
+    "engagement_type_bio_ai_with_consultationandpayment_type_paid_by_groupandconsultation_mode_offlineandblood_collection_campandauto_booking_off",
+    "engagement_type_bio_ai_with_consultationandpayment_type_paid_by_groupandconsultation_mode_offlineandblood_collection_homeandauto_booking_on",
+    "engagement_type_bio_ai_with_consultationandpayment_type_paid_by_groupandconsultation_mode_offlineandblood_collection_homeandauto_booking_off",
+    "engagement_type_bio_ai_with_consultationandpayment_type_paid_by_patientandconsultation_mode_onlineandblood_collection_campandauto_booking_on",
+    "engagement_type_bio_ai_with_consultationandpayment_type_paid_by_patientandconsultation_mode_onlineandblood_collection_campandauto_booking_off",
+    "engagement_type_bio_ai_with_consultationandpayment_type_paid_by_patientandconsultation_mode_onlineandblood_collection_homeandauto_booking_on",
+    "engagement_type_bio_ai_with_consultationandpayment_type_paid_by_patientandconsultation_mode_onlineandblood_collection_homeandauto_booking_off",
+    "engagement_type_bio_ai_with_consultationandpayment_type_paid_by_patientandconsultation_mode_offlineandblood_collection_campandauto_booking_on",
+    "engagement_type_bio_ai_with_consultationandpayment_type_paid_by_patientandconsultation_mode_offlineandblood_collection_campandauto_booking_off",
+    "engagement_type_bio_ai_with_consultationandpayment_type_paid_by_patientandconsultation_mode_offlineandblood_collection_homeandauto_booking_on",
+    "engagement_type_bio_ai_with_consultationandpayment_type_paid_by_patientandconsultation_mode_offlineandblood_collection_homeandauto_booking_off",
+    "engagement_type_blood_test_with_consultationandpayment_type_paid_by_groupandconsultation_mode_onlineandblood_collection_campandauto_booking_on",
+    "engagement_type_blood_test_with_consultationandpayment_type_paid_by_groupandconsultation_mode_onlineandblood_collection_campandauto_booking_off",
+    "engagement_type_blood_test_with_consultationandpayment_type_paid_by_groupandconsultation_mode_onlineandblood_collection_homeandauto_booking_on",
+    "engagement_type_blood_test_with_consultationandpayment_type_paid_by_groupandconsultation_mode_onlineandblood_collection_homeandauto_booking_off",
+    "engagement_type_blood_test_with_consultationandpayment_type_paid_by_groupandconsultation_mode_offlineandblood_collection_campandauto_booking_on",
+    "engagement_type_blood_test_with_consultationandpayment_type_paid_by_groupandconsultation_mode_offlineandblood_collection_campandauto_booking_off",
+    "engagement_type_blood_test_with_consultationandpayment_type_paid_by_groupandconsultation_mode_offlineandblood_collection_homeandauto_booking_on",
+    "engagement_type_blood_test_with_consultationandpayment_type_paid_by_groupandconsultation_mode_offlineandblood_collection_homeandauto_booking_off",
+    "engagement_type_blood_test_with_consultationandpayment_type_paid_by_patientandconsultation_mode_onlineandblood_collection_campandauto_booking_on",
+    "engagement_type_blood_test_with_consultationandpayment_type_paid_by_patientandconsultation_mode_onlineandblood_collection_campandauto_booking_off",
+    "engagement_type_blood_test_with_consultationandpayment_type_paid_by_patientandconsultation_mode_onlineandblood_collection_homeandauto_booking_on",
+    "engagement_type_blood_test_with_consultationandpayment_type_paid_by_patientandconsultation_mode_onlineandblood_collection_homeandauto_booking_off",
+    "engagement_type_blood_test_with_consultationandpayment_type_paid_by_patientandconsultation_mode_offlineandblood_collection_campandauto_booking_on",
+    "engagement_type_blood_test_with_consultationandpayment_type_paid_by_patientandconsultation_mode_offlineandblood_collection_campandauto_booking_off",
+    "engagement_type_blood_test_with_consultationandpayment_type_paid_by_patientandconsultation_mode_offlineandblood_collection_homeandauto_booking_on",
+    "engagement_type_blood_test_with_consultationandpayment_type_paid_by_patientandconsultation_mode_offlineandblood_collection_homeandauto_booking_off",
+    "engagement_type_consultationandpayment_type_paid_by_groupandconsultation_mode_online",
+    "engagement_type_consultationandpayment_type_paid_by_groupandconsultation_mode_offline",
+    "engagement_type_consultationandpayment_type_paid_by_patientandconsultation_mode_online",
+    "engagement_type_consultationandpayment_type_paid_by_patientandconsultation_mode_offline",
+    "engagement_type_vifcandpayment_type_paid_by_group",
+    "engagement_type_vifcandpayment_type_paid_by_patient",
+    "engagement_type_platformandpayment_type_paid_by_group",
+    "engagement_type_platformandpayment_type_paid_by_patient",
+)
+
+
+def profile_from_profile_key(key: str) -> EngagementNotificationProfile:
+    kind: str | None = None
+    payment: str | None = None
+    consult_mode: str | None = None
+    blood: str | None = None
+    auto: bool | None = None
+    for segment in key.split("and"):
+        if segment.startswith("engagement_type_"):
+            kind = segment.removeprefix("engagement_type_")
+        elif segment.startswith("payment_type_"):
+            payment = segment.removeprefix("payment_type_")
+        elif segment.startswith("consultation_mode_"):
+            consult_mode = segment.removeprefix("consultation_mode_")
+        elif segment.startswith("blood_collection_"):
+            token = segment.removeprefix("blood_collection_")
+            blood = f"{token}_collection" if token in {"camp", "home"} else token
+        elif segment.startswith("auto_booking_"):
+            auto = segment.removeprefix("auto_booking_") == "on"
+    return _profile_from_row_fields(
+        engagement_kind=kind,
+        blood_collection_type=blood,
+        auto_booking=auto,
+        consultation_mode=consult_mode,
+        payment_type=payment,
+    )
+
+
+def profile_key(profile: EngagementNotificationProfile) -> str:
+    kind = (profile.engagement_kind or "unknown").strip()
+    parts = [f"engagement_type_{kind}", f"payment_type_{profile.payment_type or 'paid_by_group'}"]
+    if kind in _KINDS_WITH_CONSULTATION:
+        parts.append(f"consultation_mode_{profile.consultation_mode or 'online'}")
+    if kind in _KINDS_WITH_BLOOD:
+        bct = profile.blood_collection_type or ""
+        if bct == "camp_collection":
+            parts.append("blood_collection_camp")
+        elif bct == "home_collection":
+            parts.append("blood_collection_home")
+        elif bct:
+            parts.append(f"blood_collection_{bct}")
+        ab = profile.auto_booking if profile.auto_booking is not None else False
+        parts.append(f"auto_booking_{'on' if ab else 'off'}")
+    return "and".join(parts)
+
+
+def profile_label(profile: EngagementNotificationProfile) -> str:
+    kind = profile.engagement_kind or "—"
+    pay = (profile.payment_type or "paid_by_group").replace("paid_by_", "")
+    chunks = [kind, pay]
+    if profile.consultation_mode:
+        chunks.append(profile.consultation_mode)
+    if profile.blood_collection_type:
+        short = "camp" if profile.blood_collection_type == "camp_collection" else "home"
+        chunks.append(short)
+    if profile.auto_booking is not None and profile.blood_collection_type:
+        chunks.append("auto on" if profile.auto_booking else "auto off")
+    return " · ".join(chunks)
+
+
+def profile_keys_for_event(event_code: str) -> tuple[str, ...]:
+    out: list[str] = []
+    for key in CANONICAL_ENGAGEMENT_PROFILE_KEYS:
+        if engagement_notification_applicable(event_code, profile_from_profile_key(key)):
+            out.append(key)
+    return tuple(out)
 
 
 def _match_tri(rule: TriStateRule, value: bool | None) -> bool:

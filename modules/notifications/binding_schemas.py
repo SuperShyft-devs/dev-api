@@ -118,9 +118,10 @@ class WizardBindingPayload(BaseModel):
     service: WizardServiceSpec
 
 
-class EngagementNotificationWizardPayload(BaseModel):
-    event_code: str = Field(min_length=1)
-    service: WizardServiceSpec
+class EngagementNotificationWizardPayload(WizardBindingPayload):
+    """Full wizard payload for a single engagement notification binding slot."""
+
+    engagement_binding_id: int | None = None
 
 
 class WhatsappTemplateMetaResponse(BaseModel):

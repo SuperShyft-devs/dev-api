@@ -304,6 +304,19 @@ class NotificationBindingWizardService:
             await db.flush()
         return self._bindings_service._to_response(updated)
 
+    def _validate_engagement_recipient(
+        self, payload: EngagementNotificationWizardPayload, ev
+    ) -> dict | None:
+        binding = WizardBindingPayload(
+            event_code=payload.event_code,
+            recipient_type=payload.recipient_type,
+            recipient_config=payload.recipient_config,
+            engagement_type_id=None,
+            emit_condition=payload.emit_condition,
+            service=payload.service,
+        )
+        return self._validate_recipient(binding, ev)
+
     async def save_engagement_wizard(
         self,
         db: AsyncSession,
@@ -317,32 +330,36 @@ class NotificationBindingWizardService:
                 error_code="INVALID_INPUT",
                 message=f"Unknown event_code '{payload.event_code}'",
             )
+        recipient_config = self._validate_engagement_recipient(payload, ev)
+        binding_payload = WizardBindingPayload(
+            event_code=payload.event_code,
+            recipient_type=payload.recipient_type,
+            recipient_config=payload.recipient_config,
+            engagement_type_id=None,
+            emit_condition=payload.emit_condition,
+            service=payload.service,
+        )
+        condition_key, emit_condition = self._validate_emit_condition(binding_payload, ev)
+        recipient_type = payload.recipient_type.strip()
+        delivery_channel = payload.service.channel.strip().lower()
         svc = await self._ensure_service(db, event_code=payload.event_code, spec=payload.service)
         configs = serialize_for_db([NotificationServiceConfigItem(service_key=svc.service_key)])
-        existing = await self._en_repo.get_for_engagement_and_event_code(
-            db, engagement_id=engagement_id, event_code=payload.event_code
+        row = await self._en_repo.upsert_binding_slot(
+            db,
+            engagement_id=engagement_id,
+            event_code=payload.event_code,
+            recipient_type=recipient_type,
+            delivery_channel=delivery_channel,
+            notification_services=configs,
+            event_name=ev.name,
+            recipient_config=recipient_config,
+            condition_key=condition_key,
+            emit_condition=emit_condition,
+            slot_id=payload.engagement_binding_id,
         )
-        if existing is None:
-            await self._en_repo.upsert_for_engagement(
-                db,
-                engagement_id,
-                [{"event_code": payload.event_code, "notification_services": configs}],
-            )
-        else:
-            all_rows = await self._en_repo.list_for_engagement(db, engagement_id)
-            items = []
-            for row in all_rows:
-                if row.event_code == payload.event_code:
-                    items.append(
-                        {"event_code": row.event_code, "notification_services": configs}
-                    )
-                else:
-                    items.append(
-                        {
-                            "event_code": row.event_code,
-                            "notification_services": row.notification_services,
-                        }
-                    )
-            await self._en_repo.upsert_for_engagement(db, engagement_id, items)
-        rows = await self._en_repo.list_for_engagement(db, engagement_id)
-        return {"engagement_id": engagement_id, "notifications": len(rows)}
+        slots = await self._en_repo.list_for_engagement(db, engagement_id)
+        return {
+            "engagement_id": engagement_id,
+            "binding_id": row.id,
+            "notifications": len(slots),
+        }

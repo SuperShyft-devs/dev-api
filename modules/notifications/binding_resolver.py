@@ -7,12 +7,8 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from modules.engagement_notifications.service_config import (
-    extract_service_keys,
-    normalize_notification_services,
-    serialize_for_db,
-)
 from modules.engagement_notifications.repository import EngagementNotificationsRepository
+from modules.engagement_notifications.service_config import extract_service_keys
 from modules.engagements.models import Engagement
 from modules.notifications.bindings_repository import NotificationBindingsRepository
 from modules.notifications.emit_condition import matches_condition
@@ -50,6 +46,33 @@ class BindingResolver:
         if ev is None:
             return []
 
+        if engagement_id is not None:
+            slots = await self._en_repo.list_slots_for_event(
+                db, engagement_id=engagement_id, event_code=event_code
+            )
+            if slots:
+                resolved: list[ResolvedBinding] = []
+                for row in slots:
+                    raw_condition = getattr(row, "emit_condition", None)
+                    condition = raw_condition if isinstance(raw_condition, dict) else None
+                    if not matches_condition(ctx, condition):
+                        continue
+                    services = row.notification_services
+                    if not extract_service_keys(services):
+                        continue
+                    resolved.append(
+                        ResolvedBinding(
+                            recipient_type=row.recipient_type,
+                            notification_services=services,
+                            event_name=row.event_name or (ev.name if ev else event_code),
+                            recipient_config=(
+                                row.recipient_config if isinstance(row.recipient_config, dict) else None
+                            ),
+                        )
+                    )
+                return resolved
+            return []
+
         if engagement_type_id is None and engagement_id is not None:
             engagement_type_id = await self._engagement_type_id(db, engagement_id)
 
@@ -68,6 +91,11 @@ class BindingResolver:
             if ctx.get("service_key"):
                 fallback_services = list(fallback_services) + [str(ctx["service_key"])]
             if fallback_services and ev.default_recipients:
+                from modules.engagement_notifications.service_config import (
+                    normalize_notification_services,
+                    serialize_for_db,
+                )
+
                 return [
                     ResolvedBinding(
                         recipient_type=ev.default_recipients[0],
@@ -82,21 +110,13 @@ class BindingResolver:
                 ]
             return []
 
-        override_services: list[dict] | None = None
-        if engagement_id is not None:
-            en = await self._en_repo.get_for_engagement_and_event_code(
-                db, engagement_id=engagement_id, event_code=event_code
-            )
-            if en is not None and extract_service_keys(en.notification_services):
-                override_services = en.notification_services
-
-        resolved: list[ResolvedBinding] = []
+        resolved = []
         for row in bindings:
             raw_condition = getattr(row, "emit_condition", None)
             condition = raw_condition if isinstance(raw_condition, dict) else None
             if not matches_condition(ctx, condition):
                 continue
-            services = override_services if override_services is not None else row.notification_services
+            services = row.notification_services
             if not extract_service_keys(services):
                 continue
             resolved.append(
