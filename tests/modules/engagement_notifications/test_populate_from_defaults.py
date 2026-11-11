@@ -36,6 +36,17 @@ async def test_populate_from_defaults_merges_global_when_type_empty(test_db_sess
     await test_db_session.execute(
         text(
             """
+            INSERT INTO notification_services (
+                service_key, display_name, channel, webhook_path, is_active
+            )
+            VALUES ('pretest-whatsapp', 'Pretest', 'whatsapp', '/pretest', true)
+            ON CONFLICT (service_key) DO NOTHING
+            """
+        )
+    )
+    await test_db_session.execute(
+        text(
+            """
             INSERT INTO notification_events (
                 event_code, event_name, recipient_type, delivery_channel,
                 notification_services, engagement_type_id

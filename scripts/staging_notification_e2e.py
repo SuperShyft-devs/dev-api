@@ -146,6 +146,28 @@ def _run_job(module: str, extra: list[str]) -> dict[str, Any]:
     }
 
 
+async def _backfill_engagement_notifications() -> dict[str, Any]:
+    from modules.engagements.models import Engagement
+
+    updated = 0
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Engagement.engagement_id, Engagement.engagement_type))
+        rows = list(result.all())
+        repo = EngagementNotificationsRepository()
+        for engagement_id, engagement_type in rows:
+            if engagement_type is None:
+                continue
+            existing = await repo.list_for_engagement(db, int(engagement_id))
+            if existing:
+                continue
+            await repo.populate_from_defaults(
+                db, engagement_id=int(engagement_id), engagement_type_id=int(engagement_type)
+            )
+            updated += 1
+        await db.commit()
+    return {"engagements_backfilled": updated}
+
+
 async def main() -> int:
     parser = argparse.ArgumentParser(description="Staging notification E2E runner")
     parser.add_argument("--yes", action="store_true", help="Perform onboard + cron dispatches")
@@ -158,6 +180,9 @@ async def main() -> int:
     args = parser.parse_args()
     phases = {p.strip() for p in args.phase.split(",") if p.strip()}
     report: dict[str, Any] = {"phases": phases, "as_of": args.as_of or _today_ist().isoformat()}
+
+    if "sync" in phases and args.yes:
+        report["sync_engagement_notifications"] = await _backfill_engagement_notifications()
 
     if "onboard" in phases:
         report["onboard"] = await _run_onboard_phases(yes=args.yes)
