@@ -283,6 +283,35 @@ async def list_catalog_events(
     return success_response([item.model_dump() for item in service.list_catalog_events()])
 
 
+@router.get("/catalog/events/{event_code}/variable-fields")
+async def list_template_variable_fields(
+    event_code: str,
+    recipient_type: str | None = None,
+    employee: EmployeeContext = Depends(get_current_employee),
+):
+    _ = employee
+    from modules.notifications.events_catalog import get_event, variable_groups as event_variable_groups
+    from modules.notifications.variable_catalog import (
+        variable_fields_for_recipient,
+        variable_groups_for_recipient,
+    )
+
+    ev = get_event(event_code)
+    if ev is None:
+        from core.exceptions import AppError
+
+        raise AppError(status_code=404, error_code="NOT_FOUND", message="Unknown event")
+    groups = event_variable_groups(event_code)
+    return success_response(
+        {
+            "event_code": event_code,
+            "recipient_type": (recipient_type or "").strip() or None,
+            "variable_groups": variable_groups_for_recipient(groups, recipient_type),
+            "variable_fields": variable_fields_for_recipient(groups, recipient_type),
+        }
+    )
+
+
 @router.get("/catalog/events/{event_code}/payload-contacts")
 async def list_payload_contact_fields(
     event_code: str,

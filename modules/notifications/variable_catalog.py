@@ -91,6 +91,44 @@ def fields_for_groups(groups: tuple[str, ...] | list[str]) -> list[str]:
     return out
 
 
+def is_team_recipient(recipient_type: str | None) -> bool:
+    """Ops/tech/design departments and onboarding assistants (message goes to internal staff)."""
+    rt = (recipient_type or "").strip()
+    if not rt:
+        return False
+    if rt in (
+        "assistants",
+        "assistants.phlebo",
+        "assistants.expert",
+        "assistants.staff",
+        "departments",
+    ):
+        return True
+    return rt.startswith("departments.")
+
+
+def variable_groups_for_recipient(
+    event_groups: tuple[str, ...] | list[str],
+    recipient_type: str | None,
+) -> list[str]:
+    groups = list(event_groups)
+    if not is_team_recipient(recipient_type):
+        return groups
+    prepend: list[str] = []
+    if "staff" not in groups:
+        prepend.append("staff")
+    if "participant" not in groups and "user" in groups:
+        prepend.append("participant")
+    return prepend + groups
+
+
+def variable_fields_for_recipient(
+    event_groups: tuple[str, ...] | list[str],
+    recipient_type: str | None,
+) -> list[str]:
+    return fields_for_groups(variable_groups_for_recipient(event_groups, recipient_type))
+
+
 KNOWN_RECIPIENT_TYPES: frozenset[str] = frozenset(
     {
         "user",
