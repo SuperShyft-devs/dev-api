@@ -22,7 +22,6 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 import asyncio
 import json
-import sys
 import urllib.error
 import urllib.request
 from datetime import date, timedelta
@@ -33,10 +32,11 @@ from sqlalchemy import select, text
 
 from db.session import AsyncSessionLocal
 from modules.engagement_notifications.repository import EngagementNotificationsRepository
-from modules.engagements.models import EngagementParticipant
-
 _IST = ZoneInfo("Asia/Kolkata")
 _STAGING_API = "https://staging-api.supershyft.com"
+# All participant-facing E2E messages (WhatsApp / email) should land here.
+STAGING_E2E_PHONE = "8762830757"
+STAGING_E2E_EMAIL = "pratheek.fitnastic@gmail.com"
 
 
 def _today_ist() -> date:
@@ -58,15 +58,15 @@ def _http_json(method: str, path: str, body: dict | None = None) -> dict[str, An
 
 def _onboard_payload(
     *,
-    suffix: str,
+    label: str,
     collection_date: date,
+    phone: str,
     email: str,
 ) -> dict[str, Any]:
-    phone = f"87628{suffix.zfill(5)}"[-10:]
     return {
         "age": 30,
-        "first_name": "Notify",
-        "last_name": f"E2E{suffix}",
+        "first_name": "Pratheek",
+        "last_name": f"E2E-{label}",
         "email": email,
         "phone": phone,
         "gender": "male",
@@ -83,60 +83,89 @@ async def _ensure_engagement_notifications(db, engagement_id: int, engagement_ty
     await repo.populate_from_defaults(db, engagement_id=engagement_id, engagement_type_id=engagement_type_id)
 
 
-async def _run_onboard_phases(*, yes: bool) -> list[dict[str, Any]]:
+async def _patch_collection_date(
+    *,
+    user_id: int,
+    engagement_id: int,
+    collection_date: date,
+) -> None:
+    """Point the participant's active blood booking at collection_date (for cron E2E)."""
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text(
+                """
+                UPDATE participant_blood_bookings pbb
+                SET collection_date = :coll_date
+                FROM engagement_participants ep
+                WHERE pbb.engagement_participant_id = ep.engagement_participant_id
+                  AND ep.user_id = :uid
+                  AND ep.engagement_id = :eid
+                  AND pbb.status = 'active'
+                """
+            ),
+            {
+                "coll_date": collection_date,
+                "uid": user_id,
+                "eid": engagement_id,
+            },
+        )
+        await db.commit()
+
+
+async def _run_onboard_phases(
+    *,
+    yes: bool,
+    phone: str,
+    email: str,
+) -> list[dict[str, Any]]:
     if not yes:
         return [{"phase": "onboard", "skipped": "pass --yes"}]
     today = _today_ist()
     tomorrow = today + timedelta(days=1)
     yesterday = today - timedelta(days=1)
-    stamp = str(int(asyncio.get_event_loop().time() * 1000))[-6:]
-    scenarios = [
-        ("pretest", tomorrow, f"e2e-pretest-{stamp}@fitnastic.testmail.app"),
-        ("qr-before", tomorrow, f"e2e-qrb-{stamp}@fitnastic.testmail.app"),
-        ("qr-after", yesterday, f"e2e-qra-{stamp}@fitnastic.testmail.app"),
-    ]
     results: list[dict[str, Any]] = []
-    for label, coll_date, email in scenarios:
-        payload = _onboard_payload(suffix=f"{label}-{stamp}", collection_date=coll_date, email=email)
-        try:
-            resp = _http_json("POST", "/users/public/onboard", payload)
-            data = resp.get("data") or {}
-            engagement_id = int(data["engagement_id"])
-            user_id = int(data["user_id"])
-            async with AsyncSessionLocal() as db:
-                row = await db.execute(
-                    select(EngagementParticipant).where(
-                        EngagementParticipant.engagement_id == engagement_id,
-                        EngagementParticipant.user_id == user_id,
-                    )
+
+    # One onboard on your test phone/email; then shift collection date per scenario.
+    payload = _onboard_payload(
+        label="staging-e2e",
+        collection_date=tomorrow,
+        phone=phone,
+        email=email,
+    )
+    try:
+        resp = _http_json("POST", "/users/public/onboard", payload)
+        data = resp.get("data") or {}
+        user_id = int(data["user_id"])
+        engagement_id = int(data["engagement_id"])
+        async with AsyncSessionLocal() as db:
+            eng_type = (
+                await db.execute(
+                    text("SELECT engagement_type FROM engagements WHERE engagement_id = :eid"),
+                    {"eid": engagement_id},
                 )
-                ep = row.scalar_one_or_none()
-                eng_type = (
-                    await db.execute(
-                        text(
-                            "SELECT engagement_type FROM engagements WHERE engagement_id = :eid"
-                        ),
-                        {"eid": engagement_id},
-                    )
-                ).scalar_one_or_none()
-                if ep is not None and eng_type is not None:
-                    await _ensure_engagement_notifications(db, engagement_id, int(eng_type))
-                await db.commit()
-            results.append(
-                {
-                    "label": label,
-                    "user_id": user_id,
-                    "engagement_id": engagement_id,
-                    "collection_date": coll_date.isoformat(),
-                    "phone": payload["phone"],
-                    "status": "onboarded",
-                }
-            )
-        except urllib.error.HTTPError as exc:
-            body = exc.read().decode("utf-8", errors="replace")
-            results.append({"label": label, "status": "error", "http": exc.code, "body": body[:500]})
-        except Exception as exc:
-            results.append({"label": label, "status": "error", "error": str(exc)[:500]})
+            ).scalar_one_or_none()
+            if eng_type is not None:
+                await _ensure_engagement_notifications(db, engagement_id, int(eng_type))
+            await db.commit()
+        results.append(
+            {
+                "label": "onboard",
+                "user_id": user_id,
+                "engagement_id": engagement_id,
+                "collection_date": tomorrow.isoformat(),
+                "phone": phone,
+                "email": email,
+                "status": "onboarded",
+            }
+        )
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        return [{"label": "onboard", "status": "error", "http": exc.code, "body": body[:500]}]
+    except Exception as exc:
+        return [{"label": "onboard", "status": "error", "error": str(exc)[:500]}]
+
+    results[0]["pretest_and_qr_before_date"] = tomorrow.isoformat()
+    results[0]["questionnaire_after_date"] = yesterday.isoformat()
     return results
 
 
@@ -191,15 +220,28 @@ async def main() -> int:
         help="Comma list: onboard,pretest,questionnaire,consultation,blood,bioai",
     )
     parser.add_argument("--as-of", default=None, help="YYYY-MM-DD for cron as-of (IST context)")
+    parser.add_argument("--phone", default=STAGING_E2E_PHONE, help="Participant WhatsApp/SMS phone")
+    parser.add_argument("--email", default=STAGING_E2E_EMAIL, help="Participant email")
     args = parser.parse_args()
     phases = {p.strip() for p in args.phase.split(",") if p.strip()}
-    report: dict[str, Any] = {"phases": phases, "as_of": args.as_of or _today_ist().isoformat()}
+    report: dict[str, Any] = {
+        "phases": phases,
+        "as_of": args.as_of or _today_ist().isoformat(),
+        "participant_phone": args.phone,
+        "participant_email": args.email,
+    }
+
+    onboard_ctx: dict[str, Any] | None = None
 
     if "sync" in phases and args.yes:
         report["sync_engagement_notifications"] = await _backfill_engagement_notifications()
 
     if "onboard" in phases:
-        report["onboard"] = await _run_onboard_phases(yes=args.yes)
+        report["onboard"] = await _run_onboard_phases(
+            yes=args.yes, phone=args.phone, email=args.email
+        )
+        if report["onboard"] and report["onboard"][0].get("user_id"):
+            onboard_ctx = report["onboard"][0]
 
     extra_as_of = ["--as-of", args.as_of] if args.as_of else []
 
@@ -209,7 +251,18 @@ async def main() -> int:
                 "db.jobs.dispatch_pretest_reminders", extra_as_of
             )
         if "questionnaire" in phases:
-            report["questionnaire_cron"] = _run_job(
+            report["questionnaire_cron_before"] = _run_job(
+                "db.jobs.dispatch_questionnaire_reminders", extra_as_of
+            )
+            if onboard_ctx:
+                yesterday = _today_ist() - timedelta(days=1)
+                await _patch_collection_date(
+                    user_id=int(onboard_ctx["user_id"]),
+                    engagement_id=int(onboard_ctx["engagement_id"]),
+                    collection_date=yesterday,
+                )
+                report["questionnaire_after_patch"] = yesterday.isoformat()
+            report["questionnaire_cron_after"] = _run_job(
                 "db.jobs.dispatch_questionnaire_reminders", extra_as_of
             )
         if "consultation" in phases:

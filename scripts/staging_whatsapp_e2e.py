@@ -21,6 +21,7 @@ from modules.notifications.staging_e2e_context import (
 )
 
 PHONE = "8762830757"
+EMAIL = "pratheek.fitnastic@gmail.com"
 OTP = "111222"
 
 
@@ -95,7 +96,7 @@ async def main() -> None:
                     "first_name": "Pratheek",
                     "last_name": "Bedre",
                     "phone": PHONE,
-                    "email": "",
+                    "email": EMAIL,
                 }
                 contact = merge_e2e_contact(
                     base_contact,
