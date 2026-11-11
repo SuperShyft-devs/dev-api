@@ -653,6 +653,18 @@ class PaymentsService:
                 await db.flush()
 
             sorted_ids = sorted(booking_ids)
+            if not skip_fulfillment:
+                from modules.notifications.payment_emit_context import (
+                    try_emit_payments_completed_after_verify,
+                )
+
+                await try_emit_payments_completed_after_verify(
+                    db,
+                    razorpay_order_id=razorpay_order_id,
+                    payer_user_id=authenticated_user_id,
+                    bookings=bookings,
+                    razorpay_payment_id=razorpay_payment_id,
+                )
             return {
                 "success": True,
                 "message": "Payment verified. Booking confirmed.",

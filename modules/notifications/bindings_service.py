@@ -18,8 +18,10 @@ from modules.notifications.binding_schemas import (
 from modules.notifications.bindings_repository import NotificationBindingsRepository
 from modules.notifications.repository import NotificationsRepository
 from modules.notifications.events_catalog import get_event, list_events
+from modules.notifications.emit_contact_catalog import payload_contact_fields_for_event
+from modules.notifications.event_trigger_source import allows_payload_recipient, trigger_source_for_event
 from modules.notifications.variable_catalog import RECIPIENT_PAYLOAD_HINTS, fields_for_groups
-from modules.notifications.binding_schemas import CatalogEventResponse
+from modules.notifications.binding_schemas import CatalogEventResponse, PayloadContactFieldResponse
 
 
 class NotificationBindingsService:
@@ -27,20 +29,35 @@ class NotificationBindingsService:
         self._repo = repository or NotificationBindingsRepository()
 
     def list_catalog_events(self) -> list[CatalogEventResponse]:
-        return [
-            CatalogEventResponse(
-                code=e.code,
-                name=e.name,
-                status=e.status,
-                variable_groups=list(e.variable_groups),
-                variable_fields=fields_for_groups(e.variable_groups),
-                default_recipients=list(e.default_recipients),
-                trigger_notes=e.trigger_notes,
-                legacy_event_code=e.legacy_event_code,
-                recipient_payload_hints=dict(RECIPIENT_PAYLOAD_HINTS),
+        out: list[CatalogEventResponse] = []
+        for e in list_events():
+            ts = trigger_source_for_event(e)
+            allow_payload = allows_payload_recipient(e)
+            payload_fields = (
+                [
+                    PayloadContactFieldResponse(**row)
+                    for row in payload_contact_fields_for_event(e.code)
+                ]
+                if allow_payload
+                else []
             )
-            for e in list_events()
-        ]
+            out.append(
+                CatalogEventResponse(
+                    code=e.code,
+                    name=e.name,
+                    status=e.status,
+                    variable_groups=list(e.variable_groups),
+                    variable_fields=fields_for_groups(e.variable_groups),
+                    default_recipients=list(e.default_recipients),
+                    trigger_notes=e.trigger_notes,
+                    legacy_event_code=e.legacy_event_code,
+                    recipient_payload_hints=dict(RECIPIENT_PAYLOAD_HINTS),
+                    trigger_source=ts,
+                    allows_payload_recipient=allow_payload,
+                    payload_contact_fields=payload_fields,
+                )
+            )
+        return out
 
     async def list_bindings(
         self,

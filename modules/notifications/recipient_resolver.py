@@ -10,6 +10,7 @@ from modules.employee.department_codes import department_for_recipient_type
 from modules.employee.notify_contacts import employees_to_notify_contacts
 from modules.employee.repository import EmployeeRepository
 from modules.engagements.repository import EngagementsRepository
+from modules.notifications.emit_contact_catalog import resolve_payload_targets
 
 _LEGACY_RECIPIENT_TYPE_ALIASES: dict[str, str] = {
     "oa.all": "assistants",
@@ -73,11 +74,22 @@ class RecipientResolver:
         recipient_type: str,
         context: dict,
         engagement_id: int | None = None,
+        recipient_config: dict | None = None,
+        event_code: str | None = None,
     ) -> DispatchTarget:
         rt = (recipient_type or "").strip()
         rt = _LEGACY_RECIPIENT_TYPE_ALIASES.get(rt, rt)
 
         if rt == "user":
+            cfg = recipient_config or {}
+            key = str(cfg.get("user_context_key") or "").strip()
+            if key:
+                uid = context.get(key)
+                uids = context.get(key) if key == "user_ids" else None
+                if key == "user_ids" and isinstance(uids, list):
+                    return DispatchTarget(user_ids=[int(x) for x in uids])
+                if uid is not None:
+                    return DispatchTarget(user_ids=[int(uid)])
             uid = context.get("user_id") or context.get("participant_user_id")
             uids = context.get("user_ids")
             if uids:
@@ -149,5 +161,14 @@ class RecipientResolver:
             if isinstance(contacts, list):
                 return DispatchTarget(contacts=contacts)
             return DispatchTarget()
+
+        if rt == "payload":
+            cfg = recipient_config or {}
+            field_ids = cfg.get("payload_field_ids") or []
+            if not isinstance(field_ids, list) or not field_ids:
+                return DispatchTarget()
+            code = (event_code or "").strip() or str(context.get("event_code") or "")
+            user_ids, contacts = resolve_payload_targets(context, list(field_ids), code)
+            return DispatchTarget(user_ids=user_ids, contacts=contacts)
 
         return DispatchTarget()

@@ -34,6 +34,17 @@ class NotificationBindingResponse(BaseModel):
     service_key: str | None = None
 
 
+class PayloadContactFieldResponse(BaseModel):
+    id: str
+    label: str
+    path: str
+    kind: str
+    cardinality: str
+    group: str
+    description: str = ""
+    example: str = ""
+
+
 class CatalogEventResponse(BaseModel):
     code: str
     name: str
@@ -44,11 +55,15 @@ class CatalogEventResponse(BaseModel):
     trigger_notes: str
     legacy_event_code: str | None = None
     recipient_payload_hints: dict[str, str] = Field(default_factory=dict)
+    trigger_source: str = "api"
+    allows_payload_recipient: bool = False
+    payload_contact_fields: list[PayloadContactFieldResponse] = Field(default_factory=list)
 
 
 class RecipientConfigPayload(BaseModel):
     phones: list[str] = Field(default_factory=list)
     emails: list[str] = Field(default_factory=list)
+    payload_field_ids: list[str] = Field(default_factory=list)
 
 
 class WizardTemplateSlot(BaseModel):

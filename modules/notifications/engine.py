@@ -95,6 +95,8 @@ class NotificationEngine:
                 recipient_type=binding.recipient_type,
                 context=emit_context,
                 engagement_id=engagement_id,
+                recipient_config=binding.recipient_config,
+                event_code=event_code,
             )
             if not target.user_ids and not target.contacts:
                 continue
@@ -149,7 +151,7 @@ class NotificationEngine:
                         nid = result.get("notification_id")
                         if nid is not None:
                             notification_ids.append(int(nid))
-                    else:
+                    if target.contacts:
                         result = await self._notifications_service.dispatch_to_contacts(
                             db,
                             service_key=service_key,

@@ -21,6 +21,8 @@ from modules.notifications.binding_schemas import (
 )
 from modules.notifications.bindings_repository import NotificationBindingsRepository
 from modules.notifications.bindings_service import NotificationBindingsService
+from modules.notifications.emit_contact_catalog import allowed_payload_field_ids
+from modules.notifications.event_trigger_source import allows_payload_recipient
 from modules.notifications.events_catalog import get_event
 from modules.notifications.models import NotificationService
 from modules.notifications.repository import NotificationsRepository
@@ -97,12 +99,37 @@ class NotificationBindingWizardService:
                     message="Custom recipient requires at least one phone or email",
                 )
             return {"phones": list(cfg.phones), "emails": list(cfg.emails)}
+        if rt == "payload":
+            if not allows_payload_recipient(ev):
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="Payload recipient is only allowed for API-triggered events",
+                )
+            cfg = payload.recipient_config
+            ids = list(cfg.payload_field_ids) if cfg and cfg.payload_field_ids else []
+            if not ids:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="Payload recipient requires at least one selected contact field",
+                )
+            allowed = allowed_payload_field_ids(payload.event_code.strip())
+            bad = [i for i in ids if i not in allowed]
+            if bad:
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message=f"Invalid payload field ids for this event: {', '.join(bad)}",
+                )
+            return {"payload_field_ids": ids}
         if rt not in ev.default_recipients and rt not in (
             "assistants",
             "departments",
             "departments.ops",
             "departments.tech",
             "departments.design",
+            "payload",
         ):
             pass
         return None

@@ -79,7 +79,7 @@ EVENTS: tuple[EventDefinition, ...] = (
     EventDefinition(
         code="payments.completed",
         name="Payment completed",
-        status="add",
+        status="current",
         variable_groups=("user", "payment", "engagement"),
         default_recipients=("user",),
         trigger_notes="Confirm payment success",

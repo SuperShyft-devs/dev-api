@@ -1195,6 +1195,16 @@ async def verify_and_finalize_engagement_code_payment(
                 "message": "Payment recorded",
             })
 
+    from modules.notifications.payment_emit_context import try_emit_payments_completed_after_verify
+
+    await try_emit_payments_completed_after_verify(
+        db,
+        razorpay_order_id=razorpay_order_id,
+        payer_user_id=caller_user_id,
+        bookings=bookings,
+        razorpay_payment_id=verify_result.get("payment_id") or razorpay_payment_id,
+    )
+
     return {
         "payment_verified": True,
         "razorpay_order_id": razorpay_order_id,
@@ -1266,6 +1276,16 @@ async def verify_and_finalize_draft_bookings(
         caller_user_id=caller_user_id,
         engagement_type_code=engagement_type_code,
         engagements_service=engagements_service,
+    )
+
+    from modules.notifications.payment_emit_context import try_emit_payments_completed_after_verify
+
+    await try_emit_payments_completed_after_verify(
+        db,
+        razorpay_order_id=razorpay_order_id,
+        payer_user_id=caller_user_id,
+        bookings=bookings,
+        razorpay_payment_id=verify_result.get("payment_id") or razorpay_payment_id,
     )
 
     return {
@@ -2725,6 +2745,17 @@ async def verify_and_finalize_consultation_booking(
         meta0 = bookings[0].metadata_ or {}
         if meta0.get("engagement_id") is not None:
             primary_engagement_id = int(meta0["engagement_id"])
+
+    from modules.notifications.payment_emit_context import try_emit_payments_completed_after_verify
+
+    await try_emit_payments_completed_after_verify(
+        db,
+        razorpay_order_id=razorpay_order_id,
+        payer_user_id=caller_user_id,
+        bookings=bookings,
+        razorpay_payment_id=verify_result.get("payment_id") or razorpay_payment_id,
+        engagement_id=primary_engagement_id,
+    )
 
     return {
         "payment_verified": True,

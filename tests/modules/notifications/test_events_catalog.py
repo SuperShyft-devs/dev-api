@@ -13,12 +13,12 @@ from modules.notifications.events_catalog import (
 def test_events_catalog_has_32_events():
     assert len(EVENTS) == 32
     assert len(list_events()) == 32
-    assert len(list_events(status="current")) == 20
-    assert len(list_events(status="add")) == 12
+    assert len(list_events(status="current")) == 21
+    assert len(list_events(status="add")) == 11
 
 
 def test_current_event_codes_count():
-    assert len(current_event_codes()) == 20
+    assert len(current_event_codes()) == 21
 
 
 def test_legacy_map_covers_onboarding():
