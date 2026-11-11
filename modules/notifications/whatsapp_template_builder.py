@@ -9,6 +9,7 @@ from modules.notifications.context_builder import build_member_context
 from modules.notifications.models import NotificationService
 from modules.notifications.template_variables import (
     _get_nested,
+    resolve_header_filename,
     resolve_header_link,
     resolve_slots,
 )
@@ -136,13 +137,14 @@ async def build_whatsapp_send_payload(
     components: list[dict[str, Any]] = []
     header_link = resolve_header_link(svc.template_variables, context)
     if header_link and _header_is_document(components_meta):
+        filename = resolve_header_filename(svc.template_variables, context) or "document.pdf"
         components.append(
             {
                 "type": "header",
                 "parameters": [
                     {
                         "type": "document",
-                        "document": {"link": header_link, "filename": "document.pdf"},
+                        "document": {"link": header_link, "filename": filename},
                     }
                 ],
             }

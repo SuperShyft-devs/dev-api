@@ -279,22 +279,6 @@ EVENTS: tuple[EventDefinition, ...] = (
         legacy_event_code="consultation_remainder",
     ),
     EventDefinition(
-        code="family.gift_sent",
-        name="Family gift sent",
-        status="current",
-        variable_groups=("gift", "payment", "engagement"),
-        default_recipients=("booker",),
-        trigger_notes="Family confirm-payment sender",
-    ),
-    EventDefinition(
-        code="family.gift_received",
-        name="Family gift received",
-        status="current",
-        variable_groups=("gift", "engagement"),
-        default_recipients=("members",),
-        trigger_notes="Family confirm-payment receiver",
-    ),
-    EventDefinition(
         code="support.ticket_created",
         name="Support ticket created",
         status="current",

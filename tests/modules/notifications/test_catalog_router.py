@@ -5,10 +5,10 @@ import pytest
 from modules.notifications.bindings_service import NotificationBindingsService
 
 
-def test_catalog_service_lists_35_events():
+def test_catalog_service_lists_32_events():
     service = NotificationBindingsService()
     events = service.list_catalog_events()
-    assert len(events) == 35
+    assert len(events) == 32
     assert events[0].recipient_payload_hints.get("user")
 
 

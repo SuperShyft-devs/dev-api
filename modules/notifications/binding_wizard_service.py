@@ -58,6 +58,10 @@ def build_template_variables(
         header: dict = {"source": template_header.source}
         if template_header.value is not None:
             header["value"] = template_header.value
+        if template_header.filename_source:
+            header["filename_source"] = template_header.filename_source
+            if template_header.filename_value is not None:
+                header["filename_value"] = template_header.filename_value
         out["header"] = header
     return out or None
 

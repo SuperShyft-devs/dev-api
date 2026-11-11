@@ -106,6 +106,25 @@ def resolve_slots(
     return [resolve_slot(slot, context) for slot in ordered]
 
 
+def _resolve_header_scalar(
+    header: dict[str, Any],
+    *,
+    source_key: str,
+    value_key: str,
+    context: dict[str, Any],
+) -> str | None:
+    source = str(header.get(source_key) or "").strip()
+    if source == "literal":
+        raw = str(header.get(value_key) or "").strip()
+        return interpolate_email_template(raw, context) or None
+    if source:
+        normalized = _normalize_slot_source(source)
+        value = _get_nested(context, normalized)
+        if value:
+            return str(value).strip()
+    return None
+
+
 def resolve_header_link(
     template_variables: dict[str, Any] | None,
     context: dict[str, Any],
@@ -114,15 +133,11 @@ def resolve_header_link(
         return None
     header = template_variables.get("header")
     if isinstance(header, dict):
-        source = str(header.get("source") or "").strip()
-        if source == "literal":
-            raw = str(header.get("value") or "").strip()
-            return interpolate_email_template(raw, context) or None
-        if source:
-            normalized = _normalize_slot_source(source)
-            value = _get_nested(context, normalized)
-            if value:
-                return value
+        link = _resolve_header_scalar(
+            header, source_key="source", value_key="value", context=context
+        )
+        if link:
+            return link
     attachments = template_variables.get("attachments")
     if isinstance(attachments, dict):
         for key in ("pdflink", "medialink"):
@@ -138,6 +153,23 @@ def resolve_header_link(
                 if value:
                     return value
     return None
+
+
+def resolve_header_filename(
+    template_variables: dict[str, Any] | None,
+    context: dict[str, Any],
+) -> str | None:
+    if not isinstance(template_variables, dict):
+        return None
+    header = template_variables.get("header")
+    if not isinstance(header, dict):
+        return None
+    return _resolve_header_scalar(
+        header,
+        source_key="filename_source",
+        value_key="filename_value",
+        context=context,
+    )
 
 
 def build_legacy_message_csv(

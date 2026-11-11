@@ -9,6 +9,7 @@ import pytest
 from modules.notifications.models import NotificationService
 from modules.notifications.template_variables import (
     build_legacy_message_csv,
+    resolve_header_filename,
     resolve_header_link,
     resolve_slots,
 )
@@ -19,6 +20,25 @@ def test_resolve_slots_otp():
     context = {"otp": {"otp": "654321"}, "user": {"first_name": "A"}}
     tv = {"slots": [{"index": 1, "source": "otp.otp"}]}
     assert resolve_slots(tv, context) == ["654321"]
+
+
+def test_resolve_header_filename_literal_and_variable():
+    context = {"report": {"filename": "blood-report.pdf"}}
+    assert (
+        resolve_header_filename(
+            {"header": {"filename_source": "literal", "filename_value": "document.pdf"}},
+            context,
+        )
+        == "document.pdf"
+    )
+    assert (
+        resolve_header_filename(
+            {"header": {"filename_source": "report.filename"}},
+            context,
+        )
+        == "blood-report.pdf"
+    )
+    assert resolve_header_filename({"header": {"source": "literal", "value": "https://x"}}, context) is None
 
 
 def test_resolve_header_link_literal_and_variable():
@@ -177,3 +197,45 @@ async def test_build_whatsapp_send_payload_uses_meta_canonical_template_name():
     assert language == "en"
     assert components
     client.fetch_message_template.assert_awaited_once_with(template_name="otpmsg")
+
+
+@pytest.mark.asyncio
+async def test_build_whatsapp_send_payload_document_header_filename_from_config():
+    client = MagicMock()
+    client.fetch_message_template = AsyncMock(
+        return_value={
+            "data": [
+                {
+                    "name": "camp15",
+                    "language": "en",
+                    "components": [
+                        {"type": "HEADER", "format": "DOCUMENT"},
+                        {"type": "BODY", "text": "Hi {{1}}"},
+                    ],
+                }
+            ]
+        }
+    )
+    svc = NotificationService(
+        service_key="pretest-whatsapp-session-v1",
+        display_name="Pretest PDF",
+        channel="whatsapp",
+        webhook_path="/test",
+        template_name="camp15",
+        template_variables={
+            "slots": [{"index": 1, "source": "literal", "value": "Hello"}],
+            "header": {
+                "source": "literal",
+                "value": "https://supershyft.com/reports/tCO8xWspk1Mdxsn5.pdf",
+                "filename_source": "literal",
+                "filename_value": "pretest-guidelines.pdf",
+            },
+        },
+    )
+    member = {"first_name": "Pratheek"}
+
+    _, components, _ = await build_whatsapp_send_payload(client, svc, member=member)
+
+    doc = components[0]["parameters"][0]["document"]
+    assert doc["link"] == "https://supershyft.com/reports/tCO8xWspk1Mdxsn5.pdf"
+    assert doc["filename"] == "pretest-guidelines.pdf"

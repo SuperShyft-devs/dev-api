@@ -60,6 +60,8 @@ class WizardTemplateSlot(BaseModel):
 class WizardTemplateHeader(BaseModel):
     source: str = Field(min_length=1)
     value: str | None = None
+    filename_source: str | None = None
+    filename_value: str | None = None
 
 
 class WizardServiceSpec(BaseModel):

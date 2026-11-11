@@ -34,6 +34,8 @@ def test_build_template_variables_with_header():
         template_header=WizardTemplateHeader(
             source="literal",
             value="https://cdn.example.com/pretest.pdf",
+            filename_source="literal",
+            filename_value="pretest-guidelines.pdf",
         ),
     )
     assert tv == {
@@ -41,5 +43,7 @@ def test_build_template_variables_with_header():
         "header": {
             "source": "literal",
             "value": "https://cdn.example.com/pretest.pdf",
+            "filename_source": "literal",
+            "filename_value": "pretest-guidelines.pdf",
         },
     }
