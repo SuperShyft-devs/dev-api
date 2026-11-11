@@ -2576,6 +2576,8 @@ class UsersService:
             collection_date=collection_date,
             collection_time=collection_time,
             cabin_name=cabin_name,
+            engagement_name=getattr(engagement, "engagement_name", None),
+            engagement_code=getattr(engagement, "engagement_code", None),
         )
         await notify_onboarding_assistants_on_enrollment(
             db,

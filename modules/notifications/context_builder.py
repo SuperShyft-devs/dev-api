@@ -46,6 +46,19 @@ def build_member_context(
             "address": str(pd.get("address") or member.get("address") or "").strip(),
         }
 
+    session_date = str(session.get("date") or pd.get("collection_date") or "").strip()
+    session_time = str(
+        session.get("slot") or session.get("time") or pd.get("collection_time") or ""
+    ).strip()
+    session_cabin = str(session.get("cabin") or pd.get("cabin_name") or "").strip()
+    # Strip display placeholders from legacy payloads
+    if session_date == "-":
+        session_date = ""
+    if session_time == "-":
+        session_time = ""
+    if session_cabin == "-":
+        session_cabin = ""
+
     context: dict[str, Any] = {
         "staff": {
             "name": member_name,
@@ -56,9 +69,9 @@ def build_member_context(
         },
         "user": user_block,
         "session": {
-            "date": str(session.get("date") or "").strip(),
-            "time": str(session.get("slot") or session.get("time") or "").strip(),
-            "cabin": str(session.get("cabin") or "").strip(),
+            "date": session_date,
+            "time": session_time,
+            "cabin": session_cabin,
         },
         "report": {
             "blood_report_url": str(member.get("blood_report_url") or "").strip(),
@@ -104,10 +117,25 @@ def build_member_context(
             if coll_time:
                 booking.setdefault("collection_time", coll_time)
             context["booking"] = booking
+        eng_name = str(pd.get("engagement_name") or "").strip()
+        eng_code = str(pd.get("engagement_code") or "").strip()
         eng_label = str(pd.get("engagement") or "").strip()
-        if eng_label:
+        if eng_name in ("-", ""):
+            eng_name = ""
+        if eng_code in ("-", ""):
+            eng_code = ""
+        if eng_label in ("-", ""):
+            eng_label = ""
+        if eng_name or eng_code or eng_label:
             engagement = dict(context.get("engagement") or {})
-            engagement.setdefault("engagement_name", eng_label)
+            if eng_name:
+                engagement["engagement_name"] = eng_name
+            elif eng_label and not engagement.get("engagement_name"):
+                engagement["engagement_name"] = eng_label
+            if eng_code:
+                engagement["engagement_code"] = eng_code
+            if eng_label and not engagement.get("engagement_code"):
+                engagement["engagement_code"] = eng_label
             context["engagement"] = engagement
 
     return context

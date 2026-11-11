@@ -2376,6 +2376,8 @@ class EngagementsService:
             participant_user_id=int(user.user_id),
             collection_date=collection_date,
             collection_time=collection_time,
+            engagement_name=getattr(engagement, "engagement_name", None),
+            engagement_code=getattr(engagement, "engagement_code", None),
         )
         await notify_onboarding_assistants_on_enrollment(
             db,

@@ -30,6 +30,8 @@ def participant_details_from_user(
     collection_date: str | None = None,
     collection_time: str | None = None,
     cabin_name: str | None = None,
+    engagement_name: str | None = None,
+    engagement_code: str | None = None,
 ) -> dict[str, str]:
     first_name = getattr(user, "first_name", None) or ""
     last_name = getattr(user, "last_name", None) or ""
@@ -38,7 +40,9 @@ def participant_details_from_user(
         "name": detail_or_hyphen(name),
         "email": detail_or_hyphen(getattr(user, "email", None)),
         "phone": detail_or_hyphen(getattr(user, "phone", None)),
-        "engagement": detail_or_hyphen(source),
+        "engagement": detail_or_hyphen(engagement_code or source),
+        "engagement_name": detail_or_hyphen(engagement_name or source),
+        "engagement_code": detail_or_hyphen(engagement_code or source),
         "participant_user_id": str(participant_user_id),
         "age": detail_or_hyphen(getattr(user, "age", None)),
         "gender": detail_or_hyphen(getattr(user, "gender", None)),

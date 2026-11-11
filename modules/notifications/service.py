@@ -370,6 +370,17 @@ class NotificationsService:
         members: list[dict] = []
         resolved_assessment_instance_id: int | None = None
         resolved_engagement_id: int | None = payload.engagement_id
+        engagement_meta: dict[str, str] | None = None
+        if resolved_engagement_id is not None:
+            from modules.engagements.models import Engagement
+
+            engagement_row = await db.get(Engagement, resolved_engagement_id)
+            if engagement_row is not None:
+                engagement_meta = {
+                    "engagement_id": str(engagement_row.engagement_id),
+                    "engagement_code": str(engagement_row.engagement_code or "").strip(),
+                    "engagement_name": str(engagement_row.engagement_name or "").strip(),
+                }
 
         for user in users:
             instance = None
@@ -413,6 +424,8 @@ class NotificationsService:
                 "phone": user.phone or "",
                 "email": user.email or "",
             }
+            if engagement_meta:
+                member["engagement"] = dict(engagement_meta)
 
             if needs_report:
                 if not instance:
