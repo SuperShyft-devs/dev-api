@@ -102,9 +102,16 @@ class EngagementNotificationsRepository:
         )
         result = []
         for item in prepared:
+            ev = get_event(item["event_code"])
+            event_name = ev.name if ev else item["event_code"]
+            recipient_type = (
+                ev.default_recipients[0] if ev and ev.default_recipients else "user"
+            )
             obj = EngagementNotification(
                 engagement_id=engagement_id,
                 event_code=item["event_code"],
+                event_name=event_name,
+                recipient_type=recipient_type,
                 notification_services=item["notification_services"],
             )
             db.add(obj)
