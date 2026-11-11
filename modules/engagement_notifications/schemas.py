@@ -17,12 +17,6 @@ from modules.engagement_notifications.service_config import (
 class EngagementNotificationItem(BaseModel):
     event_code: str = Field(min_length=1)
     notification_services: list[NotificationServiceConfigItem] = Field(default_factory=list)
-    recipient_type: str | None = None
-    delivery_channel: str | None = None
-    recipient_config: dict | None = None
-    condition_key: str | None = None
-    emit_condition: dict | None = None
-    event_name: str | None = None
 
     @field_validator("notification_services", mode="before")
     @classmethod
@@ -36,12 +30,6 @@ class EngagementNotificationResponse(BaseModel):
     event_code: str
     notification_services: list[NotificationServiceConfigItem]
     event_display_name: str | None = None
-    recipient_type: str | None = None
-    delivery_channel: str | None = None
-    recipient_config: dict | None = None
-    condition_key: str | None = "default"
-    emit_condition: dict | None = None
-    event_name: str | None = None
 
     @field_validator("notification_services", mode="before")
     @classmethod
@@ -81,13 +69,6 @@ class NotificationDefaultResponse(BaseModel):
 class NotificationDefaultsUpsertRequest(BaseModel):
     engagement_type_id: PositiveIntId
     defaults: list[NotificationDefaultItem] = Field(default_factory=list)
-
-
-class NotificationSetupPreviewRequest(BaseModel):
-    engagement_kind: str = Field(min_length=1)
-    blood_collection_type: str | None = None
-    auto_booking: bool | None = None
-    consultation_mode: str | None = None
 
 
 __all__ = [

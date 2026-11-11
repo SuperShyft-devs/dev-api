@@ -24,7 +24,6 @@ from modules.notifications.payload_contact_catalog import (
 )
 from modules.notifications.variable_catalog import RECIPIENT_PAYLOAD_HINTS, fields_for_groups
 from modules.notifications.binding_schemas import CatalogEventResponse, PayloadContactFieldResponse
-from modules.notifications.event_applicability import catalog_groups_for_event, show_on_engagement_wizard
 
 
 class NotificationBindingsService:
@@ -49,8 +48,6 @@ class NotificationBindingsService:
                     PayloadContactFieldResponse.model_validate(row)
                     for row in payload_contact_fields_for_event(e.code)
                 ],
-                catalog_groups=list(catalog_groups_for_event(e.code)),
-                show_on_engagement_wizard=show_on_engagement_wizard(e.code),
             )
             for e in list_events()
         ]

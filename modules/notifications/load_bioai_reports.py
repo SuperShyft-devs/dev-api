@@ -335,7 +335,6 @@ async def _get_eligible_participants(
             EngagementNotification.notification_services,
         )
         .where(EngagementNotification.event_code == "reports.bioai_ready")
-        .where(EngagementNotification.recipient_type == "user")
         .subquery("en_bioai")
     )
 

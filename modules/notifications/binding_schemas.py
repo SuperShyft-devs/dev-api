@@ -72,8 +72,6 @@ class CatalogEventResponse(BaseModel):
     trigger_kind: Literal["http", "cron", "webhook", "internal"] = "http"
     allows_payload_recipient: bool = False
     payload_contact_fields: list[PayloadContactFieldResponse] = Field(default_factory=list)
-    catalog_groups: list[str] = Field(default_factory=list)
-    show_on_engagement_wizard: bool = False
 
 
 class RecipientConfigPayload(BaseModel):
@@ -122,11 +120,7 @@ class WizardBindingPayload(BaseModel):
 
 class EngagementNotificationWizardPayload(BaseModel):
     event_code: str = Field(min_length=1)
-    recipient_type: str = Field(min_length=1)
-    recipient_config: RecipientConfigPayload | None = None
-    emit_condition: EmitConditionPayload | None = None
     service: WizardServiceSpec
-    binding_id: int | None = None
 
 
 class WhatsappTemplateMetaResponse(BaseModel):

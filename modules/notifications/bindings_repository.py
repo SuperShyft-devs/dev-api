@@ -17,7 +17,6 @@ class NotificationBindingsRepository:
         *,
         event_code: str | None = None,
         engagement_type_id: int | None = None,
-        global_only: bool = True,
     ) -> list[NotificationEventBinding]:
         q = select(NotificationEventBinding).order_by(
             NotificationEventBinding.event_code.asc(),
@@ -25,11 +24,9 @@ class NotificationBindingsRepository:
             NotificationEventBinding.delivery_channel.asc(),
             NotificationEventBinding.id.asc(),
         )
-        if global_only:
-            q = q.where(NotificationEventBinding.engagement_type_id.is_(None))
         if event_code is not None:
             q = q.where(NotificationEventBinding.event_code == event_code)
-        if engagement_type_id is not None and not global_only:
+        if engagement_type_id is not None:
             q = q.where(NotificationEventBinding.engagement_type_id == engagement_type_id)
         result = await db.execute(q)
         return list(result.scalars().all())
@@ -133,12 +130,16 @@ class NotificationBindingsRepository:
         event_code: str,
         engagement_type_id: int | None = None,
     ) -> list[NotificationEventBinding]:
-        del engagement_type_id  # defaults are global-only; per-engagement overrides use engagement_notifications
-        q = select(NotificationEventBinding).where(
-            NotificationEventBinding.event_code == event_code,
-            NotificationEventBinding.engagement_type_id.is_(None),
-        )
+        q = select(NotificationEventBinding).where(NotificationEventBinding.event_code == event_code)
+        if engagement_type_id is not None:
+            q = q.where(
+                (NotificationEventBinding.engagement_type_id.is_(None))
+                | (NotificationEventBinding.engagement_type_id == engagement_type_id)
+            )
+        else:
+            q = q.where(NotificationEventBinding.engagement_type_id.is_(None))
         q = q.order_by(
+            NotificationEventBinding.engagement_type_id.desc().nullslast(),
             NotificationEventBinding.delivery_channel.asc(),
             NotificationEventBinding.id.asc(),
         )

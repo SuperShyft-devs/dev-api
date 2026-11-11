@@ -825,12 +825,6 @@ class EngagementsService:
                 {
                     "event_code": n.event_code,
                     "notification_services": serialize_for_db(n.notification_services),
-                    "recipient_type": getattr(n, "recipient_type", None),
-                    "delivery_channel": getattr(n, "delivery_channel", None),
-                    "recipient_config": getattr(n, "recipient_config", None),
-                    "condition_key": getattr(n, "condition_key", None),
-                    "emit_condition": getattr(n, "emit_condition", None),
-                    "event_name": getattr(n, "event_name", None),
                 }
                 for n in payload.notifications
             ]

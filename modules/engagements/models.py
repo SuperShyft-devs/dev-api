@@ -20,7 +20,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import validates
 from sqlalchemy.sql import func
 from sqlalchemy.types import JSON
@@ -325,15 +325,7 @@ class EngagementNotification(Base):
 
     __tablename__ = "engagement_notifications"
     __table_args__ = (
-        UniqueConstraint(
-            "engagement_id",
-            "event_code",
-            "recipient_type",
-            "delivery_channel",
-            "condition_key",
-            name="uq_engagement_notification_slot",
-        ),
-        Index("ix_engagement_notifications_event", "engagement_id", "event_code"),
+        UniqueConstraint("engagement_id", "event_code", name="uq_engagement_notification_event"),
     )
 
     id = Column(Integer, primary_key=True)
@@ -341,11 +333,7 @@ class EngagementNotification(Base):
     event_code = Column(String, nullable=False)
     event_name = Column(String, nullable=True)
     recipient_type = Column(String, nullable=False, server_default="user")
-    delivery_channel = Column(String, nullable=False, server_default="whatsapp")
     notification_services = Column(JSON, nullable=False)
-    recipient_config = Column(JSONB, nullable=True)
-    condition_key = Column(String, nullable=False, server_default=text("'default'"))
-    emit_condition = Column(JSONB, nullable=True)
 
 
 class EngagementFeedback(Base):

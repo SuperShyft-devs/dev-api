@@ -2,26 +2,42 @@
 
 from __future__ import annotations
 
-import copy
-from typing import Any
-
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from modules.notifications.models import NotificationService
+
 from modules.engagement_notifications.service_config import (
+    NotificationServiceConfigItem,
     extract_service_keys,
     normalize_notification_services,
     prepare_notification_items_for_storage,
     serialize_for_db,
-    validate_notification_service_configs,
 )
-from modules.engagements.models import Engagement, EngagementNotification
+from modules.engagements.models import EngagementNotification
 from modules.notifications.bindings_repository import NotificationBindingsRepository
 from modules.notifications.events_catalog import get_event, map_legacy_event_code
+from modules.notifications.models import NotificationEventBinding
+
+# Events crons and report loaders read from engagement_notifications (not emit engine).
+_ENGAGEMENT_SCOPED_EVENT_CODES = frozenset(
+    {
+        "reminders.pretest",
+        "reminders.questionnaire_before",
+        "reminders.questionnaire_after",
+        "reminders.booking_guide",
+        "reminders.consultation_ready_to_book",
+        "reminders.consultation_reminder",
+        "reports.blood_ready",
+        "reports.bioai_ready",
+        "reports.face_scan_ready",
+        "users.onboarded",
+    }
+)
 
 
 class EngagementNotificationsRepository:
-    """Database queries for engagement_notifications (per-engagement binding slots)."""
+    """Database queries for engagement_notifications and type-level defaults."""
 
     def __init__(self) -> None:
         self._bindings_repo = NotificationBindingsRepository()
@@ -30,62 +46,14 @@ class EngagementNotificationsRepository:
         self,
         db: AsyncSession,
         engagement_id: int,
-        *,
-        event_code: str | None = None,
     ) -> list[EngagementNotification]:
-        q = (
+        query = (
             select(EngagementNotification)
             .where(EngagementNotification.engagement_id == engagement_id)
-            .order_by(
-                EngagementNotification.event_code.asc(),
-                EngagementNotification.recipient_type.asc(),
-                EngagementNotification.delivery_channel.asc(),
-                EngagementNotification.id.asc(),
-            )
+            .order_by(EngagementNotification.event_code.asc())
         )
-        if event_code is not None:
-            q = q.where(EngagementNotification.event_code == map_legacy_event_code(event_code))
-        result = await db.execute(q)
+        result = await db.execute(query)
         return list(result.scalars().all())
-
-    async def get_by_id(
-        self, db: AsyncSession, binding_id: int
-    ) -> EngagementNotification | None:
-        result = await db.execute(
-            select(EngagementNotification).where(EngagementNotification.id == binding_id)
-        )
-        return result.scalar_one_or_none()
-
-    async def find_binding_by_slot(
-        self,
-        db: AsyncSession,
-        *,
-        engagement_id: int,
-        event_code: str,
-        recipient_type: str,
-        delivery_channel: str,
-        condition_key: str = "default",
-    ) -> EngagementNotification | None:
-        normalized = map_legacy_event_code(event_code)
-        result = await db.execute(
-            select(EngagementNotification).where(
-                EngagementNotification.engagement_id == engagement_id,
-                EngagementNotification.event_code == normalized,
-                EngagementNotification.recipient_type == recipient_type,
-                EngagementNotification.delivery_channel == delivery_channel,
-                EngagementNotification.condition_key == condition_key,
-            )
-        )
-        return result.scalar_one_or_none()
-
-    async def list_for_event(
-        self,
-        db: AsyncSession,
-        *,
-        engagement_id: int,
-        event_code: str,
-    ) -> list[EngagementNotification]:
-        return await self.list_for_engagement(db, engagement_id, event_code=event_code)
 
     async def get_for_engagement_and_event_code(
         self,
@@ -93,17 +61,15 @@ class EngagementNotificationsRepository:
         *,
         engagement_id: int,
         event_code: str,
-        recipient_type: str = "user",
     ) -> EngagementNotification | None:
-        """Primary participant-facing binding when multiple rows exist."""
-        rows = await self.list_for_event(db, engagement_id=engagement_id, event_code=event_code)
-        for row in rows:
-            if row.recipient_type == recipient_type and extract_service_keys(row.notification_services):
-                return row
-        for row in rows:
-            if row.recipient_type == recipient_type:
-                return row
-        return rows[0] if rows else None
+        normalized = map_legacy_event_code(event_code)
+        query = (
+            select(EngagementNotification)
+            .where(EngagementNotification.engagement_id == engagement_id)
+            .where(EngagementNotification.event_code == normalized)
+        )
+        result = await db.execute(query)
+        return result.scalar_one_or_none()
 
     async def get_services_for_engagement_event(
         self,
@@ -111,103 +77,14 @@ class EngagementNotificationsRepository:
         *,
         engagement_id: int,
         event_code: str,
-        recipient_type: str = "user",
     ) -> list[str]:
+        """Return service keys for an engagement+event, or empty list."""
         en = await self.get_for_engagement_and_event_code(
-            db,
-            engagement_id=engagement_id,
-            event_code=event_code,
-            recipient_type=recipient_type,
+            db, engagement_id=engagement_id, event_code=event_code
         )
         if en is None:
             return []
         return extract_service_keys(en.notification_services)
-
-    async def create_binding(
-        self,
-        db: AsyncSession,
-        *,
-        engagement_id: int,
-        event_code: str,
-        event_name: str,
-        recipient_type: str,
-        delivery_channel: str,
-        notification_services: list,
-        recipient_config: dict | None = None,
-        condition_key: str = "default",
-        emit_condition: dict | None = None,
-    ) -> EngagementNotification:
-        obj = EngagementNotification(
-            engagement_id=engagement_id,
-            event_code=map_legacy_event_code(event_code),
-            event_name=event_name,
-            recipient_type=recipient_type,
-            delivery_channel=delivery_channel,
-            notification_services=notification_services,
-            recipient_config=recipient_config,
-            condition_key=condition_key or "default",
-            emit_condition=emit_condition,
-        )
-        db.add(obj)
-        await db.flush()
-        return obj
-
-    async def update_binding(
-        self,
-        db: AsyncSession,
-        row: EngagementNotification,
-        *,
-        event_name: str | None = None,
-        recipient_type: str | None = None,
-        delivery_channel: str | None = None,
-        notification_services: list | None = None,
-        recipient_config: dict | None = None,
-        condition_key: str | None = None,
-        emit_condition: dict | None = None,
-    ) -> EngagementNotification:
-        if event_name is not None:
-            row.event_name = event_name
-        if recipient_type is not None:
-            row.recipient_type = recipient_type
-        if delivery_channel is not None:
-            row.delivery_channel = delivery_channel
-        if notification_services is not None:
-            row.notification_services = notification_services
-        if recipient_config is not None:
-            row.recipient_config = recipient_config
-        if condition_key is not None:
-            row.condition_key = condition_key
-        if emit_condition is not None:
-            row.emit_condition = emit_condition
-        await db.flush()
-        return row
-
-    async def delete_binding(self, db: AsyncSession, binding_id: int) -> bool:
-        row = await self.get_by_id(db, binding_id)
-        if row is None:
-            return False
-        await db.delete(row)
-        await db.flush()
-        return True
-
-    async def replace_all_bindings(
-        self,
-        db: AsyncSession,
-        engagement_id: int,
-        items: list[dict],
-    ) -> list[EngagementNotification]:
-        """Replace full engagement binding set (admin save)."""
-        prepared = await self._prepare_binding_items(db, items)
-        await db.execute(
-            delete(EngagementNotification).where(
-                EngagementNotification.engagement_id == engagement_id
-            )
-        )
-        result: list[EngagementNotification] = []
-        for item in prepared:
-            obj = await self.create_binding(db, engagement_id=engagement_id, **item)
-            result.append(obj)
-        return result
 
     async def upsert_for_engagement(
         self,
@@ -215,59 +92,32 @@ class EngagementNotificationsRepository:
         engagement_id: int,
         notifications: list[dict],
     ) -> list[EngagementNotification]:
-        """Legacy bulk replace; accepts binding-shaped dicts."""
-        return await self.replace_all_bindings(db, engagement_id, notifications)
+        """Bulk upsert notification configs for an engagement."""
+        prepared = await prepare_notification_items_for_storage(db, notifications)
 
-    async def copy_global_bindings_to_engagement(
-        self,
-        db: AsyncSession,
-        engagement_id: int,
-        profile,
-        *,
-        replace_existing: bool = True,
-    ) -> list[EngagementNotification]:
-        from modules.notifications.event_applicability import list_applicable_event_codes
-
-        if replace_existing:
-            await db.execute(
-                delete(EngagementNotification).where(
-                    EngagementNotification.engagement_id == engagement_id
-                )
+        await db.execute(
+            delete(EngagementNotification).where(
+                EngagementNotification.engagement_id == engagement_id
             )
-
-        created: list[EngagementNotification] = []
-        for event_code in list_applicable_event_codes(profile):
-            global_rows = await self._bindings_repo.list_for_event(db, event_code=event_code)
-            if not global_rows:
-                continue
-            ev = get_event(event_code)
-            event_name = ev.name if ev else event_code
-            for grow in global_rows:
-                services = grow.notification_services or []
-                if not extract_service_keys(services):
-                    continue
-                row = await self.create_binding(
-                    db,
-                    engagement_id=engagement_id,
-                    event_code=event_code,
-                    event_name=grow.event_name or event_name,
-                    recipient_type=grow.recipient_type,
-                    delivery_channel=grow.delivery_channel,
-                    notification_services=copy.deepcopy(services),
-                    recipient_config=(
-                        dict(grow.recipient_config)
-                        if isinstance(grow.recipient_config, dict)
-                        else None
-                    ),
-                    condition_key=grow.condition_key or "default",
-                    emit_condition=(
-                        dict(grow.emit_condition)
-                        if isinstance(grow.emit_condition, dict)
-                        else None
-                    ),
-                )
-                created.append(row)
-        return created
+        )
+        result = []
+        for item in prepared:
+            ev = get_event(item["event_code"])
+            event_name = ev.name if ev else item["event_code"]
+            recipient_type = (
+                ev.default_recipients[0] if ev and ev.default_recipients else "user"
+            )
+            obj = EngagementNotification(
+                engagement_id=engagement_id,
+                event_code=item["event_code"],
+                event_name=event_name,
+                recipient_type=recipient_type,
+                notification_services=item["notification_services"],
+            )
+            db.add(obj)
+            result.append(obj)
+        await db.flush()
+        return result
 
     async def populate_from_defaults(
         self,
@@ -276,56 +126,101 @@ class EngagementNotificationsRepository:
         engagement_id: int,
         engagement_type_id: int,
     ) -> list[EngagementNotification]:
-        del engagement_type_id
-        from modules.notifications.event_applicability import profile_from_engagement
+        """Auto-populate engagement_notifications from type-level + global bindings."""
+        type_rows = await self.list_defaults_for_type(db, engagement_type_id)
+        all_bindings = await self._bindings_repo.list_all(db)
+        global_rows = [r for r in all_bindings if r.engagement_type_id is None]
+        type_event_codes = {r.event_code for r in type_rows}
+        sources = list(type_rows)
+        for row in global_rows:
+            if row.event_code not in type_event_codes:
+                sources.append(row)
 
-        engagement = await db.get(Engagement, engagement_id)
-        if engagement is None:
-            return []
-        profile = await profile_from_engagement(db, engagement)
-        return await self.copy_global_bindings_to_engagement(
-            db, engagement_id, profile, replace_existing=True
-        )
-
-    async def _prepare_binding_items(
-        self, db: AsyncSession, notifications: list[dict]
-    ) -> list[dict[str, Any]]:
-        prepared: list[dict[str, Any]] = []
-        for item in notifications:
-            event_code = item.get("event_code")
-            if not event_code:
+        by_event: dict[str, list] = {}
+        for row in sources:
+            if row.event_code not in _ENGAGEMENT_SCOPED_EVENT_CODES:
                 continue
-            event_code = map_legacy_event_code(str(event_code).strip())
-            ev = get_event(event_code)
-            if ev is None:
-                continue
-            configs = await validate_notification_service_configs(
-                db,
-                notification_services=item.get("notification_services"),
-                event_label=event_code,
-            )
+            configs = normalize_notification_services(row.notification_services)
             if not configs:
                 continue
-            recipient_type = (
-                str(item.get("recipient_type") or "").strip()
-                or (ev.default_recipients[0] if ev.default_recipients else "user")
+            bucket = by_event.setdefault(row.event_code, [])
+            seen = {c.service_key for c in bucket}
+            for cfg in configs:
+                if cfg.service_key and cfg.service_key not in seen:
+                    seen.add(cfg.service_key)
+                    bucket.append(cfg)
+
+        items: list[dict] = []
+        for event_code, configs in sorted(by_event.items()):
+            if not configs:
+                continue
+            keys = [c.service_key for c in configs if c.service_key]
+            if not keys:
+                continue
+            result = await db.execute(
+                select(NotificationService).where(NotificationService.service_key.in_(keys))
             )
-            delivery_channel = str(item.get("delivery_channel") or "whatsapp").strip().lower()
-            condition_key = str(item.get("condition_key") or "default").strip() or "default"
-            rc = item.get("recipient_config")
-            recipient_config = dict(rc) if isinstance(rc, dict) else None
-            ec = item.get("emit_condition")
-            emit_condition = dict(ec) if isinstance(ec, dict) else None
-            prepared.append(
+            services_by_key = {svc.service_key: svc for svc in result.scalars().all()}
+            filtered = []
+            for cfg in configs:
+                svc = services_by_key.get(cfg.service_key)
+                if svc is None:
+                    continue
+                link = cfg.external_link
+                if svc.require_external_link and not (link and str(link).strip()):
+                    link = "https://app.supershyft.com"
+                filtered.append(
+                    NotificationServiceConfigItem(
+                        service_key=cfg.service_key,
+                        external_link=link,
+                    )
+                )
+            if not filtered:
+                continue
+            items.append(
                 {
                     "event_code": event_code,
-                    "event_name": str(item.get("event_name") or ev.name),
-                    "recipient_type": recipient_type,
-                    "delivery_channel": delivery_channel,
-                    "notification_services": serialize_for_db(configs),
-                    "recipient_config": recipient_config,
-                    "condition_key": condition_key,
-                    "emit_condition": emit_condition,
+                    "notification_services": serialize_for_db(filtered),
                 }
             )
-        return prepared
+        if not items:
+            return []
+        return await self.upsert_for_engagement(db, engagement_id, items)
+
+    async def list_defaults_for_type(
+        self,
+        db: AsyncSession,
+        engagement_type_id: int,
+    ) -> list[NotificationEventBinding]:
+        return await self._bindings_repo.list_all(db, engagement_type_id=engagement_type_id)
+
+    async def upsert_defaults(
+        self,
+        db: AsyncSession,
+        engagement_type_id: int,
+        defaults: list[dict],
+    ) -> list[NotificationEventBinding]:
+        """Bulk upsert notification defaults for an engagement type."""
+        prepared = await prepare_notification_items_for_storage(db, defaults)
+
+        existing = await self._bindings_repo.list_all(db, engagement_type_id=engagement_type_id)
+        for row in existing:
+            await self._bindings_repo.delete(db, row.id)
+
+        result: list[NotificationEventBinding] = []
+        for item in prepared:
+            ev = get_event(item["event_code"])
+            event_name = ev.name if ev else item["event_code"]
+            recipient = item.get("recipient_type") or (
+                ev.default_recipients[0] if ev and ev.default_recipients else "user"
+            )
+            obj = await self._bindings_repo.create(
+                db,
+                event_code=item["event_code"],
+                event_name=event_name,
+                recipient_type=str(recipient),
+                notification_services=item["notification_services"],
+                engagement_type_id=engagement_type_id,
+            )
+            result.append(obj)
+        return result
