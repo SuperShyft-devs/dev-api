@@ -110,7 +110,8 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"Dispatch pretest reminders ({mode}): "
         f"as_of={result['as_of']}, collection_date={result['collection_date']}, "
-        f"matched={result['matched']}, sent={result['sent']}, "
+        f"participants_matched={result['matched']}, participants_notified={result['sent']}, "
+        f"notifications_sent={result.get('notifications_sent', result['sent'])}, "
         f"skipped={result['skipped']}, failed={result['failed']}"
     )
     return 0

@@ -63,6 +63,24 @@ def normalize_notification_services(raw: list | None) -> list[NotificationServic
     return result
 
 
+def merge_notification_service_configs(
+    *groups: list[NotificationServiceConfigItem] | tuple[NotificationServiceConfigItem, ...] | None,
+) -> list[NotificationServiceConfigItem]:
+    """Union service configs from multiple engagement notification slots (dedupe by service_key)."""
+    seen: set[str] = set()
+    merged: list[NotificationServiceConfigItem] = []
+    for group in groups:
+        if not group:
+            continue
+        for cfg in group:
+            key = (cfg.service_key or "").strip()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            merged.append(cfg)
+    return merged
+
+
 def extract_service_keys(raw: list | None) -> list[str]:
     return [cfg.service_key for cfg in normalize_notification_services(raw)]
 

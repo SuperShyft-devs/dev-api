@@ -80,6 +80,7 @@ async def dispatch_pretest_reminders(
 
     matched = len(participants)
     sent = 0
+    notifications_sent = 0
     skipped = 0
     failed = 0
     details: list[dict[str, Any]] = []
@@ -99,6 +100,7 @@ async def dispatch_pretest_reminders(
             "collection_date": collection_date.isoformat(),
             "matched": matched,
             "sent": 0,
+            "notifications_sent": 0,
             "skipped": matched,
             "failed": 0,
             "dry_run": True,
@@ -163,6 +165,7 @@ async def dispatch_pretest_reminders(
                     triggered_by_user_id=None,
                 )
                 dispatched_any = True
+                notifications_sent += 1
                 details.append({
                     "user_id": participant.user_id,
                     "engagement_id": participant.engagement_id,
@@ -200,6 +203,7 @@ async def dispatch_pretest_reminders(
         "collection_date": collection_date.isoformat(),
         "matched": matched,
         "sent": sent,
+        "notifications_sent": notifications_sent,
         "skipped": skipped,
         "failed": failed,
         "dry_run": False,

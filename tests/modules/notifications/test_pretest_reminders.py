@@ -360,6 +360,91 @@ async def test_pretest_reminders_dry_run_does_not_dispatch(test_db_session, monk
     assert notification_count == 0
 
 
+async def _bind_pretest_multichannel_slots(
+    test_db_session,
+    *,
+    engagement_id: int,
+) -> None:
+    await test_db_session.execute(
+        text(
+            """
+            INSERT INTO engagement_notifications (
+                engagement_id, event_code, event_name, recipient_type, delivery_channel,
+                notification_services
+            )
+            VALUES
+            (
+                :eid, 'reminders.pretest', 'Pretest', 'user', 'whatsapp',
+                CAST(:wa AS jsonb)
+            ),
+            (
+                :eid, 'reminders.pretest', 'Pretest', 'user', 'email',
+                CAST(:em AS jsonb)
+            )
+            ON CONFLICT ON CONSTRAINT uq_engagement_notification_slot
+            DO UPDATE SET notification_services = EXCLUDED.notification_services
+            """
+        ),
+        {
+            "eid": engagement_id,
+            "wa": json.dumps([{"service_key": PRETEST_WHATSAPP_KEY}]),
+            "em": json.dumps([{"service_key": PRETEST_EMAIL_KEY}]),
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_pretest_reminders_merges_multichannel_binding_slots(test_db_session, monkeypatch):
+    await _seed_dependencies(test_db_session)
+    await _insert_engagement(
+        test_db_session,
+        engagement_id=9605,
+        engagement_code="ENG9605",
+        status="running",
+        bind_services=False,
+    )
+    await _bind_pretest_multichannel_slots(test_db_session, engagement_id=9605)
+    collection_date = "2026-06-02"
+    as_of = date(2026, 6, 1)
+    await _insert_participant(
+        test_db_session,
+        engagement_id=9605,
+        user_id=96051,
+        engagement_date=collection_date,
+        slot_start_time="07:30:00",
+    )
+    await test_db_session.commit()
+
+    repository = EngagementsRepository()
+    participants = await repository.list_participants_for_pretest_reminder(
+        test_db_session,
+        collection_date=date.fromisoformat(collection_date),
+    )
+    assert len(participants) == 1
+    assert len(participants[0].service_configs) == 2
+
+    webhook_calls: list[dict] = []
+    monkeypatch.setattr(
+        "modules.notifications.service.httpx.AsyncClient",
+        _fake_httpx_client(webhook_calls),
+    )
+
+    notifications_service, engagements_repository = _services()
+    result = await dispatch_pretest_reminders(
+        test_db_session,
+        notifications_service=notifications_service,
+        engagements_repository=engagements_repository,
+        as_of=as_of,
+        dry_run=False,
+    )
+    await test_db_session.commit()
+
+    assert result["matched"] == 1
+    assert result["sent"] == 1
+    assert result["notifications_sent"] == 2
+    assert len(webhook_calls) == 2
+
+
 @pytest.mark.asyncio
 async def test_pretest_reminders_one_user_id_per_dispatch(test_db_session, monkeypatch):
     await _seed_dependencies(test_db_session)

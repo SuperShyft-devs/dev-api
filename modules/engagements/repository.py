@@ -1641,19 +1641,41 @@ class EngagementsRepository:
                 EngagementParticipant.user_id.asc(),
             )
         )
+        from modules.engagement_notifications.service_config import merge_notification_service_configs
+
         result = await db.execute(query)
-        return [
-            PretestReminderParticipant(
-                user_id=int(row.user_id),
-                engagement_id=int(row.engagement_id),
-                service_configs=tuple(normalize_notification_services(row.notification_services)),
-                engagement_date=row.engagement_date,
-                slot_start_time=row.slot_start_time,
-                blood_collection_cabin=(row.blood_collection_cabin or None),
+        merged: dict[tuple[int, int], PretestReminderParticipant] = {}
+        for row in result.all():
+            if row.engagement_date is None:
+                continue
+            user_id = int(row.user_id)
+            engagement_id = int(row.engagement_id)
+            key = (user_id, engagement_id)
+            slot_configs = normalize_notification_services(row.notification_services)
+            existing = merged.get(key)
+            if existing is None:
+                merged[key] = PretestReminderParticipant(
+                    user_id=user_id,
+                    engagement_id=engagement_id,
+                    service_configs=tuple(slot_configs),
+                    engagement_date=row.engagement_date,
+                    slot_start_time=row.slot_start_time,
+                    blood_collection_cabin=(row.blood_collection_cabin or None),
+                )
+                continue
+            combined = merge_notification_service_configs(
+                existing.service_configs,
+                slot_configs,
             )
-            for row in result.all()
-            if row.engagement_date is not None
-        ]
+            merged[key] = PretestReminderParticipant(
+                user_id=user_id,
+                engagement_id=engagement_id,
+                service_configs=tuple(combined),
+                engagement_date=existing.engagement_date,
+                slot_start_time=existing.slot_start_time,
+                blood_collection_cabin=existing.blood_collection_cabin,
+            )
+        return sorted(merged.values(), key=lambda p: (p.engagement_id, p.user_id))
 
     async def list_engagements_for_booking_guide_reminder(
         self,
@@ -1781,16 +1803,34 @@ class EngagementsRepository:
                 EngagementParticipant.user_id.asc(),
             )
         )
+        from modules.engagement_notifications.service_config import merge_notification_service_configs
+
         result = await db.execute(query)
-        return [
-            (
-                int(row.user_id),
-                int(row.engagement_id),
-                row.engagement_date,
-                normalize_notification_services(row.qr_before_services),
-                normalize_notification_services(row.qr_after_services),
+        merged: dict[
+            tuple[int, int, date],
+            tuple[list[NotificationServiceConfigItem], list[NotificationServiceConfigItem]],
+        ] = {}
+        for row in result.all():
+            user_id = int(row.user_id)
+            engagement_id = int(row.engagement_id)
+            engagement_date = row.engagement_date
+            key = (user_id, engagement_id, engagement_date)
+            before = normalize_notification_services(row.qr_before_services)
+            after = normalize_notification_services(row.qr_after_services)
+            existing = merged.get(key)
+            if existing is None:
+                merged[key] = (before, after)
+                continue
+            prev_before, prev_after = existing
+            merged[key] = (
+                merge_notification_service_configs(prev_before, before),
+                merge_notification_service_configs(prev_after, after),
             )
-            for row in result.all()
+        return [
+            (user_id, engagement_id, engagement_date, before, after)
+            for (user_id, engagement_id, engagement_date), (before, after) in sorted(
+                merged.items(), key=lambda item: (item[0][1], item[0][0], item[0][2])
+            )
         ]
 
     async def list_participants_for_consultation_notification(
