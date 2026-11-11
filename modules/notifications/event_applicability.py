@@ -380,6 +380,7 @@ def list_applicable_event_codes(profile: EngagementNotificationProfile) -> list[
 
 
 _BLOOD_KINDS = ("bio_ai", "blood_test", "blood_test_with_consultation", "bio_ai_with_consultation")
+_BIO_AI_KINDS = ("bio_ai", "bio_ai_with_consultation")
 _CONSULT_KINDS = ("consultation", "blood_test_with_consultation", "bio_ai_with_consultation")
 _ALL_ENGAGEMENT_KINDS = _BLOOD_KINDS + ("consultation",)
 
@@ -480,23 +481,23 @@ EVENT_CATALOG_META: dict[str, dict[str, Any]] = {
     },
     "reports.bioai_ready": {
         "groups": ("Reports & reminders",),
-        "applicability": _eng(kinds=("bio_ai", "bio_ai_with_consultation")),
+        "applicability": _eng(kinds=_BIO_AI_KINDS),
     },
     "reports.face_scan_ready": {
         "groups": ("Reports & reminders",),
-        "applicability": _eng(kinds=("bio_ai", "bio_ai_with_consultation")),
+        "applicability": _eng(kinds=_BIO_AI_KINDS),
     },
     "reminders.pretest": {
         "groups": ("Camp & enrollment", "Reports & reminders"),
-        "applicability": _eng(kinds=_BLOOD_KINDS, blood="camp_collection"),
+        "applicability": _eng(kinds=_BLOOD_KINDS),
     },
     "reminders.questionnaire_before": {
         "groups": ("Camp & enrollment", "Reports & reminders"),
-        "applicability": _eng(kinds=_BLOOD_KINDS, blood="camp_collection"),
+        "applicability": _eng(kinds=_BIO_AI_KINDS),
     },
     "reminders.questionnaire_after": {
         "groups": ("Camp & enrollment", "Reports & reminders"),
-        "applicability": _eng(kinds=_BLOOD_KINDS, blood="camp_collection"),
+        "applicability": _eng(kinds=_BIO_AI_KINDS),
     },
     "reminders.booking_guide": {
         "groups": ("Camp & enrollment",),

@@ -244,6 +244,100 @@ async def test_seed_updates_legacy_row_instead_of_duplicate_insert(test_db_sessi
 
 
 @pytest.mark.asyncio
+async def test_seed_users_onboarded_clones_all_delivery_channels(test_db_session):
+    """Global defaults may include multiple slots per recipient (e.g. user · whatsapp + email)."""
+    from tests.helpers.engagement_types import engagement_type_id
+    from modules.notifications.event_applicability import profile_from_engagement
+    from modules.engagements.models import Engagement
+
+    type_id = await engagement_type_id(test_db_session, "bio_ai")
+    eid = 88005
+    await test_db_session.execute(
+        text(
+            """
+            INSERT INTO engagements (
+                engagement_id, engagement_name, engagement_code, engagement_type,
+                assessment_package_id, diagnostic_package_id, city, slot_duration,
+                start_date, end_date, status, blood_collection_type, payment_type
+            )
+            VALUES (
+                :eid, 'Onboard Seed', 'E2E88005', :etype, 1, 1, 'BLR', 20,
+                '2026-12-01', '2026-12-01', 3, 'camp_collection', 'paid_by_group'
+            )
+            ON CONFLICT (engagement_id) DO NOTHING
+            """
+        ),
+        {"eid": eid, "etype": type_id},
+    )
+    for sk, ch in (
+        ("users-onboarded-wa", "whatsapp"),
+        ("welcome-wa", "whatsapp"),
+        ("welcome-email", "email"),
+    ):
+        await test_db_session.execute(
+            text(
+                """
+                INSERT INTO notification_services (
+                    service_key, display_name, channel, webhook_path, is_active
+                )
+                VALUES (:sk, :sk, :ch, '/x', true)
+                ON CONFLICT (service_key) DO NOTHING
+                """
+            ),
+            {"sk": sk, "ch": ch},
+        )
+    await test_db_session.execute(
+        text("DELETE FROM notification_events WHERE event_code = 'users.onboarded'")
+    )
+    await test_db_session.execute(
+        text(
+            """
+            INSERT INTO notification_events (
+                event_code, event_name, recipient_type, delivery_channel,
+                notification_services, engagement_type_id, condition_key
+            )
+            VALUES
+            (
+                'users.onboarded', 'User onboarded', 'departments.ops', 'whatsapp',
+                CAST(:ops AS jsonb), NULL, 'default'
+            ),
+            (
+                'users.onboarded', 'User onboarded', 'user', 'whatsapp',
+                CAST(:uwa AS jsonb), NULL, 'default'
+            ),
+            (
+                'users.onboarded', 'User onboarded', 'user', 'email',
+                CAST(:uem AS jsonb), NULL, 'default'
+            )
+            """
+        ),
+        {
+            "ops": json.dumps([{"service_key": "users-onboarded-wa"}]),
+            "uwa": json.dumps([{"service_key": "welcome-wa"}]),
+            "uem": json.dumps([{"service_key": "welcome-email"}]),
+        },
+    )
+    await test_db_session.commit()
+
+    repo = EngagementNotificationsRepository()
+    engagement = await test_db_session.get(Engagement, eid)
+    profile = await profile_from_engagement(test_db_session, engagement)
+    await repo.seed_from_global_defaults(test_db_session, engagement_id=eid, profile=profile)
+    await test_db_session.commit()
+
+    slots = await repo.list_slots_for_event(
+        test_db_session, engagement_id=eid, event_code="users.onboarded"
+    )
+    assert len(slots) == 3
+    channels = {(s.recipient_type, s.delivery_channel) for s in slots}
+    assert channels == {
+        ("departments.ops", "whatsapp"),
+        ("user", "whatsapp"),
+        ("user", "email"),
+    }
+
+
+@pytest.mark.asyncio
 async def test_resolver_platform_event_uses_global_even_with_engagement_slots(test_db_session):
     from tests.helpers.engagement_types import engagement_type_id
 

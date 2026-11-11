@@ -820,7 +820,7 @@ class EngagementsService:
         from modules.engagement_notifications.repository import EngagementNotificationsRepository
         from modules.engagement_notifications.service_config import serialize_for_db
         en_repo = EngagementNotificationsRepository()
-        if payload.notifications is not None:
+        if payload.notifications:
             items = [
                 {
                     "event_code": n.event_code,
@@ -1675,7 +1675,7 @@ class EngagementsService:
 
         engagement = await self._repository.update_engagement(db, engagement)
 
-        if "notifications" in update_fields and payload.notifications is not None:
+        if "notifications" in update_fields and payload.notifications:
             from modules.engagement_notifications.repository import EngagementNotificationsRepository
             from modules.engagement_notifications.service_config import serialize_for_db
             en_repo = EngagementNotificationsRepository()

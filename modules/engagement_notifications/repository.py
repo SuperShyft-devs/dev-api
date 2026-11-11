@@ -184,7 +184,12 @@ class EngagementNotificationsRepository:
                 )
                 .limit(1)
             )
-            existing = legacy.scalar_one_or_none()
+            legacy_row = legacy.scalar_one_or_none()
+            if legacy_row is not None:
+                legacy_ch = (legacy_row.delivery_channel or "whatsapp").strip().lower()
+                legacy_ck = (legacy_row.condition_key or "default").strip() or "default"
+                if legacy_ch == channel and legacy_ck == ck:
+                    existing = legacy_row
 
         if existing is not None:
             existing.event_name = name
