@@ -66,7 +66,7 @@ def _onboard_payload(
     return {
         "age": 30,
         "first_name": "Pratheek",
-        "last_name": f"E2E-{label}",
+        "last_name": "Notify",
         "email": email,
         "phone": phone,
         "gender": "male",

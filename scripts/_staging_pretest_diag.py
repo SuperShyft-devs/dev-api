@@ -30,7 +30,7 @@ async def main() -> None:
                         LEFT JOIN participant_blood_bookings pbb
                           ON pbb.engagement_participant_id = ep.engagement_participant_id
                         WHERE e.engagement_id = :eid
-                        ORDER BY pbb.participant_blood_booking_id DESC NULLS LAST
+                        ORDER BY pbb.id DESC NULLS LAST
                         LIMIT 5
                         """
                     ),
