@@ -99,5 +99,6 @@ class WhatsappTemplateMetaResponse(BaseModel):
     parameter_format: str | None = None
     body_positional_count: int | None = None
     header_format: str | None = None
+    requires_header_document: bool | None = None
     component_types: list[str] = Field(default_factory=list)
     body_text: str | None = None

@@ -27,8 +27,34 @@ def _header_format(components: list[dict[str, Any]]) -> str | None:
         if str(comp.get("type") or "").upper() != "HEADER":
             continue
         fmt = str(comp.get("format") or "").strip().upper()
-        return fmt or None
+        if fmt:
+            return fmt
+        example = comp.get("example")
+        if isinstance(example, dict):
+            handles = example.get("header_handle")
+            if isinstance(handles, list) and handles:
+                return "DOCUMENT"
+            header_text = example.get("header_text")
+            if isinstance(header_text, list) and header_text:
+                return "TEXT"
+        return "DOCUMENT"
     return None
+
+
+def template_requires_header_media(components: list[dict[str, Any]], header_format: str | None) -> bool:
+    fmt = (header_format or "").upper()
+    if fmt in {"DOCUMENT", "IMAGE", "VIDEO"}:
+        return True
+    for comp in components:
+        if str(comp.get("type") or "").upper() != "HEADER":
+            continue
+        comp_fmt = str(comp.get("format") or "").strip().upper()
+        if comp_fmt in {"DOCUMENT", "IMAGE", "VIDEO"}:
+            return True
+        example = comp.get("example")
+        if isinstance(example, dict) and example.get("header_handle"):
+            return True
+    return False
 
 
 def _component_types(components: list[dict[str, Any]]) -> list[str]:
@@ -53,6 +79,7 @@ def normalize_template_response(raw: dict[str, Any]) -> dict[str, Any] | None:
         if str(comp.get("type") or "").upper() == "BODY":
             body_text = str(comp.get("text") or "")
             break
+    header_format = _header_format(components)
     return {
         "name": str(item.get("name") or ""),
         "language": str(item.get("language") or ""),
@@ -60,7 +87,8 @@ def normalize_template_response(raw: dict[str, Any]) -> dict[str, Any] | None:
         "status": str(item.get("status") or ""),
         "parameter_format": str(item.get("parameter_format") or ""),
         "body_positional_count": _count_body_positional_params(components),
-        "header_format": _header_format(components),
+        "header_format": header_format,
+        "requires_header_document": template_requires_header_media(components, header_format),
         "component_types": _component_types(components),
         "body_text": body_text,
     }
