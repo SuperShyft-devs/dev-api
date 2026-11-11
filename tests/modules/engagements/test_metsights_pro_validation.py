@@ -5,6 +5,7 @@ from sqlalchemy import text
 
 from core.exceptions import AppError
 from modules.engagements.metsights_pro_validation import (
+    coerce_b2c_assessment_away_from_pro_when_ineligible,
     missing_metsights_pro_hormone_labels,
     ensure_metsights_pro_allowed_for_engagement,
     ensure_metsights_pro_allowed_for_b2c_type_defaults,
@@ -104,6 +105,57 @@ async def test_ensure_metsights_pro_allows_basic_without_hormones(test_db_sessio
         diagnostic_package_id_male=None,
         diagnostic_package_id_female=None,
     )
+
+
+@pytest.mark.asyncio
+async def test_coerce_b2c_assessment_falls_back_to_essentials_when_pro_ineligible(test_db_session):
+    bio_ai_type_id = (
+        await test_db_session.execute(
+            text("SELECT id FROM engagement_types WHERE code = 'bio_ai_with_consultation' LIMIT 1")
+        )
+    ).scalar_one_or_none()
+    if bio_ai_type_id is None:
+        bio_ai_type_id = (
+            await test_db_session.execute(
+                text("SELECT id FROM engagement_types WHERE code = 'bio_ai' LIMIT 1")
+            )
+        ).scalar_one()
+    pro_id = (
+        await test_db_session.execute(
+            text(
+                "SELECT package_id FROM assessment_packages "
+                "WHERE package_code = 'METSIGHTS_PRO' ORDER BY package_id LIMIT 1"
+            )
+        )
+    ).scalar_one()
+    essentials_id = (
+        await test_db_session.execute(
+            text(
+                "SELECT package_id FROM assessment_packages "
+                "WHERE package_code = 'METSIGHTS_BASIC' ORDER BY package_id LIMIT 1"
+            )
+        )
+    ).scalar_one()
+    await test_db_session.execute(
+        text(
+            "INSERT INTO diagnostic_package (diagnostic_package_id, reference_id, package_name, "
+            "diagnostic_provider, status, bookings_count) "
+            "VALUES (934, 'REF934', 'Supershyft Core+', 'healthians', 1, 0) "
+            "ON CONFLICT (diagnostic_package_id) DO NOTHING"
+        )
+    )
+    await test_db_session.commit()
+
+    coerced = await coerce_b2c_assessment_away_from_pro_when_ineligible(
+        test_db_session,
+        engagement_type_id=int(bio_ai_type_id),
+        assessment_package_id=int(pro_id),
+        diagnostic_package_id=934,
+        diagnostic_package_id_male=None,
+        diagnostic_package_id_female=None,
+    )
+    assert coerced == int(essentials_id)
+    assert coerced != int(pro_id)
 
 
 @pytest.mark.asyncio

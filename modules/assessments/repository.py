@@ -388,7 +388,10 @@ class AssessmentsRepository:
         if not code:
             return None
         result = await db.execute(
-            select(AssessmentPackage).where(func.lower(AssessmentPackage.package_code) == code.lower())
+            select(AssessmentPackage)
+            .where(func.lower(AssessmentPackage.package_code) == code.lower())
+            .order_by(AssessmentPackage.package_id.asc())
+            .limit(1)
         )
         return result.scalar_one_or_none()
 

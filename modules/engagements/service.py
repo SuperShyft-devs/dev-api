@@ -70,7 +70,10 @@ from modules.engagements.participant_list_filters import (
     filters_are_active,
     parse_participant_list_filters,
 )
-from modules.engagements.metsights_pro_validation import ensure_metsights_pro_allowed_for_engagement
+from modules.engagements.metsights_pro_validation import (
+    coerce_b2c_assessment_away_from_pro_when_ineligible,
+    ensure_metsights_pro_allowed_for_engagement,
+)
 from modules.engagements.repository import EngagementsRepository
 from modules.engagements.slot_availability import (
     build_cabin_slot_rows,
@@ -1871,6 +1874,14 @@ class EngagementsService:
             )
 
         if assessment_package_id is not None and engagement_type is not None:
+            assessment_package_id = await coerce_b2c_assessment_away_from_pro_when_ineligible(
+                db,
+                engagement_type_id=int(engagement_type),
+                assessment_package_id=assessment_package_id,
+                diagnostic_package_id=diagnostic_package_id,
+                diagnostic_package_id_male=None,
+                diagnostic_package_id_female=None,
+            )
             await ensure_metsights_pro_allowed_for_engagement(
                 db,
                 engagement_type_id=int(engagement_type),
@@ -1967,23 +1978,32 @@ class EngagementsService:
         type_code = await self._engagement_type_code(db, engagement.engagement_type)
         settings_service = PlatformSettingsService(self._platform_settings_repository)
         defaults = await settings_service.resolve_b2c_onboarding_defaults(db, type_code)
-        await settings_service.ensure_active_b2c_packages(
-            db,
-            defaults.assessment_package_id,
-            engagement.diagnostic_package_id,
-        )
-
+        resolved_assessment = defaults.assessment_package_id
         if engagement.enforce_metsights_pro_gate is True and engagement.engagement_type is not None:
+            resolved_assessment = await coerce_b2c_assessment_away_from_pro_when_ineligible(
+                db,
+                engagement_type_id=int(engagement.engagement_type),
+                assessment_package_id=resolved_assessment,
+                diagnostic_package_id=engagement.diagnostic_package_id,
+                diagnostic_package_id_male=engagement.diagnostic_package_id_male,
+                diagnostic_package_id_female=engagement.diagnostic_package_id_female,
+            )
             await ensure_metsights_pro_allowed_for_engagement(
                 db,
                 engagement_type_id=int(engagement.engagement_type),
-                assessment_package_id=defaults.assessment_package_id,
+                assessment_package_id=resolved_assessment,
                 diagnostic_package_id=engagement.diagnostic_package_id,
                 diagnostic_package_id_male=engagement.diagnostic_package_id_male,
                 diagnostic_package_id_female=engagement.diagnostic_package_id_female,
             )
 
-        engagement.assessment_package_id = defaults.assessment_package_id
+        await settings_service.ensure_active_b2c_packages(
+            db,
+            int(resolved_assessment),
+            engagement.diagnostic_package_id,
+        )
+
+        engagement.assessment_package_id = resolved_assessment
         engagement.create_profile_on_metsights = bool(defaults.create_profile_on_metsights)
         engagement.enroll_for_fitprint_full = bool(defaults.enroll_for_fitprint_full)
         extra = b2c_engagement_create_kwargs_from_defaults(defaults, engagement.consultations)
