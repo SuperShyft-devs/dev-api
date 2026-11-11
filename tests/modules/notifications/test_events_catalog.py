@@ -21,6 +21,13 @@ def test_current_event_codes_count():
     assert len(current_event_codes()) == 21
 
 
+def test_payments_completed_is_http_trigger():
+    ev = get_event("payments.completed")
+    assert ev is not None
+    assert ev.trigger_kind == "http"
+    assert ev.status == "current"
+
+
 def test_legacy_map_covers_onboarding():
     assert map_legacy_event_code("onboarding") == "users.onboarded"
     ev = get_event("users.onboarded")

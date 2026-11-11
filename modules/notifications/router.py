@@ -283,6 +283,22 @@ async def list_catalog_events(
     return success_response([item.model_dump() for item in service.list_catalog_events()])
 
 
+@router.get("/catalog/events/{event_code}/payload-contacts")
+async def list_payload_contact_fields(
+    event_code: str,
+    employee: EmployeeContext = Depends(get_current_employee),
+):
+    _ = employee
+    from modules.notifications.events_catalog import get_event
+    from modules.notifications.payload_contact_catalog import payload_contact_fields_for_event
+
+    if get_event(event_code) is None:
+        from core.exceptions import AppError
+
+        raise AppError(status_code=404, error_code="NOT_FOUND", message="Unknown event")
+    return success_response(payload_contact_fields_for_event(event_code))
+
+
 @router.get("/bindings")
 async def list_notification_bindings(
     event_code: str | None = None,

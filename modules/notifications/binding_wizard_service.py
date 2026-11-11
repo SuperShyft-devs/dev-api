@@ -21,11 +21,13 @@ from modules.notifications.binding_schemas import (
 )
 from modules.notifications.bindings_repository import NotificationBindingsRepository
 from modules.notifications.bindings_service import NotificationBindingsService
-from modules.notifications.emit_contact_catalog import allowed_payload_field_ids
-from modules.notifications.event_trigger_source import allows_payload_recipient
 from modules.notifications.events_catalog import get_event
 from modules.notifications.models import NotificationService
 from modules.notifications.repository import NotificationsRepository
+from modules.notifications.payload_contact_catalog import (
+    allows_payload_recipient,
+    get_payload_contact_field,
+)
 from modules.notifications.variable_catalog import KNOWN_RECIPIENT_TYPES
 
 
@@ -84,6 +86,7 @@ class NotificationBindingWizardService:
 
     def _validate_recipient(self, payload: WizardBindingPayload, ev) -> dict | None:
         rt = payload.recipient_type.strip()
+        channel = payload.service.channel.strip().lower()
         if rt not in KNOWN_RECIPIENT_TYPES:
             raise AppError(
                 status_code=400,
@@ -100,29 +103,41 @@ class NotificationBindingWizardService:
                 )
             return {"phones": list(cfg.phones), "emails": list(cfg.emails)}
         if rt == "payload":
-            if not allows_payload_recipient(ev):
+            if not allows_payload_recipient(ev.code):
                 raise AppError(
                     status_code=400,
                     error_code="INVALID_INPUT",
-                    message="Payload recipient is only allowed for API-triggered events",
+                    message="Payload recipient is only allowed for HTTP API events",
                 )
             cfg = payload.recipient_config
-            ids = list(cfg.payload_field_ids) if cfg and cfg.payload_field_ids else []
-            if not ids:
+            path = (cfg.payload_path if cfg else None) or ""
+            path = path.strip()
+            if not path:
                 raise AppError(
                     status_code=400,
                     error_code="INVALID_INPUT",
-                    message="Payload recipient requires at least one selected contact field",
+                    message="Payload recipient requires payload_path in recipient_config",
                 )
-            allowed = allowed_payload_field_ids(payload.event_code.strip())
-            bad = [i for i in ids if i not in allowed]
-            if bad:
+            field = get_payload_contact_field(ev.code, path)
+            if field is None:
                 raise AppError(
                     status_code=400,
                     error_code="INVALID_INPUT",
-                    message=f"Invalid payload field ids for this event: {', '.join(bad)}",
+                    message=f"Unknown payload contact path '{path}' for event '{ev.code}'",
                 )
-            return {"payload_field_ids": ids}
+            if channel == "whatsapp" and field.value_type != "phone":
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="WhatsApp bindings require a phone payload path",
+                )
+            if channel == "email" and field.value_type != "email":
+                raise AppError(
+                    status_code=400,
+                    error_code="INVALID_INPUT",
+                    message="Email bindings require an email payload path",
+                )
+            return {"payload_path": field.path, "value_type": field.value_type}
         if rt not in ev.default_recipients and rt not in (
             "assistants",
             "departments",

@@ -111,5 +111,5 @@ RECIPIENT_PAYLOAD_HINTS: dict[str, str] = {
     "departments.tech": "active employees in tech department",
     "departments.design": "active employees in design department",
     "custom": "phones and emails configured on this binding",
-    "payload": "phone, email, and user_id fields from emit context (per-event catalog)",
+    "payload": "phone or email path from API emit context (per binding)",
 }

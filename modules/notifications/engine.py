@@ -90,16 +90,20 @@ class NotificationEngine:
                         contacts.append({"email": e})
                 if contacts:
                     emit_context["custom_contacts"] = contacts
+            binding_recipient_config = (
+                binding.recipient_config if isinstance(binding.recipient_config, dict) else None
+            )
             target = await self._recipient_resolver.resolve(
                 db,
                 recipient_type=binding.recipient_type,
                 context=emit_context,
                 engagement_id=engagement_id,
-                recipient_config=binding.recipient_config,
-                event_code=event_code,
+                recipient_config=binding_recipient_config,
             )
             if not target.user_ids and not target.contacts:
                 continue
+
+            force_contacts_only = binding.recipient_type == "payload"
 
             for service_key in binding_keys:
                 if (
@@ -124,7 +128,7 @@ class NotificationEngine:
                         binding.notification_services, service_key
                     ) or external_link
 
-                    if target.user_ids:
+                    if target.user_ids and not force_contacts_only:
                         payload = DispatchRequest(
                             service_key=service_key,
                             user_ids=target.user_ids,
@@ -151,7 +155,7 @@ class NotificationEngine:
                         nid = result.get("notification_id")
                         if nid is not None:
                             notification_ids.append(int(nid))
-                    if target.contacts:
+                    elif target.contacts:
                         result = await self._notifications_service.dispatch_to_contacts(
                             db,
                             service_key=service_key,

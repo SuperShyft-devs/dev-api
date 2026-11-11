@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 EventStatus = Literal["current", "add"]
+TriggerKind = Literal["http", "cron", "webhook", "internal"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,6 +18,7 @@ class EventDefinition:
     default_recipients: tuple[str, ...]
     trigger_notes: str = ""
     legacy_event_code: str | None = None
+    trigger_kind: TriggerKind = "http"
 
 
 LEGACY_EVENT_CODE_MAP: dict[str, str] = {
@@ -81,7 +83,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         name="Payment completed",
         status="current",
         variable_groups=("user", "payment", "engagement"),
-        default_recipients=("user",),
+        default_recipients=("user", "payload"),
         trigger_notes="Confirm payment success",
     ),
     EventDefinition(
@@ -99,6 +101,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         variable_groups=("user", "engagement", "session", "booking"),
         default_recipients=("user",),
         trigger_notes="Healthians BS005 / vendor confirm",
+        trigger_kind="webhook",
     ),
     EventDefinition(
         code="bookings.rescheduled",
@@ -123,6 +126,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         variable_groups=("user", "session", "phlebo"),
         default_recipients=("user",),
         trigger_notes="Healthians phlebo_assigned",
+        trigger_kind="webhook",
     ),
     EventDefinition(
         code="bookings.phlebo_reassigned",
@@ -131,6 +135,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         variable_groups=("user", "session", "phlebo"),
         default_recipients=("user",),
         trigger_notes="Healthians phlebo_reassigned",
+        trigger_kind="webhook",
     ),
     EventDefinition(
         code="bookings.phlebo_enroute",
@@ -139,6 +144,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         variable_groups=("user", "session", "phlebo"),
         default_recipients=("user",),
         trigger_notes="Healthians phlebo_enroute",
+        trigger_kind="webhook",
     ),
     EventDefinition(
         code="bookings.phlebo_delayed",
@@ -147,6 +153,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         variable_groups=("user", "session", "phlebo"),
         default_recipients=("user",),
         trigger_notes="Healthians phlebo_delay_notification",
+        trigger_kind="webhook",
     ),
     EventDefinition(
         code="bookings.sample_collected",
@@ -155,6 +162,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         variable_groups=("user", "session", "booking"),
         default_recipients=("user",),
         trigger_notes="Healthians sample_collected_confirmation",
+        trigger_kind="webhook",
     ),
     EventDefinition(
         code="consultations.booked",
@@ -205,6 +213,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         default_recipients=("user",),
         trigger_notes="Cron load_blood_reports",
         legacy_event_code="blood_report_ready",
+        trigger_kind="cron",
     ),
     EventDefinition(
         code="reports.bioai_ready",
@@ -214,6 +223,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         default_recipients=("user",),
         trigger_notes="Cron load_bioai_reports",
         legacy_event_code="bioai_report_ready",
+        trigger_kind="cron",
     ),
     EventDefinition(
         code="reports.face_scan_ready",
@@ -223,6 +233,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         default_recipients=("user",),
         trigger_notes="Aurae webhook",
         legacy_event_code="report_ready",
+        trigger_kind="webhook",
     ),
     EventDefinition(
         code="reminders.pretest",
@@ -232,6 +243,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         default_recipients=("user",),
         trigger_notes="Cron day-before blood test",
         legacy_event_code="pretest_guidelines",
+        trigger_kind="cron",
     ),
     EventDefinition(
         code="reminders.questionnaire_before",
@@ -241,6 +253,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         default_recipients=("user",),
         trigger_notes="Cron day-before collection",
         legacy_event_code="questionnaire_reminder_before",
+        trigger_kind="cron",
     ),
     EventDefinition(
         code="reminders.questionnaire_after",
@@ -250,6 +263,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         default_recipients=("user",),
         trigger_notes="Cron day-after collection",
         legacy_event_code="questionnaire_reminder_after",
+        trigger_kind="cron",
     ),
     EventDefinition(
         code="reminders.booking_guide",
@@ -259,6 +273,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         default_recipients=("assistants.phlebo",),
         trigger_notes="Cron day-before camp collection",
         legacy_event_code="booking_guide",
+        trigger_kind="cron",
     ),
     EventDefinition(
         code="reminders.consultation_ready_to_book",
@@ -268,6 +283,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         default_recipients=("user",),
         trigger_notes="Cron blood ready, consult not booked",
         legacy_event_code="consultation_ready",
+        trigger_kind="cron",
     ),
     EventDefinition(
         code="reminders.consultation_reminder",
@@ -277,6 +293,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         default_recipients=("user",),
         trigger_notes="Cron consult today",
         legacy_event_code="consultation_remainder",
+        trigger_kind="cron",
     ),
     EventDefinition(
         code="support.ticket_created",
@@ -317,6 +334,7 @@ EVENTS: tuple[EventDefinition, ...] = (
         variable_groups=("server",),
         default_recipients=("departments.ops",),
         trigger_notes="Server health CPU alert",
+        trigger_kind="internal",
     ),
 )
 

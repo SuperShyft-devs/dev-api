@@ -2,27 +2,7 @@
 
 from __future__ import annotations
 
-from modules.notifications.emit_contact_catalog import (
-    payload_contact_fields_for_event,
-    resolve_payload_targets,
-)
-from modules.notifications.event_payload_meta import payload_trigger_apis_for_event
-
-
-def test_payments_completed_picker_fields_merged_from_trigger_apis():
-    fields = payload_contact_fields_for_event("payments.completed")
-    assert len(fields) == 6
-    assert {f["id"] for f in fields} == {
-        "booker.phone",
-        "booker.email",
-        "payer_user_id",
-        "members.phones",
-        "members.emails",
-        "members.user_ids",
-    }
-    apis = payload_trigger_apis_for_event("payments.completed")
-    assert "POST /book/bio-ai" in apis
-    assert "POST /payments/verify" in apis
+from modules.notifications.emit_contact_catalog import resolve_payload_targets
 
 
 def test_resolve_payload_members_phones_dedupe():

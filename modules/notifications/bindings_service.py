@@ -18,15 +18,10 @@ from modules.notifications.binding_schemas import (
 from modules.notifications.bindings_repository import NotificationBindingsRepository
 from modules.notifications.repository import NotificationsRepository
 from modules.notifications.events_catalog import get_event, list_events
-from modules.notifications.emit_contact_catalog import (
+from modules.notifications.payload_contact_catalog import (
+    allows_payload_recipient,
     payload_contact_fields_for_event,
-    payload_layout_for_event,
 )
-from modules.notifications.event_payload_meta import (
-    EVENT_PAYLOAD_ADMIN_HINT,
-    payload_trigger_apis_for_event,
-)
-from modules.notifications.event_trigger_source import allows_payload_recipient, trigger_source_for_event
 from modules.notifications.variable_catalog import RECIPIENT_PAYLOAD_HINTS, fields_for_groups
 from modules.notifications.binding_schemas import CatalogEventResponse, PayloadContactFieldResponse
 
@@ -36,38 +31,26 @@ class NotificationBindingsService:
         self._repo = repository or NotificationBindingsRepository()
 
     def list_catalog_events(self) -> list[CatalogEventResponse]:
-        out: list[CatalogEventResponse] = []
-        for e in list_events():
-            ts = trigger_source_for_event(e)
-            allow_payload = allows_payload_recipient(e)
-            payload_fields = (
-                [
-                    PayloadContactFieldResponse(**row)
+        return [
+            CatalogEventResponse(
+                code=e.code,
+                name=e.name,
+                status=e.status,
+                variable_groups=list(e.variable_groups),
+                variable_fields=fields_for_groups(e.variable_groups),
+                default_recipients=list(e.default_recipients),
+                trigger_notes=e.trigger_notes,
+                legacy_event_code=e.legacy_event_code,
+                recipient_payload_hints=dict(RECIPIENT_PAYLOAD_HINTS),
+                trigger_kind=e.trigger_kind,
+                allows_payload_recipient=allows_payload_recipient(e.code),
+                payload_contact_fields=[
+                    PayloadContactFieldResponse.model_validate(row)
                     for row in payload_contact_fields_for_event(e.code)
-                ]
-                if allow_payload
-                else []
+                ],
             )
-            out.append(
-                CatalogEventResponse(
-                    code=e.code,
-                    name=e.name,
-                    status=e.status,
-                    variable_groups=list(e.variable_groups),
-                    variable_fields=fields_for_groups(e.variable_groups),
-                    default_recipients=list(e.default_recipients),
-                    trigger_notes=e.trigger_notes,
-                    legacy_event_code=e.legacy_event_code,
-                    recipient_payload_hints=dict(RECIPIENT_PAYLOAD_HINTS),
-                    trigger_source=ts,
-                    allows_payload_recipient=allow_payload,
-                    payload_contact_fields=payload_fields,
-                    payload_layout=payload_layout_for_event(e.code) if allow_payload else "default",
-                    payload_trigger_apis=payload_trigger_apis_for_event(e.code) if allow_payload else [],
-                    payload_admin_hint=EVENT_PAYLOAD_ADMIN_HINT.get(e.code, "") if allow_payload else "",
-                )
-            )
-        return out
+            for e in list_events()
+        ]
 
     async def list_bindings(
         self,

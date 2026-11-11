@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from modules.engagement_notifications.service_config import NotificationServiceConfigItem
@@ -35,17 +37,12 @@ class NotificationBindingResponse(BaseModel):
 
 
 class PayloadContactFieldResponse(BaseModel):
-    id: str
-    label: str
     path: str
-    kind: str
-    cardinality: str
-    group: str
-    description: str = ""
-    example: str = ""
-    audience: str = ""
-    channels: list[str] = Field(default_factory=list)
-    sort_order: int = 0
+    label: str
+    value_type: Literal["phone", "email"]
+    cardinality: Literal["scalar", "array"]
+    description: str
+    group: str = "Context"
 
 
 class CatalogEventResponse(BaseModel):
@@ -58,18 +55,16 @@ class CatalogEventResponse(BaseModel):
     trigger_notes: str
     legacy_event_code: str | None = None
     recipient_payload_hints: dict[str, str] = Field(default_factory=dict)
-    trigger_source: str = "api"
+    trigger_kind: Literal["http", "cron", "webhook", "internal"] = "http"
     allows_payload_recipient: bool = False
     payload_contact_fields: list[PayloadContactFieldResponse] = Field(default_factory=list)
-    payload_layout: str = "default"
-    payload_trigger_apis: list[str] = Field(default_factory=list)
-    payload_admin_hint: str = ""
 
 
 class RecipientConfigPayload(BaseModel):
     phones: list[str] = Field(default_factory=list)
     emails: list[str] = Field(default_factory=list)
-    payload_field_ids: list[str] = Field(default_factory=list)
+    payload_path: str | None = None
+    value_type: Literal["phone", "email"] | None = None
 
 
 class WizardTemplateSlot(BaseModel):
