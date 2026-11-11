@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from modules.discounts.models import DiscountCode, DiscountUsage
 from modules.payments.models import Booking, Order, Payment
 from modules.users.models import User
 
@@ -71,16 +72,39 @@ async def build_payment_completed_emit_context(
         if pay_row and pay_row.razorpay_payment_id:
             payment_id = pay_row.razorpay_payment_id
 
+    discount_code = ""
+    discount_paise: int | None = None
+    usage_rows = await db.execute(
+        select(DiscountUsage, DiscountCode.code)
+        .join(DiscountCode, DiscountCode.discount_code_id == DiscountUsage.discount_code_id)
+        .where(
+            DiscountUsage.order_id == int(order.order_id),
+            DiscountUsage.status.in_(("committed", "reserved")),
+        )
+        .order_by(DiscountUsage.usage_id.desc())
+        .limit(1)
+    )
+    usage_pair = usage_rows.first()
+    if usage_pair is not None:
+        usage, code_str = usage_pair
+        discount_code = (code_str or "").strip()
+        discount_paise = int(usage.discount_paise or 0)
+
+    payment_block: dict[str, Any] = {
+        "order_id": order.razorpay_order_id,
+        "payment_id": payment_id or "",
+        "amount_paise": int(order.amount_paise or 0),
+        "discount_code": discount_code,
+    }
+    if discount_paise is not None:
+        payment_block["discount_paise"] = discount_paise
+
     ctx: dict[str, Any] = {
         "payer_user_id": int(payer_user_id),
         "user_id": int(payer_user_id),
         "booker": booker_row or {},
         "members": members,
-        "payment": {
-            "order_id": order.razorpay_order_id,
-            "payment_id": payment_id or "",
-            "amount_paise": int(order.amount_paise or 0),
-        },
+        "payment": payment_block,
     }
     return ctx
 

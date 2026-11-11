@@ -5,7 +5,12 @@ from __future__ import annotations
 import pytest
 
 from core.exceptions import AppError
-from modules.notifications.binding_schemas import RecipientConfigPayload, WizardBindingPayload, WizardServiceSpec
+from modules.notifications.binding_schemas import (
+    EmitConditionPayload,
+    RecipientConfigPayload,
+    WizardBindingPayload,
+    WizardServiceSpec,
+)
 from modules.notifications.binding_wizard_service import NotificationBindingWizardService
 from modules.notifications.events_catalog import get_event
 
@@ -41,3 +46,24 @@ def test_payload_wizard_rejects_cron_event():
     )
     with pytest.raises(AppError):
         svc._validate_recipient(payload, get_event("reminders.pretest"))
+
+
+def test_emit_condition_validates_on_payments_completed():
+    svc = NotificationBindingWizardService()
+    ev = get_event("payments.completed")
+    assert ev is not None
+    payload = WizardBindingPayload(
+        event_code="payments.completed",
+        recipient_type="payload",
+        recipient_config=RecipientConfigPayload(payload_path="booker.phone"),
+        emit_condition=EmitConditionPayload(op="equals", value="VIP"),
+        service=WizardServiceSpec(channel="whatsapp", template_name="camp1"),
+    )
+    key, cond = svc._validate_emit_condition(payload, ev)
+    assert key == "dc-eq-vip"
+    assert cond == {"path": "payment.discount_code", "op": "equals", "value": "VIP"}
+
+    payload.emit_condition = None
+    key2, cond2 = svc._validate_emit_condition(payload, ev)
+    assert key2 == "default"
+    assert cond2 is None

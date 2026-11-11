@@ -299,6 +299,22 @@ async def list_payload_contact_fields(
     return success_response(payload_contact_fields_for_event(event_code))
 
 
+@router.get("/catalog/events/{event_code}/emit-conditions")
+async def list_emit_condition_fields(
+    event_code: str,
+    employee: EmployeeContext = Depends(get_current_employee),
+):
+    _ = employee
+    from modules.notifications.events_catalog import get_event
+    from modules.notifications.emit_condition import emit_condition_fields_for_event
+
+    if get_event(event_code) is None:
+        from core.exceptions import AppError
+
+        raise AppError(status_code=404, error_code="NOT_FOUND", message="Unknown event")
+    return success_response(emit_condition_fields_for_event(event_code))
+
+
 @router.get("/bindings")
 async def list_notification_bindings(
     event_code: str | None = None,

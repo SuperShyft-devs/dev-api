@@ -152,4 +152,10 @@ class NotificationBindingsService:
             engagement_type_id=row.engagement_type_id,
             recipient_config=row.recipient_config if hasattr(row, "recipient_config") else None,
             service_key=service_key,
+            condition_key=str(getattr(row, "condition_key", None) or "default"),
+            emit_condition=(
+                row.emit_condition
+                if hasattr(row, "emit_condition") and isinstance(row.emit_condition, dict)
+                else None
+            ),
         )

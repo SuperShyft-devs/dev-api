@@ -15,6 +15,7 @@ from modules.engagement_notifications.service_config import (
 from modules.engagement_notifications.repository import EngagementNotificationsRepository
 from modules.engagements.models import Engagement
 from modules.notifications.bindings_repository import NotificationBindingsRepository
+from modules.notifications.emit_condition import matches_condition
 from modules.notifications.events_catalog import get_event
 
 
@@ -91,6 +92,10 @@ class BindingResolver:
 
         resolved: list[ResolvedBinding] = []
         for row in bindings:
+            raw_condition = getattr(row, "emit_condition", None)
+            condition = raw_condition if isinstance(raw_condition, dict) else None
+            if not matches_condition(ctx, condition):
+                continue
             services = override_services if override_services is not None else row.notification_services
             if not extract_service_keys(services):
                 continue

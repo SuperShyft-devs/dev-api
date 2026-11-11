@@ -32,6 +32,7 @@ class NotificationEventBinding(Base):
             "recipient_type",
             "engagement_type_id",
             "delivery_channel",
+            "condition_key",
             name="uq_notification_events_binding",
         ),
         Index("ix_notification_events_event_code", "event_code"),
@@ -45,6 +46,8 @@ class NotificationEventBinding(Base):
     notification_services = Column(JSON, nullable=False, server_default=text("'[]'"))
     engagement_type_id = Column(Integer, ForeignKey("engagement_types.id"), nullable=True)
     recipient_config = Column(JSONB, nullable=True)
+    condition_key = Column(String, nullable=False, server_default=text("'default'"))
+    emit_condition = Column(JSONB, nullable=True)
 
 
 class NotificationService(Base):

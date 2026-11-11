@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from modules.notifications.models import NotificationEventBinding
 
+_EMIT_CONDITION_UNSET = object()
+
 
 class NotificationBindingsRepository:
     async def list_all(
@@ -43,11 +45,13 @@ class NotificationBindingsRepository:
         recipient_type: str,
         engagement_type_id: int | None,
         delivery_channel: str,
+        condition_key: str = "default",
     ) -> NotificationEventBinding | None:
         q = select(NotificationEventBinding).where(
             NotificationEventBinding.event_code == event_code,
             NotificationEventBinding.recipient_type == recipient_type,
             NotificationEventBinding.delivery_channel == delivery_channel,
+            NotificationEventBinding.condition_key == condition_key,
         )
         if engagement_type_id is None:
             q = q.where(NotificationEventBinding.engagement_type_id.is_(None))
@@ -67,6 +71,8 @@ class NotificationBindingsRepository:
         delivery_channel: str,
         engagement_type_id: int | None = None,
         recipient_config: dict | None = None,
+        condition_key: str = "default",
+        emit_condition: dict | None = None,
     ) -> NotificationEventBinding:
         obj = NotificationEventBinding(
             event_code=event_code,
@@ -76,6 +82,8 @@ class NotificationBindingsRepository:
             notification_services=notification_services,
             engagement_type_id=engagement_type_id,
             recipient_config=recipient_config,
+            condition_key=condition_key,
+            emit_condition=emit_condition,
         )
         db.add(obj)
         await db.flush()
@@ -92,6 +100,8 @@ class NotificationBindingsRepository:
         engagement_type_id: int | None = None,
         recipient_config: dict | None = None,
         delivery_channel: str | None = None,
+        condition_key: str | None = None,
+        emit_condition: dict | None | object = _EMIT_CONDITION_UNSET,
     ) -> NotificationEventBinding:
         if event_name is not None:
             binding.event_name = event_name
@@ -103,6 +113,10 @@ class NotificationBindingsRepository:
             binding.notification_services = notification_services
         if recipient_config is not None:
             binding.recipient_config = recipient_config
+        if condition_key is not None:
+            binding.condition_key = condition_key
+        if emit_condition is not _EMIT_CONDITION_UNSET:
+            binding.emit_condition = emit_condition  # type: ignore[assignment]
         await db.flush()
         return binding
 

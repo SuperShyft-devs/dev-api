@@ -24,6 +24,18 @@ class NotificationBindingUpdate(BaseModel):
     engagement_type_id: int | None = None
 
 
+class EmitConditionPayload(BaseModel):
+    path: str = Field(default="payment.discount_code", min_length=1)
+    op: Literal["is_empty", "is_not_empty", "equals", "one_of"]
+    value: str | None = None
+
+
+class EmitConditionFieldResponse(BaseModel):
+    path: str
+    label: str
+    allowed_ops: list[str]
+
+
 class NotificationBindingResponse(BaseModel):
     id: int
     event_code: str
@@ -34,6 +46,8 @@ class NotificationBindingResponse(BaseModel):
     engagement_type_id: int | None = None
     recipient_config: dict | None = None
     service_key: str | None = None
+    condition_key: str = "default"
+    emit_condition: dict | None = None
 
 
 class PayloadContactFieldResponse(BaseModel):
@@ -100,6 +114,7 @@ class WizardBindingPayload(BaseModel):
     recipient_type: str = Field(min_length=1)
     recipient_config: RecipientConfigPayload | None = None
     engagement_type_id: int | None = None
+    emit_condition: EmitConditionPayload | None = None
     service: WizardServiceSpec
 
 
