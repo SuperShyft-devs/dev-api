@@ -174,9 +174,22 @@ class EngagementNotificationsRepository:
                 )
             )
             existing = result.scalar_one_or_none()
+        if existing is None:
+            legacy = await db.execute(
+                select(EngagementNotification)
+                .where(
+                    EngagementNotification.engagement_id == engagement_id,
+                    EngagementNotification.event_code == normalized,
+                    EngagementNotification.recipient_type == rt,
+                )
+                .limit(1)
+            )
+            existing = legacy.scalar_one_or_none()
 
         if existing is not None:
             existing.event_name = name
+            existing.delivery_channel = channel
+            existing.condition_key = ck
             existing.notification_services = notification_services
             existing.recipient_config = recipient_config
             existing.emit_condition = emit_condition
@@ -308,10 +321,16 @@ class EngagementNotificationsRepository:
             codes |= set(extra_event_codes)
 
         existing_slots = await self.list_for_engagement(db, engagement_id)
-        existing_keys = {
-            (s.event_code, s.recipient_type, s.delivery_channel, s.condition_key)
-            for s in existing_slots
-        }
+        def _slot_key(s: EngagementNotification) -> tuple[str, str, str, str]:
+            return (
+                s.event_code,
+                s.recipient_type,
+                (s.delivery_channel or "whatsapp").strip().lower(),
+                s.condition_key or "default",
+            )
+
+        existing_keys = {_slot_key(s) for s in existing_slots}
+        existing_legacy = {(s.event_code, s.recipient_type) for s in existing_slots}
 
         created: list[EngagementNotification] = []
         for event_code in sorted(codes):
@@ -321,17 +340,24 @@ class EngagementNotificationsRepository:
             for row in global_rows:
                 if row.engagement_type_id is not None:
                     continue
+                normalized_code = map_legacy_event_code(row.event_code)
                 slot_key = (
-                    map_legacy_event_code(row.event_code),
+                    normalized_code,
                     row.recipient_type,
-                    row.delivery_channel,
+                    (row.delivery_channel or "whatsapp").strip().lower(),
                     row.condition_key or "default",
                 )
                 if slot_key in existing_keys:
-                    continue
+                    already = next(
+                        (s for s in existing_slots if _slot_key(s) == slot_key),
+                        None,
+                    )
+                    if already is not None and already.source_binding_id is not None:
+                        continue
                 obj = await self._clone_global_row(db, engagement_id=engagement_id, row=row)
                 if obj is not None:
                     existing_keys.add(slot_key)
+                    existing_legacy.add((normalized_code, row.recipient_type))
                     created.append(obj)
         return created
 

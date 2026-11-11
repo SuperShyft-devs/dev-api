@@ -149,6 +149,101 @@ async def test_resolver_falls_back_to_global_without_engagement_slots(test_db_se
 
 
 @pytest.mark.asyncio
+async def test_seed_updates_legacy_row_instead_of_duplicate_insert(test_db_session):
+    from tests.helpers.engagement_types import engagement_type_id
+
+    type_id = await engagement_type_id(test_db_session, "blood_test")
+    eid = 88004
+    await test_db_session.execute(
+        text(
+            """
+            INSERT INTO engagements (
+                engagement_id, engagement_name, engagement_code, engagement_type,
+                assessment_package_id, diagnostic_package_id, city, slot_duration,
+                start_date, end_date, status, blood_collection_type, payment_type,
+                auto_booking
+            )
+            VALUES (
+                :eid, 'Legacy Seed', 'E2E88004', :etype, 1, 1, 'BLR', 20,
+                '2026-12-01', '2026-12-01', 3, 'home_collection', 'paid_by_patient',
+                true
+            )
+            ON CONFLICT (engagement_id) DO NOTHING
+            """
+        ),
+        {"eid": eid, "etype": type_id},
+    )
+    await test_db_session.execute(
+        text(
+            """
+            INSERT INTO notification_services (
+                service_key, display_name, channel, webhook_path, is_active
+            )
+            VALUES ('confirm-home-wa', 'Confirm', 'whatsapp', '/c', true)
+            ON CONFLICT (service_key) DO NOTHING
+            """
+        )
+    )
+    await test_db_session.execute(
+        text(
+            """
+            INSERT INTO engagement_notifications (
+                engagement_id, event_code, event_name, recipient_type,
+                notification_services
+            )
+            VALUES (
+                :eid, 'bookings.confirmed', 'Confirmed', 'user',
+                CAST(:svc AS jsonb)
+            )
+            """
+        ),
+        {"eid": eid, "svc": json.dumps([{"service_key": "old-svc"}])},
+    )
+    await test_db_session.execute(
+        text(
+            """
+            DELETE FROM notification_events
+            WHERE event_code = 'bookings.confirmed' AND engagement_type_id IS NULL
+            """
+        )
+    )
+    await test_db_session.execute(
+        text(
+            """
+            INSERT INTO notification_events (
+                event_code, event_name, recipient_type, delivery_channel,
+                notification_services, engagement_type_id, condition_key
+            )
+            VALUES (
+                'bookings.confirmed', 'Confirmed', 'user', 'whatsapp',
+                CAST(:svc AS jsonb), NULL, 'default'
+            )
+            """
+        ),
+        {"svc": json.dumps([{"service_key": "confirm-home-wa"}])},
+    )
+    await test_db_session.commit()
+
+    repo = EngagementNotificationsRepository()
+    from modules.notifications.event_applicability import profile_from_engagement
+    from modules.engagements.models import Engagement
+
+    engagement = await test_db_session.get(Engagement, eid)
+    profile = await profile_from_engagement(test_db_session, engagement)
+    rows = await repo.seed_from_global_defaults(
+        test_db_session, engagement_id=eid, profile=profile
+    )
+    await test_db_session.commit()
+    assert rows
+    slots = await repo.list_slots_for_event(
+        test_db_session, engagement_id=eid, event_code="bookings.confirmed"
+    )
+    assert len(slots) == 1
+    keys = {s.notification_services[0].get("service_key") for s in slots}
+    assert "confirm-home-wa" in keys
+
+
+@pytest.mark.asyncio
 async def test_resolver_platform_event_uses_global_even_with_engagement_slots(test_db_session):
     from tests.helpers.engagement_types import engagement_type_id
 

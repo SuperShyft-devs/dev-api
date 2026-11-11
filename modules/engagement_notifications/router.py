@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.responses import success_response
@@ -88,8 +89,21 @@ async def seed_engagement_notifications_from_defaults(
     if engagement is None:
         raise AppError(status_code=404, error_code="NOT_FOUND", message="Engagement not found")
     profile = await profile_from_engagement(db, engagement)
-    rows = await repo.seed_from_global_defaults(db, engagement_id=engagement_id, profile=profile)
-    await db.commit()
+    try:
+        rows = await repo.seed_from_global_defaults(
+            db, engagement_id=engagement_id, profile=profile
+        )
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise AppError(
+            status_code=409,
+            error_code="CONFLICT",
+            message=(
+                "Could not seed all notification slots (database constraint conflict). "
+                "Run migrations and retry, or configure bindings manually."
+            ),
+        ) from None
     setup = await build_notification_setup_for_profile(db, profile, engagement_id=engagement_id)
     return success_response({"seeded_slots": len(rows), **setup})
 
